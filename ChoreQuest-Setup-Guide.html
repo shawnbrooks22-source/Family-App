@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChoreQuest – Collaboration Setup Guide</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f0ff;
+      color: #222;
+      padding: 40px 20px;
+    }
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 24px;
+      padding: 56px 64px;
+      box-shadow: 0 8px 40px rgba(108,99,255,0.13);
+    }
+    /* Cover */
+    .cover {
+      text-align: center;
+      padding-bottom: 48px;
+      border-bottom: 3px solid #f0ebff;
+      margin-bottom: 48px;
+    }
+    .cover-emoji { font-size: 80px; margin-bottom: 16px; display: block; }
+    .cover h1 {
+      font-size: 42px;
+      font-weight: 900;
+      color: #6C63FF;
+      letter-spacing: -1px;
+    }
+    .cover .subtitle {
+      font-size: 20px;
+      color: #888;
+      margin-top: 10px;
+      font-weight: 600;
+    }
+    .cover .badge {
+      display: inline-block;
+      background: #fff0f5;
+      color: #ff6584;
+      border: 2px solid #ff6584;
+      border-radius: 999px;
+      padding: 6px 18px;
+      font-size: 14px;
+      font-weight: 800;
+      margin-top: 18px;
+    }
+
+    /* Sections */
+    h2 {
+      font-size: 26px;
+      font-weight: 900;
+      color: #6C63FF;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .num {
+      background: #6C63FF;
+      color: white;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    h3 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #444;
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+    p {
+      font-size: 16px;
+      line-height: 1.7;
+      color: #444;
+      margin-bottom: 12px;
+    }
+    ul, ol {
+      padding-left: 24px;
+      margin-bottom: 14px;
+    }
+    li {
+      font-size: 16px;
+      line-height: 1.7;
+      color: #444;
+      margin-bottom: 6px;
+    }
+
+    /* Code blocks */
+    code {
+      background: #f5f0ff;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: #6C63FF;
+      font-weight: 700;
+    }
+    pre {
+      background: #1e1b2e;
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin: 14px 0 20px;
+      overflow-x: auto;
+    }
+    pre code {
+      background: none;
+      color: #a9ffa9;
+      font-size: 14px;
+      font-weight: 400;
+      padding: 0;
+      line-height: 1.7;
+    }
+
+    /* Callout boxes */
+    .box {
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin: 18px 0;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .box-purple {
+      background: #f5f0ff;
+      border-left: 5px solid #6C63FF;
+      color: #444;
+    }
+    .box-green {
+      background: #f0fff6;
+      border-left: 5px solid #43E97B;
+      color: #2e7d32;
+    }
+    .box-yellow {
+      background: #fffbe6;
+      border-left: 5px solid #FFD700;
+      color: #7a6000;
+    }
+    .box-pink {
+      background: #fff0f5;
+      border-left: 5px solid #FF6584;
+      color: #a0003a;
+    }
+    .box strong { font-weight: 800; }
+
+    /* Step badges */
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .step-num {
+      background: #6C63FF;
+      color: white;
+      border-radius: 10px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+    .step-body strong { font-size: 16px; font-weight: 800; color: #333; display: block; margin-bottom: 4px; }
+
+    /* Who does what */
+    .who-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .who-table th {
+      background: #6C63FF;
+      color: white;
+      padding: 14px 18px;
+      font-size: 15px;
+      text-align: left;
+      font-weight: 800;
+    }
+    .who-table td {
+      padding: 13px 18px;
+      font-size: 15px;
+      border-bottom: 1px solid #f0ebff;
+      vertical-align: top;
+    }
+    .who-table tr:last-child td { border-bottom: none; }
+    .who-table tr:nth-child(even) td { background: #faf8ff; }
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 12px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .tag-you { background: #e8f5ff; color: #0077cc; }
+    .tag-her { background: #fff0f5; color: #cc003a; }
+    .tag-both { background: #f5f0ff; color: #6C63FF; }
+
+    /* Divider */
+    hr { border: none; border-top: 2px solid #f0ebff; margin: 40px 0; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      color: #bbb;
+      font-size: 13px;
+      margin-top: 48px;
+      font-weight: 600;
+    }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .page { box-shadow: none; border-radius: 0; padding: 40px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <span class="cover-emoji">⭐</span>
+    <h1>ChoreQuest</h1>
+    <p class="subtitle">Collaboration Setup Guide</p>
+    <span class="badge">Private & Confidential — For Your Eyes Only</span>
+  </div>
+
+  <!-- OWNERSHIP NOTE -->
+  <div class="box box-pink">
+    <strong>🔒 A Note on Ownership</strong><br/>
+    Your code is automatically protected by copyright the moment it's written — no registration needed.
+    To protect your project: keep the GitHub repo <strong>private</strong>, don't share credentials,
+    and document your development history (git commits act as timestamped proof).
+    If this grows into a business, consult a lawyer about forming an LLC and filing a trademark.
+  </div>
+
+  <hr/>
+
+  <!-- SECTION 1: GitHub -->
+  <h2><span class="num">1</span> Put ChoreQuest on a Private GitHub Repo</h2>
+  <p>
+    GitHub is where your code lives in the cloud. Both of you will access the project from there.
+    This step is done <strong>once by you (Shawn)</strong>.
+  </p>
+
+  <h3>Step 1a — Create a GitHub account (if you don't have one)</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Go to github.com</strong>
+      Click "Sign up" and create a free account. Remember your username.
+    </div>
+  </div>
+
+  <h3>Step 1b — Create a new private repository</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Click the "+" icon</strong> (top right) → "New repository"
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Fill in the details:</strong>
+      Repository name: <code>ChoreQuest</code> &nbsp;|&nbsp; Set to <strong>Private</strong> &nbsp;|&nbsp; Do NOT check "Initialize this repository"
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Click "Create repository"</strong> — GitHub will show you a page with setup commands. Keep it open.
+    </div>
+  </div>
+
+  <h3>Step 1c — Push your existing code to GitHub</h3>
+  <p>Open Command Prompt in your <code>Family-App</code> folder and run:</p>
+  <pre><code>git init
+git add .
+git commit -m "Initial ChoreQuest app"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/ChoreQuest.git
+git push -u origin main</code></pre>
+  <div class="box box-yellow">
+    <strong>Replace YOUR_USERNAME</strong> with your actual GitHub username. GitHub will ask you to log in — use your GitHub email and password (or a personal access token if prompted).
+  </div>
+
+  <hr/>
+
+  <!-- SECTION 2: Invite Girlfriend -->
+  <h2><span class="num">2</span> Invite Your Girlfriend as a Collaborator</h2>
+  <p>This lets her access the private repo with her own GitHub account.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>She creates a free GitHub account</strong> at github.com — she needs to pick a username and remember it.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>You go to your repo:</strong> github.com/YOUR_USERNAME/ChoreQuest → <strong>Settings</strong> → <strong>Collaborators</strong> → "Add people"
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Type her GitHub username</strong> and click "Add collaborator". She'll get an email to accept the invite.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>She accepts the invite</strong> from her email — she now has full access to the repo.
+    </div>
+  </div>
+
+  <div class="box box-green">
+    <strong>✅ At this point:</strong> Both of you can see and edit the code. She can never lock you out — you're the owner of the repo.
+  </div>
+
+  <hr/>
+
+  <!-- SECTION 3: Her Machine Setup -->
+  <h2><span class="num">3</span> Set Up Her Computer</h2>
+  <p>She needs to do these steps on her own laptop/PC. These are one-time installs.</p>
+
+  <h3>Step 3a — Install Node.js</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Go to nodejs.org</strong> → Download the <strong>LTS version</strong> (the button that says "Recommended For Most Users") → Install it.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Verify it worked</strong> — open Command Prompt and run:
+      <pre><code>node --version</code></pre>
+      You should see something like <code>v20.x.x</code>
+    </div>
+  </div>
+
+  <h3>Step 3b — Install Expo CLI</h3>
+  <pre><code>npm install -g expo-cli</code></pre>
+
+  <h3>Step 3c — Install Git</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Go to git-scm.com</strong> → Download and install Git for Windows (or Mac). Use all default options during install.
+    </div>
+  </div>
+
+  <h3>Step 3d — Install the Expo Go app on her phone</h3>
+  <p>Search for <strong>"Expo Go"</strong> in the App Store (iPhone) or Google Play (Android) and install it.</p>
+
+  <hr/>
+
+  <!-- SECTION 4: Clone the Repo -->
+  <h2><span class="num">4</span> She Clones the Project</h2>
+  <p>This downloads the code to her computer.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Open Command Prompt</strong> and navigate to where she wants to store the project:
+      <pre><code>cd Desktop</code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Clone the repo:</strong>
+      <pre><code>git clone https://github.com/YOUR_USERNAME/ChoreQuest.git
+cd ChoreQuest</code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Install dependencies:</strong>
+      <pre><code>npm install --legacy-peer-deps</code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Start the app:</strong>
+      <pre><code>npx expo start</code></pre>
+      Scan the QR code with Expo Go on her phone — the app should appear!
+    </div>
+  </div>
+
+  <hr/>
+
+  <!-- SECTION 5: Claude Code Setup -->
+  <h2><span class="num">5</span> Set Up Claude Code on Her Computer</h2>
+  <p>Claude Code is the AI coding assistant you've been using. She needs her own Anthropic account.</p>
+
+  <h3>Step 5a — Create an Anthropic account</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Go to claude.ai</strong> and sign up for a free account with her email.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>For Claude Code (CLI), go to console.anthropic.com</strong> → Sign up / Log in → Go to "API Keys" → Create a new key → Copy it (you only see it once!).
+    </div>
+  </div>
+
+  <h3>Step 5b — Install Claude Code</h3>
+  <pre><code>npm install -g @anthropic-ai/claude-code</code></pre>
+
+  <h3>Step 5c — Log in</h3>
+  <pre><code>claude</code></pre>
+  <p>It will ask for her API key — paste the one she copied. She's now logged in.</p>
+
+  <h3>Step 5d — Open the project in Claude Code</h3>
+  <pre><code>cd Desktop/ChoreQuest
+claude</code></pre>
+  <p>She can now ask Claude Code to help her build features, fix bugs, and more — just like you have been!</p>
+
+  <hr/>
+
+  <!-- SECTION 6: Working Together -->
+  <h2><span class="num">6</span> How to Work Together Without Conflicts</h2>
+  <p>Follow these rules so you don't accidentally overwrite each other's work.</p>
+
+  <table class="who-table">
+    <tr>
+      <th>Action</th>
+      <th>Command</th>
+      <th>Who / When</th>
+    </tr>
+    <tr>
+      <td>Get the latest code before starting work</td>
+      <td><code>git pull origin main</code></td>
+      <td><span class="tag tag-both">Both of you</span> — always do this first</td>
+    </tr>
+    <tr>
+      <td>Save your work to GitHub</td>
+      <td><code>git add .</code><br/><code>git commit -m "what you did"</code><br/><code>git push origin main</code></td>
+      <td><span class="tag tag-both">Both of you</span> — after every session</td>
+    </tr>
+    <tr>
+      <td>Check what changed</td>
+      <td><code>git status</code></td>
+      <td><span class="tag tag-both">Both of you</span> — anytime</td>
+    </tr>
+    <tr>
+      <td>See recent changes</td>
+      <td><code>git log --oneline</code></td>
+      <td><span class="tag tag-both">Both of you</span> — anytime</td>
+    </tr>
+  </table>
+
+  <div class="box box-purple">
+    <strong>Golden Rule:</strong> Always <code>git pull</code> before you start working, and always <code>git push</code> when you're done. This keeps both of you in sync and prevents lost work.
+  </div>
+
+  <hr/>
+
+  <!-- SECTION 7: Quick Reference -->
+  <h2><span class="num">7</span> Daily Workflow — Quick Reference Card</h2>
+
+  <h3>Every time you sit down to work:</h3>
+  <pre><code># 1. Go to the project folder
+cd Desktop/ChoreQuest        (or wherever it's saved)
+
+# 2. Get the latest code
+git pull origin main
+
+# 3. Start the app
+npx expo start
+
+# 4. Open Claude Code in another terminal window
+claude
+
+# 5. When done, save your work
+git add .
+git commit -m "describe what you built today"
+git push origin main</code></pre>
+
+  <div class="box box-green">
+    <strong>Tip for Claude Code:</strong> You can just describe what you want in plain English — "Add a points system for kids" or "Make the buttons bigger" — and Claude will write the code for you. You don't need to know how to code!
+  </div>
+
+  <hr/>
+
+  <!-- Summary -->
+  <h2>Summary Checklist</h2>
+
+  <table class="who-table">
+    <tr>
+      <th>Task</th>
+      <th>Who Does It</th>
+      <th>Done?</th>
+    </tr>
+    <tr>
+      <td>Create GitHub account</td>
+      <td><span class="tag tag-you">Shawn</span> <span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Create private GitHub repo & push code</td>
+      <td><span class="tag tag-you">Shawn</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Invite girlfriend as collaborator</td>
+      <td><span class="tag tag-you">Shawn</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Accept GitHub invite</td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Install Node.js on her computer</td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Install Git on her computer</td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Install Expo Go on her phone</td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Clone the repo & run <code>npm install</code></td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Create Anthropic account & get API key</td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Install Claude Code & log in</td>
+      <td><span class="tag tag-her">Girlfriend</span></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>Successfully run the app on her phone</td>
+      <td><span class="tag tag-both">Both verify</span></td>
+      <td>☐</td>
+    </tr>
+  </table>
+
+  <div class="footer">
+    ChoreQuest · Private &amp; Confidential · Created with Claude Code · ⭐
+  </div>
+
+</div>
+</body>
+</html>
