@@ -16,8 +16,9 @@ function AppNavigator() {
 
   if (!isLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#6C63FF' }}>
-        <ActivityIndicator size="large" color="white" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAFAFA' }}>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>⭐</Text>
+        <ActivityIndicator size="large" color="#5C5FE4" />
       </View>
     );
   }

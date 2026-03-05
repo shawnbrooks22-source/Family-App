@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,297 +6,502 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  Animated,
+  Dimensions,
   ScrollView,
   StatusBar,
+  Platform,
+  Pressable,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
+import { colors, shadows } from '../theme/index';
 
-const KID_COLORS = [
-  '#FF6584', '#FFD700', '#43E97B', '#00B4D8',
-  '#FF8C42', '#9B59B6', '#1ABC9C', '#E74C3C',
-];
+const { width, height } = Dimensions.get('window');
 
-export default function HomeScreen({ navigation }) {
-  const { family, verifyPin } = useApp();
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState('');
+// ─── How many columns ──────────────────────────────────────────────────────────
+const NUM_COLS = width >= 390 ? 3 : 2;
+const CARD_SIZE = (width - 48 - (NUM_COLS - 1) * 16) / NUM_COLS;
+const AVATAR_SIZE = CARD_SIZE - 16;
 
-  function handleKidPress(kid) {
-    navigation.navigate('Kid', { kidId: kid.id });
+// ─── Time-aware greeting ───────────────────────────────────────────────────────
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// ─── Individual Profile Card ───────────────────────────────────────────────────
+function ProfileCard({ profile, isParent, onPress }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  function pressIn() {
+    Animated.spring(scaleAnim, {
+      toValue: 0.92,
+      friction: 10,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
   }
-
-  function handleParentPress() {
-    setPin('');
-    setPinError('');
-    setShowPinModal(true);
+  function pressOut() {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 5,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
   }
-
-  function handlePinSubmit() {
-    if (verifyPin(pin)) {
-      setShowPinModal(false);
-      navigation.navigate('Parent');
-    } else {
-      setPinError('Wrong PIN, try again 🙈');
-      setPin('');
-    }
-  }
-
-  const kids = family.kids.map((kid, i) => ({
-    ...kid,
-    color: kid.color || KID_COLORS[i % KID_COLORS.length],
-  }));
 
   return (
-    <LinearGradient colors={['#6C63FF', '#4834d4']} style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <Pressable
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        onPress={onPress}
+        style={styles.profileItem}
+      >
+        <View
+          style={[
+            styles.avatarCircle,
+            {
+              backgroundColor: isParent ? colors.primary : profile.color,
+              width: AVATAR_SIZE,
+              height: AVATAR_SIZE,
+              borderRadius: AVATAR_SIZE / 2,
+            },
+          ]}
+        >
+          <Text style={styles.avatarEmoji}>{profile.emoji}</Text>
 
-        <View style={styles.header}>
-          <Text style={styles.title}>ChoreQuest ⭐</Text>
-          <Text style={styles.subtitle}>Who's playing today?</Text>
-        </View>
-
-        <View style={styles.avatarGrid}>
-          {/* Parent card */}
-          <TouchableOpacity
-            style={[styles.avatarCard, styles.parentCard]}
-            onPress={handleParentPress}
-            activeOpacity={0.88}
-          >
-            <View style={styles.cardInner}>
-              <Text style={styles.avatarEmoji}>{family.parentEmoji}</Text>
-              <Text style={styles.avatarName}>{family.parentName}</Text>
-              <View style={styles.parentBadge}>
-                <Text style={styles.parentBadgeText}>👑 Parent</Text>
-              </View>
+          {isParent && (
+            <View style={styles.lockBadge}>
+              <Text style={{ fontSize: 12 }}>🔐</Text>
             </View>
-          </TouchableOpacity>
-
-          {/* Kid cards */}
-          {kids.map(kid => (
-            <TouchableOpacity
-              key={kid.id}
-              style={[styles.avatarCard, { backgroundColor: kid.color }]}
-              onPress={() => handleKidPress(kid)}
-              activeOpacity={0.88}
-            >
-              <View style={styles.cardInner}>
-                <Text style={styles.avatarEmoji}>{kid.emoji}</Text>
-                <Text style={styles.avatarName}>{kid.name}</Text>
-                <Text style={styles.tapHint}>Tap to play!</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          )}
         </View>
-      </ScrollView>
-
-      {/* PIN Modal */}
-      <Modal visible={showPinModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.lockIcon}>🔒</Text>
-            <Text style={styles.modalTitle}>Parent Zone</Text>
-            <Text style={styles.modalSubtitle}>Enter your 4-digit PIN</Text>
-
-            <TextInput
-              style={styles.pinInput}
-              value={pin}
-              onChangeText={setPin}
-              keyboardType="number-pad"
-              maxLength={4}
-              secureTextEntry
-              placeholder="• • • •"
-              placeholderTextColor="#C4B5FD"
-              textAlign="center"
-              autoFocus
-              onSubmitEditing={handlePinSubmit}
-            />
-
-            {pinError ? <Text style={styles.pinError}>{pinError}</Text> : null}
-
-            <TouchableOpacity
-              style={[styles.modalBtn, pin.length < 4 && styles.modalBtnDisabled]}
-              onPress={handlePinSubmit}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.modalBtnText}>Enter</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setShowPinModal(false)} style={styles.cancelTouchable}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+        <Text style={styles.profileName} numberOfLines={1}>
+          {profile.name}
+        </Text>
+        {isParent ? (
+          <View style={styles.parentPill}>
+            <Text style={styles.parentPillText}>Parent</Text>
           </View>
-        </View>
-      </Modal>
-    </LinearGradient>
+        ) : (
+          <Text style={styles.profileTapHint}>Tap to play</Text>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
+// ─── Main Screen ───────────────────────────────────────────────────────────────
+export default function HomeScreen({ navigation }) {
+  const { family, verifyPin } = useApp();
+  const [showPin, setShowPin] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const inputRef = useRef(null);
+
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+  const sheetAnim = useRef(new Animated.Value(500)).current;
+
+  const profiles = [
+    { id: 'parent', name: family.parentName, emoji: family.parentEmoji, type: 'parent' },
+    ...family.kids.map(k => ({ ...k, type: 'kid' })),
+  ];
+
+  // Stagger entrance animations
+  const entryAnims = useRef(
+    profiles.map(() => ({ opacity: new Animated.Value(0), y: new Animated.Value(28) }))
+  ).current;
+
+  useEffect(() => {
+    Animated.stagger(
+      65,
+      entryAnims.map(a =>
+        Animated.parallel([
+          Animated.timing(a.opacity, { toValue: 1, duration: 380, useNativeDriver: true }),
+          Animated.spring(a.y, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        ])
+      )
+    ).start();
+  }, []);
+
+  // ─── PIN sheet open / close ──────────────────────────────────────────────────
+  function openPin() {
+    setPin('');
+    setPinError(false);
+    setShowPin(true);
+    Animated.parallel([
+      Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.spring(sheetAnim, { toValue: 0, friction: 8, tension: 90, useNativeDriver: true }),
+    ]).start(() => {
+      setTimeout(() => inputRef.current?.focus(), 80);
+    });
+  }
+
+  function closePin() {
+    Animated.parallel([
+      Animated.timing(overlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(sheetAnim, { toValue: 500, duration: 230, useNativeDriver: true }),
+    ]).start(() => {
+      setShowPin(false);
+      setPin('');
+      setPinError(false);
+    });
+  }
+
+  // ─── PIN input handler ───────────────────────────────────────────────────────
+  function handlePinChange(val) {
+    const digits = val.replace(/\D/g, '').slice(0, 4);
+    setPin(digits);
+    setPinError(false);
+
+    if (digits.length === 4) {
+      if (verifyPin(digits)) {
+        closePin();
+        setTimeout(() => navigation.navigate('Parent'), 280);
+      } else {
+        setPinError(true);
+        Animated.sequence([
+          Animated.timing(shakeAnim, { toValue: 12, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -12, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+        ]).start(() => setPin(''));
+      }
+    }
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+
+      <SafeAreaView style={{ backgroundColor: colors.bg }}>
+        {/* App bar */}
+        <View style={styles.appBar}>
+          <Text style={styles.appBarTitle}>ChoreQuest ⭐</Text>
+        </View>
+      </SafeAreaView>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Greeting */}
+        <Text style={styles.greeting}>{getGreeting()}! 👋</Text>
+        <Text style={styles.whoIsHere}>Who's here?</Text>
+        <Text style={styles.familySub}>{family.parentName}'s Family</Text>
+
+        {/* Profile grid */}
+        <View style={styles.profileGrid}>
+          {profiles.map((profile, i) => {
+            const isParent = profile.type === 'parent';
+            const ea = entryAnims[i];
+            return (
+              <Animated.View
+                key={profile.id}
+                style={{ opacity: ea.opacity, transform: [{ translateY: ea.y }] }}
+              >
+                <ProfileCard
+                  profile={profile}
+                  isParent={isParent}
+                  onPress={
+                    isParent ? openPin : () => navigation.navigate('Kid', { kidId: profile.id })
+                  }
+                />
+              </Animated.View>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      {/* ─── PIN Bottom Sheet ────────────────────────────────────────────────── */}
+      <Modal visible={showPin} transparent animationType="none" onRequestClose={closePin}>
+        <View style={styles.modalRoot}>
+          {/* Backdrop */}
+          <Animated.View
+            style={[styles.modalBackdrop, { opacity: overlayAnim }]}
+            pointerEvents="box-none"
+          >
+            <Pressable style={StyleSheet.absoluteFill} onPress={closePin} />
+          </Animated.View>
+
+          {/* Sheet */}
+          <Animated.View style={[styles.pinSheet, { transform: [{ translateY: sheetAnim }] }]}>
+            <View style={styles.sheetHandle} />
+
+            {/* Avatar */}
+            <View style={[styles.pinSheetAvatar, { backgroundColor: colors.primary }]}>
+              <Text style={{ fontSize: 38 }}>{family.parentEmoji}</Text>
+            </View>
+
+            <Text style={styles.pinSheetTitle}>Parent Zone</Text>
+            <Text style={styles.pinSheetSub}>Enter your 4-digit PIN to continue</Text>
+
+            {/* PIN boxes */}
+            <Pressable onPress={() => inputRef.current?.focus()} style={{ alignItems: 'center' }}>
+              <Animated.View
+                style={[styles.pinBoxRow, { transform: [{ translateX: shakeAnim }] }]}
+              >
+                {[0, 1, 2, 3].map(idx => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.pinBox,
+                      pin.length > idx && styles.pinBoxFilled,
+                      pin.length === idx && !pinError && styles.pinBoxCurrent,
+                      pinError && styles.pinBoxError,
+                    ]}
+                  >
+                    {pin.length > idx && (
+                      <View style={[styles.pinDot, pinError && styles.pinDotError]} />
+                    )}
+                  </View>
+                ))}
+              </Animated.View>
+            </Pressable>
+
+            {pinError && (
+              <Text style={styles.pinErrorText}>Incorrect PIN — try again</Text>
+            )}
+
+            {/* Hidden real input */}
+            <TextInput
+              ref={inputRef}
+              style={styles.hiddenInput}
+              value={pin}
+              onChangeText={handlePinChange}
+              keyboardType="number-pad"
+              maxLength={4}
+              caretHidden
+            />
+
+            <TouchableOpacity style={styles.cancelBtn} onPress={closePin}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+
+            {/* Extra space for keyboard */}
+            <View style={{ height: Platform.OS === 'ios' ? 24 : 12 }} />
+          </Animated.View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.bg,
   },
-  scroll: {
-    paddingTop: 72,
-    paddingHorizontal: 20,
-    paddingBottom: 48,
-  },
-  header: {
+
+  // ─── App bar
+  appBar: {
     alignItems: 'center',
-    marginBottom: 40,
+    paddingTop: 14,
+    paddingBottom: 4,
+    paddingHorizontal: 24,
   },
-  title: {
-    fontSize: 38,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+  appBarTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text1,
+    letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 8,
+
+  // ─── Scroll / greeting
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 60,
+  },
+  greeting: {
+    fontSize: 15,
     fontWeight: '600',
+    color: colors.text3,
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  avatarGrid: {
+  whoIsHere: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: colors.text1,
+    textAlign: 'center',
+    letterSpacing: -0.6,
+  },
+  familySub: {
+    fontSize: 15,
+    color: colors.text3,
+    textAlign: 'center',
+    fontWeight: '500',
+    marginTop: 6,
+    marginBottom: 36,
+  },
+
+  // ─── Profile grid
+  profileGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 16,
     justifyContent: 'center',
-    gap: 14,
   },
-  avatarCard: {
-    width: 150,
-    height: 175,
-    borderRadius: 28,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
+  profileItem: {
+    width: CARD_SIZE,
+    alignItems: 'center',
   },
-  parentCard: {
-    backgroundColor: '#5B4FE9',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  cardInner: {
-    flex: 1,
+  avatarCircle: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 12,
+    ...shadows.md,
   },
   avatarEmoji: {
-    fontSize: 60,
+    fontSize: AVATAR_SIZE * 0.4,
   },
-  avatarName: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: 'white',
-    marginTop: 8,
+  lockBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 4,
+    ...shadows.sm,
   },
-  parentBadge: {
-    marginTop: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  parentBadgeText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.95)',
+  profileName: {
+    fontSize: 16,
     fontWeight: '700',
+    color: colors.text1,
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  tapHint: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 5,
-    fontWeight: '600',
+  parentPill: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  parentPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  profileTapHint: {
+    fontSize: 11,
+    color: colors.text3,
+    fontWeight: '500',
   },
 
   // ─── PIN Modal
-  modalOverlay: {
+  modalRoot: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+  },
+  pinSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 28,
+    paddingTop: 14,
+    paddingBottom: 20,
+    alignItems: 'center',
+    ...shadows.lg,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 28,
+  },
+  pinSheetAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 16,
   },
-  modalCard: {
-    backgroundColor: 'white',
-    borderRadius: 28,
-    padding: 32,
-    width: '84%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.3,
-    shadowRadius: 32,
-    elevation: 14,
-  },
-  lockIcon: {
-    fontSize: 40,
-    marginBottom: 10,
-  },
-  modalTitle: {
+  pinSheetTitle: {
     fontSize: 26,
-    fontWeight: '900',
-    color: '#1A1A2E',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 15,
-    color: '#9CA3AF',
-    marginBottom: 24,
-    fontWeight: '500',
-  },
-  pinInput: {
-    borderWidth: 2,
-    borderColor: '#DDD6FE',
-    borderRadius: 16,
-    fontSize: 32,
-    fontWeight: '900',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    width: '100%',
-    color: '#1A1A2E',
-    letterSpacing: 14,
-    backgroundColor: '#F5F3FF',
-  },
-  pinError: {
-    color: '#EF4444',
-    fontSize: 14,
-    marginTop: 12,
-    fontWeight: '600',
-  },
-  modalBtn: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 100,
-    paddingVertical: 16,
-    paddingHorizontal: 56,
-    marginTop: 24,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  modalBtnDisabled: {
-    opacity: 0.5,
-  },
-  modalBtnText: {
-    color: 'white',
-    fontSize: 18,
     fontWeight: '800',
+    color: colors.text1,
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
-  cancelTouchable: {
-    marginTop: 16,
-    padding: 10,
+  pinSheetSub: {
+    fontSize: 14,
+    color: colors.text3,
+    fontWeight: '500',
+    marginBottom: 30,
+    textAlign: 'center',
   },
-  cancelText: {
-    color: '#9CA3AF',
-    fontSize: 15,
+  pinBoxRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 16,
+  },
+  pinBox: {
+    width: 62,
+    height: 62,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinBoxCurrent: {
+    borderColor: colors.primary,
+    borderWidth: 2.5,
+  },
+  pinBoxFilled: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  pinBoxError: {
+    borderColor: colors.error,
+    backgroundColor: colors.errorLight,
+  },
+  pinDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+  },
+  pinDotError: {
+    backgroundColor: colors.error,
+  },
+  pinErrorText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+    top: -9999,
+    left: -9999,
+  },
+  cancelBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 48,
+    borderRadius: 100,
+  },
+  cancelBtnText: {
+    color: colors.text3,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

@@ -6,102 +6,101 @@ import {
   TouchableOpacity,
   Animated,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 
-const NUM_STARS = 16;
-const STAR_EMOJIS = ['⭐', '🌟', '✨', '💫', '🎉', '🎊', '🏆', '🎯', '💥', '🌈', '🦋', '🎀', '🥇', '🎁', '🔥', '💎'];
+const { width, height } = Dimensions.get('window');
 
-const TWINKLE_POSITIONS = [
-  { top: '8%', left: '6%' },
-  { top: '12%', right: '10%' },
-  { top: '22%', left: '18%' },
-  { top: '28%', right: '22%' },
-  { top: '42%', left: '4%' },
-  { top: '48%', right: '6%' },
-  { top: '60%', left: '12%' },
-  { top: '68%', right: '14%' },
-  { top: '78%', left: '20%' },
-  { top: '84%', right: '20%' },
+const NUM_PARTICLES = 18;
+const PARTICLE_EMOJIS = [
+  '⭐', '🌟', '✨', '💫', '🎉', '🎊', '🏆', '🎯',
+  '💥', '🌈', '🦋', '🎀', '🥇', '🎁', '🔥', '💎', '🚀', '❤️',
 ];
 
-// ─── Phase 1: SUSPENSE — dark, mysterious, TAP TO REVEAL
-// ─── Phase 2: REVEALING — gift shakes violently, white flash
-// ─── Phase 3: REVEALED — full celebration explosion
+const TWINKLE_POSITIONS = [
+  { top: '7%', left: '8%' }, { top: '10%', right: '12%' },
+  { top: '20%', left: '20%' }, { top: '25%', right: '18%' },
+  { top: '38%', left: '5%' }, { top: '44%', right: '7%' },
+  { top: '58%', left: '14%' }, { top: '65%', right: '12%' },
+  { top: '76%', left: '22%' }, { top: '82%', right: '20%' },
+];
 
+// ─── Phase: suspense → revealing → revealed ────────────────────────────────────
 export default function CelebrationScreen({ route, navigation }) {
   const { taskId, reward, kidName } = route.params || {};
   const { markCelebrated } = useApp();
   const [phase, setPhase] = useState('suspense');
 
-  // Mark celebrated immediately so KidDashboard won't re-trigger navigation
   useEffect(() => {
     if (taskId) markCelebrated(taskId);
   }, []);
 
-  // ─── Suspense anims
+  // ─── Suspense animations ─────────────────────────────────────────────────────
   const giftPulse = useRef(new Animated.Value(1)).current;
   const giftWiggle = useRef(new Animated.Value(0)).current;
-  const buttonPulse = useRef(new Animated.Value(1)).current;
+  const btnPulse = useRef(new Animated.Value(1)).current;
   const [twinkleAnims] = useState(() =>
     TWINKLE_POSITIONS.map(() => new Animated.Value(Math.random() * 0.4 + 0.2))
   );
 
-  // ─── Revealing anims
+  // ─── Reveal transition ───────────────────────────────────────────────────────
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const giftRevealScale = useRef(new Animated.Value(1)).current;
   const flashOpacity = useRef(new Animated.Value(0)).current;
 
-  // ─── Revealed anims
+  // ─── Revealed phase animations ───────────────────────────────────────────────
   const [revealAnims] = useState(() => {
-    const stars = Array.from({ length: NUM_STARS }, (_, i) => {
-      const angle = (i / NUM_STARS) * Math.PI * 2;
-      const dist = 120 + (i % 5) * 30;
+    const particles = Array.from({ length: NUM_PARTICLES }, (_, i) => {
+      const angle = (i / NUM_PARTICLES) * Math.PI * 2;
+      const dist = 110 + (i % 5) * 32;
       return {
         anim: new Animated.Value(0),
         x: Math.cos(angle) * dist,
         y: Math.sin(angle) * dist,
-        emoji: STAR_EMOJIS[i % STAR_EMOJIS.length],
+        emoji: PARTICLE_EMOJIS[i % PARTICLE_EMOJIS.length],
       };
     });
     return {
       titleScale: new Animated.Value(0),
-      rewardSlide: new Animated.Value(80),
+      titleOpacity: new Animated.Value(0),
+      rewardSlide: new Animated.Value(60),
       rewardOpacity: new Animated.Value(0),
       trophyScale: new Animated.Value(0),
       trophyRotate: new Animated.Value(0),
-      stars,
+      backBtnOpacity: new Animated.Value(0),
+      particles,
     };
   });
 
-  // Start suspense animations on mount
+  // ─── Start suspense on mount ─────────────────────────────────────────────────
   useEffect(() => {
-    // Gift box pulse
+    // Gift breathing pulse
     Animated.loop(
       Animated.sequence([
-        Animated.timing(giftPulse, { toValue: 1.14, duration: 700, useNativeDriver: true }),
-        Animated.timing(giftPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(giftPulse, { toValue: 1.12, duration: 800, useNativeDriver: true }),
+        Animated.timing(giftPulse, { toValue: 1, duration: 800, useNativeDriver: true }),
       ])
     ).start();
 
-    // Gift box periodic wiggle
+    // Gift wiggle (teaser)
     Animated.loop(
       Animated.sequence([
-        Animated.delay(1200),
-        Animated.timing(giftWiggle, { toValue: 9, duration: 70, useNativeDriver: true }),
-        Animated.timing(giftWiggle, { toValue: -9, duration: 70, useNativeDriver: true }),
-        Animated.timing(giftWiggle, { toValue: 6, duration: 70, useNativeDriver: true }),
-        Animated.timing(giftWiggle, { toValue: 0, duration: 70, useNativeDriver: true }),
-        Animated.delay(1800),
+        Animated.delay(1500),
+        Animated.timing(giftWiggle, { toValue: 10, duration: 60, useNativeDriver: true }),
+        Animated.timing(giftWiggle, { toValue: -10, duration: 60, useNativeDriver: true }),
+        Animated.timing(giftWiggle, { toValue: 7, duration: 60, useNativeDriver: true }),
+        Animated.timing(giftWiggle, { toValue: 0, duration: 60, useNativeDriver: true }),
+        Animated.delay(2000),
       ])
     ).start();
 
-    // "TAP TO REVEAL" button pulse
+    // Tap button pulse
     Animated.loop(
       Animated.sequence([
-        Animated.timing(buttonPulse, { toValue: 1.07, duration: 700, useNativeDriver: true }),
-        Animated.timing(buttonPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(btnPulse, { toValue: 1.06, duration: 700, useNativeDriver: true }),
+        Animated.timing(btnPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
       ])
     ).start();
 
@@ -109,116 +108,130 @@ export default function CelebrationScreen({ route, navigation }) {
     twinkleAnims.forEach((anim, i) => {
       Animated.loop(
         Animated.sequence([
-          Animated.delay(i * 280),
-          Animated.timing(anim, { toValue: 1, duration: 700 + i * 80, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0.15, duration: 700 + i * 80, useNativeDriver: true }),
+          Animated.delay(i * 250),
+          Animated.timing(anim, { toValue: 1, duration: 600 + i * 80, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0.1, duration: 600 + i * 80, useNativeDriver: true }),
         ])
       ).start();
     });
   }, []);
 
-  function handleTapReveal() {
+  // ─── Tap to reveal ───────────────────────────────────────────────────────────
+  function handleReveal() {
     setPhase('revealing');
 
-    // Shake the gift box
+    // Violent shake
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 20, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -20, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 24, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -24, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 18, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -18, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 26, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -26, duration: 40, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 22, duration: 40, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -22, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 16, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -16, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 26, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -26, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 20, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -20, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 14, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -14, duration: 40, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
     ]).start();
 
     // Gift grows
-    Animated.timing(giftRevealScale, {
-      toValue: 2.8,
-      duration: 560,
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(giftRevealScale, { toValue: 3.2, duration: 540, useNativeDriver: true }).start();
 
-    // Flash white then transition
+    // Flash white → transition
     setTimeout(() => {
-      Animated.timing(flashOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start(() => {
+      Animated.timing(flashOpacity, { toValue: 1, duration: 160, useNativeDriver: true }).start(() => {
         setPhase('revealed');
-        startRevealedAnimations();
+        playRevealedAnims();
       });
-    }, 560);
+    }, 500);
   }
 
-  function startRevealedAnimations() {
-    const { titleScale, rewardSlide, rewardOpacity, trophyScale, trophyRotate, stars } = revealAnims;
+  // ─── Revealed phase ──────────────────────────────────────────────────────────
+  function playRevealedAnims() {
+    const { titleScale, titleOpacity, rewardSlide, rewardOpacity, trophyScale, trophyRotate, backBtnOpacity, particles } =
+      revealAnims;
 
-    Animated.spring(trophyScale, {
-      toValue: 1, friction: 3, tension: 120, useNativeDriver: true,
-    }).start();
+    // Trophy enters
+    Animated.spring(trophyScale, { toValue: 1, friction: 3, tension: 100, useNativeDriver: true }).start();
 
+    // Trophy wiggle loop
     Animated.loop(
       Animated.sequence([
-        Animated.timing(trophyRotate, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(trophyRotate, { toValue: -1, duration: 300, useNativeDriver: true }),
-        Animated.timing(trophyRotate, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.delay(1400),
-      ]),
+        Animated.timing(trophyRotate, { toValue: 1, duration: 260, useNativeDriver: true }),
+        Animated.timing(trophyRotate, { toValue: -1, duration: 260, useNativeDriver: true }),
+        Animated.timing(trophyRotate, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.delay(1600),
+      ])
     ).start();
 
+    // Title
     Animated.sequence([
-      Animated.delay(150),
-      Animated.spring(titleScale, { toValue: 1, friction: 4, tension: 100, useNativeDriver: true }),
+      Animated.delay(120),
+      Animated.parallel([
+        Animated.spring(titleScale, { toValue: 1, friction: 4, tension: 100, useNativeDriver: true }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]),
     ]).start();
 
-    Animated.stagger(35,
-      stars.map(s =>
-        Animated.spring(s.anim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true })
+    // Particles burst
+    Animated.stagger(
+      30,
+      particles.map(p =>
+        Animated.spring(p.anim, { toValue: 1, friction: 4, tension: 70, useNativeDriver: true })
       )
     ).start();
 
+    // Reward card slides up
     Animated.sequence([
-      Animated.delay(350),
+      Animated.delay(300),
       Animated.parallel([
-        Animated.timing(rewardOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(rewardOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
         Animated.spring(rewardSlide, { toValue: 0, friction: 7, tension: 80, useNativeDriver: true }),
       ]),
     ]).start();
+
+    // Back button fades in
+    Animated.sequence([
+      Animated.delay(600),
+      Animated.timing(backBtnOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
   }
 
-  const { titleScale, rewardSlide, rewardOpacity, trophyScale, trophyRotate, stars } = revealAnims;
-  const trophyRotateDeg = trophyRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-15deg', '15deg'] });
+  const { titleScale, titleOpacity, rewardSlide, rewardOpacity, trophyScale, trophyRotate, backBtnOpacity, particles } =
+    revealAnims;
+  const trophyDeg = trophyRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-14deg', '14deg'] });
 
-  // ─── SUSPENSE & REVEALING PHASE ──────────────────────────────────────────────
+  // ─── Suspense / Revealing ────────────────────────────────────────────────────
   if (phase === 'suspense' || phase === 'revealing') {
     return (
-      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.container}>
+      <LinearGradient colors={['#0D0B30', '#1E1A60', '#0D0B30']} style={styles.container}>
         <StatusBar barStyle="light-content" />
 
-        {/* White flash overlay */}
+        {/* White flash */}
         <Animated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { backgroundColor: 'white', opacity: flashOpacity, zIndex: 10 }]}
         />
 
-        {/* Twinkling background stars */}
+        {/* Twinkling stars */}
         {twinkleAnims.map((anim, i) => (
           <Animated.Text key={i} style={[styles.twinkleStar, TWINKLE_POSITIONS[i], { opacity: anim }]}>
             ✨
           </Animated.Text>
         ))}
 
-        <View style={styles.suspenseContent}>
-          <Text style={styles.suspenseBadge}>✨ QUEST COMPLETE ✨</Text>
+        <View style={styles.suspenseCenter}>
+          {/* Badge */}
+          <View style={styles.questBadge}>
+            <Text style={styles.questBadgeText}>QUEST COMPLETE</Text>
+          </View>
 
           {kidName ? (
-            <Text style={styles.suspenseKidName}>Nice work, {kidName}...</Text>
+            <Text style={styles.suspenseKidName}>
+              Nice work,{'\n'}{kidName}!
+            </Text>
           ) : null}
 
-          {/* Mystery gift box */}
+          {/* Gift box */}
           <Animated.Text
             style={[
               styles.giftEmoji,
@@ -234,13 +247,17 @@ export default function CelebrationScreen({ route, navigation }) {
           </Animated.Text>
 
           <Text style={styles.suspenseMystery}>
-            {phase === 'suspense' ? 'Your reward is locked inside...' : '🔓 OPENING...'}
+            {phase === 'suspense' ? 'Your reward is waiting inside…' : '🔓 Opening…'}
           </Text>
 
           {phase === 'suspense' && (
-            <Animated.View style={{ transform: [{ scale: buttonPulse }] }}>
-              <TouchableOpacity style={styles.revealBtn} onPress={handleTapReveal} activeOpacity={0.88}>
-                <Text style={styles.revealBtnText}>TAP TO REVEAL! 🔥</Text>
+            <Animated.View style={{ transform: [{ scale: btnPulse }] }}>
+              <TouchableOpacity
+                style={styles.tapRevealBtn}
+                onPress={handleReveal}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.tapRevealBtnText}>TAP TO REVEAL  🔥</Text>
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -249,187 +266,227 @@ export default function CelebrationScreen({ route, navigation }) {
     );
   }
 
-  // ─── REVEALED PHASE ──────────────────────────────────────────────────────────
+  // ─── Revealed ────────────────────────────────────────────────────────────────
   return (
-    <LinearGradient colors={['#FF6584', '#FFD700', '#43E97B']} style={styles.container}>
+    <LinearGradient colors={['#7C3AED', '#EC4899', '#F59E0B']} style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Star burst */}
-      <View style={styles.starsContainer} pointerEvents="none">
-        {stars.map((star, i) => (
+      {/* Particle burst */}
+      <View style={styles.particlesContainer} pointerEvents="none">
+        {particles.map((p, i) => (
           <Animated.Text
             key={i}
             style={[
-              styles.star,
+              styles.particle,
               {
-                opacity: star.anim,
+                opacity: p.anim,
                 transform: [
-                  { translateX: star.anim.interpolate({ inputRange: [0, 1], outputRange: [0, star.x] }) },
-                  { translateY: star.anim.interpolate({ inputRange: [0, 1], outputRange: [0, star.y] }) },
-                  { scale: star.anim },
+                  { translateX: p.anim.interpolate({ inputRange: [0, 1], outputRange: [0, p.x] }) },
+                  { translateY: p.anim.interpolate({ inputRange: [0, 1], outputRange: [0, p.y] }) },
+                  { scale: p.anim },
                 ],
               },
             ]}
           >
-            {star.emoji}
+            {p.emoji}
           </Animated.Text>
         ))}
       </View>
 
-      <Animated.Text
-        style={[styles.trophyEmoji, { transform: [{ scale: trophyScale }, { rotate: trophyRotateDeg }] }]}
-      >
-        🏆
-      </Animated.Text>
+      <View style={styles.revealedCenter}>
+        {/* Trophy */}
+        <Animated.Text
+          style={[styles.trophyEmoji, { transform: [{ scale: trophyScale }, { rotate: trophyDeg }] }]}
+        >
+          🏆
+        </Animated.Text>
 
-      <Animated.Text style={[styles.title, { transform: [{ scale: titleScale }] }]}>
-        AMAZING! 🎉
-      </Animated.Text>
+        {/* Title */}
+        <Animated.View style={{ transform: [{ scale: titleScale }], opacity: titleOpacity }}>
+          <Text style={styles.revealedTitle}>AMAZING!</Text>
+          {kidName ? (
+            <Text style={styles.revealedKidName}>Way to go, {kidName}! 🌟</Text>
+          ) : null}
+        </Animated.View>
 
-      {kidName ? <Text style={styles.kidNameText}>Way to go, {kidName}! 🌟</Text> : null}
+        {/* Reward card */}
+        <Animated.View
+          style={[
+            styles.rewardCard,
+            { opacity: rewardOpacity, transform: [{ translateY: rewardSlide }] },
+          ]}
+        >
+          <Text style={styles.rewardCardLabel}>🎁  YOUR REWARD</Text>
+          <Text style={styles.rewardCardValue}>{reward || 'Awesome job!'}</Text>
+        </Animated.View>
 
-      <Animated.View
-        style={[styles.rewardCard, { opacity: rewardOpacity, transform: [{ translateY: rewardSlide }] }]}
-      >
-        <Text style={styles.rewardLabel}>🎁 Your Reward</Text>
-        <Text style={styles.rewardValue}>{reward || 'Awesome job!'}</Text>
-      </Animated.View>
-
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.85}>
-        <Text style={styles.backBtnText}>Back to My Quests! 🚀</Text>
-      </TouchableOpacity>
+        {/* Back button */}
+        <Animated.View style={{ opacity: backBtnOpacity, width: '100%' }}>
+          <TouchableOpacity
+            style={styles.backToQuestsBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backToQuestsBtnText}>Back to My Quests 🚀</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </LinearGradient>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
   },
 
   // ─── Suspense
   twinkleStar: {
     position: 'absolute',
-    fontSize: 16,
+    fontSize: 18,
   },
-  suspenseContent: {
+  suspenseCenter: {
     alignItems: 'center',
     width: '100%',
   },
-  suspenseBadge: {
-    fontSize: 13,
-    fontWeight: '800',
+  questBadge: {
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    borderRadius: 100,
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    marginBottom: 18,
+  },
+  questBadgeText: {
     color: '#FFD700',
-    letterSpacing: 2,
-    marginBottom: 14,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 2.5,
   },
   suspenseKidName: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '900',
-    color: 'white',
+    color: '#fff',
     textAlign: 'center',
     marginBottom: 32,
+    letterSpacing: -0.5,
+    lineHeight: 42,
   },
   giftEmoji: {
-    fontSize: 120,
-    marginBottom: 20,
+    fontSize: 110,
+    marginBottom: 24,
   },
   suspenseMystery: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: '500',
     marginBottom: 44,
     textAlign: 'center',
   },
-  revealBtn: {
+  tapRevealBtn: {
     backgroundColor: '#FFD700',
     borderRadius: 100,
-    paddingVertical: 22,
-    paddingHorizontal: 52,
+    paddingVertical: 20,
+    paddingHorizontal: 48,
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.9,
-    shadowRadius: 24,
-    elevation: 14,
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 12,
   },
-  revealBtnText: {
-    color: '#1a0a00',
-    fontSize: 22,
+  tapRevealBtnText: {
+    color: '#1A0800',
+    fontSize: 20,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
 
   // ─── Revealed
-  starsContainer: {
+  particlesContainer: {
     position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
     width: '100%',
     height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  star: {
+  particle: {
     position: 'absolute',
-    fontSize: 28,
+    fontSize: 26,
+  },
+  revealedCenter: {
+    alignItems: 'center',
+    width: '100%',
   },
   trophyEmoji: {
-    fontSize: 100,
-    marginBottom: 12,
+    fontSize: 96,
+    marginBottom: 10,
   },
-  title: {
-    fontSize: 52,
+  revealedTitle: {
+    fontSize: 56,
     fontWeight: '900',
-    color: 'white',
+    color: '#fff',
     textAlign: 'center',
+    letterSpacing: -1,
     marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
-  kidNameText: {
-    fontSize: 24,
-    color: 'rgba(255,255,255,0.95)',
-    fontWeight: '800',
+  revealedKidName: {
+    fontSize: 22,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 28,
   },
+
+  // Reward card
   rewardCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 28,
-    padding: 30,
+    padding: 28,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
   },
-  rewardLabel: {
-    fontSize: 15,
-    color: '#999',
-    fontWeight: '700',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  rewardValue: {
-    fontSize: 30,
-    fontWeight: '900',
-    color: '#1A1A2E',
-    textAlign: 'center',
-  },
-  backBtn: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 100,
-    paddingVertical: 18,
-    paddingHorizontal: 44,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.7)',
-  },
-  backBtnText: {
-    color: 'white',
-    fontSize: 17,
+  rewardCardLabel: {
+    fontSize: 11,
     fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  rewardCardValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+
+  // Back button
+  backToQuestsBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 100,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  backToQuestsBtnText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
   },
 });
