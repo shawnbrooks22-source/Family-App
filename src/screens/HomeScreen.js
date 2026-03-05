@@ -13,14 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 
 const KID_COLORS = [
-  '#FF6584',
-  '#FFD700',
-  '#43E97B',
-  '#00B4D8',
-  '#FF8C42',
-  '#9B59B6',
-  '#1ABC9C',
-  '#E74C3C',
+  '#FF6584', '#FFD700', '#43E97B', '#00B4D8',
+  '#FF8C42', '#9B59B6', '#1ABC9C', '#E74C3C',
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -44,7 +38,7 @@ export default function HomeScreen({ navigation }) {
       setShowPinModal(false);
       navigation.navigate('Parent');
     } else {
-      setPinError('Wrong PIN! Try again 🙈');
+      setPinError('Wrong PIN, try again 🙈');
       setPin('');
     }
   }
@@ -55,25 +49,28 @@ export default function HomeScreen({ navigation }) {
   }));
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={['#6C63FF', '#4834d4']} style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
         <View style={styles.header}>
-          <Text style={styles.title}>⭐ ChoreQuest! ⭐</Text>
+          <Text style={styles.title}>ChoreQuest ⭐</Text>
           <Text style={styles.subtitle}>Who's playing today?</Text>
         </View>
 
         <View style={styles.avatarGrid}>
           {/* Parent card */}
           <TouchableOpacity
-            style={[styles.avatarCard, { backgroundColor: '#6C63FF' }]}
+            style={[styles.avatarCard, styles.parentCard]}
             onPress={handleParentPress}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
-            <Text style={styles.avatarEmoji}>{family.parentEmoji}</Text>
-            <Text style={styles.avatarName}>{family.parentName}</Text>
-            <View style={styles.parentBadgeRow}>
-              <Text style={styles.parentBadge}>👑 Parent</Text>
+            <View style={styles.cardInner}>
+              <Text style={styles.avatarEmoji}>{family.parentEmoji}</Text>
+              <Text style={styles.avatarName}>{family.parentName}</Text>
+              <View style={styles.parentBadge}>
+                <Text style={styles.parentBadgeText}>👑 Parent</Text>
+              </View>
             </View>
           </TouchableOpacity>
 
@@ -83,22 +80,26 @@ export default function HomeScreen({ navigation }) {
               key={kid.id}
               style={[styles.avatarCard, { backgroundColor: kid.color }]}
               onPress={() => handleKidPress(kid)}
-              activeOpacity={0.85}
+              activeOpacity={0.88}
             >
-              <Text style={styles.avatarEmoji}>{kid.emoji}</Text>
-              <Text style={styles.avatarName}>{kid.name}</Text>
-              <Text style={styles.tapHint}>Tap to play!</Text>
+              <View style={styles.cardInner}>
+                <Text style={styles.avatarEmoji}>{kid.emoji}</Text>
+                <Text style={styles.avatarName}>{kid.name}</Text>
+                <Text style={styles.tapHint}>Tap to play!</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
       {/* PIN Modal */}
-      <Modal visible={showPinModal} transparent animationType="slide">
+      <Modal visible={showPinModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Parent Zone 🔒</Text>
+            <Text style={styles.lockIcon}>🔒</Text>
+            <Text style={styles.modalTitle}>Parent Zone</Text>
             <Text style={styles.modalSubtitle}>Enter your 4-digit PIN</Text>
+
             <TextInput
               style={styles.pinInput}
               value={pin}
@@ -106,15 +107,23 @@ export default function HomeScreen({ navigation }) {
               keyboardType="number-pad"
               maxLength={4}
               secureTextEntry
-              placeholder="••••"
-              placeholderTextColor="#ccc"
+              placeholder="• • • •"
+              placeholderTextColor="#C4B5FD"
               textAlign="center"
               autoFocus
+              onSubmitEditing={handlePinSubmit}
             />
+
             {pinError ? <Text style={styles.pinError}>{pinError}</Text> : null}
-            <TouchableOpacity style={styles.modalBtn} onPress={handlePinSubmit}>
-              <Text style={styles.modalBtnText}>Enter! 🚀</Text>
+
+            <TouchableOpacity
+              style={[styles.modalBtn, pin.length < 4 && styles.modalBtnDisabled]}
+              onPress={handlePinSubmit}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalBtnText}>Enter</Text>
             </TouchableOpacity>
+
             <TouchableOpacity onPress={() => setShowPinModal(false)} style={styles.cancelTouchable}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -130,145 +139,164 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scroll: {
-    paddingTop: 70,
+    paddingTop: 72,
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   header: {
     alignItems: 'center',
     marginBottom: 40,
   },
   title: {
-    fontSize: 40,
+    fontSize: 38,
     fontWeight: '900',
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 2, height: 3 },
-    textShadowRadius: 6,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 20,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 10,
-    fontWeight: '700',
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 8,
+    fontWeight: '600',
   },
   avatarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    gap: 14,
   },
   avatarCard: {
-    width: 148,
-    height: 172,
+    width: 150,
+    height: 175,
     borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  parentCard: {
+    backgroundColor: '#5B4FE9',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  cardInner: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   avatarEmoji: {
-    fontSize: 64,
+    fontSize: 60,
   },
   avatarName: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '800',
     color: 'white',
     marginTop: 8,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  parentBadgeRow: {
-    marginTop: 5,
   },
   parentBadge: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
+    marginTop: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  parentBadgeText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.95)',
     fontWeight: '700',
   },
   tapHint: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
+    marginTop: 5,
     fontWeight: '600',
   },
+
+  // ─── PIN Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalCard: {
     backgroundColor: 'white',
-    borderRadius: 32,
-    padding: 36,
-    width: '82%',
+    borderRadius: 28,
+    padding: 32,
+    width: '84%',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.3,
+    shadowRadius: 32,
+    elevation: 14,
+  },
+  lockIcon: {
+    fontSize: 40,
+    marginBottom: 10,
   },
   modalTitle: {
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '900',
-    color: '#333',
-    marginBottom: 8,
+    color: '#1A1A2E',
+    marginBottom: 4,
   },
   modalSubtitle: {
-    fontSize: 16,
-    color: '#777',
-    marginBottom: 28,
-    fontWeight: '600',
+    fontSize: 15,
+    color: '#9CA3AF',
+    marginBottom: 24,
+    fontWeight: '500',
   },
   pinInput: {
-    borderWidth: 3,
-    borderColor: '#6C63FF',
-    borderRadius: 18,
-    fontSize: 36,
+    borderWidth: 2,
+    borderColor: '#DDD6FE',
+    borderRadius: 16,
+    fontSize: 32,
     fontWeight: '900',
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     width: '100%',
-    color: '#333',
-    letterSpacing: 16,
-    backgroundColor: '#F8F5FF',
+    color: '#1A1A2E',
+    letterSpacing: 14,
+    backgroundColor: '#F5F3FF',
   },
   pinError: {
-    color: '#FF6584',
-    fontSize: 15,
-    marginTop: 14,
-    fontWeight: '700',
+    color: '#EF4444',
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '600',
   },
   modalBtn: {
     backgroundColor: '#6C63FF',
-    borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 48,
-    marginTop: 28,
+    borderRadius: 100,
+    paddingVertical: 16,
+    paddingHorizontal: 56,
+    marginTop: 24,
     shadowColor: '#6C63FF',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 6,
   },
+  modalBtnDisabled: {
+    opacity: 0.5,
+  },
   modalBtnText: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
   },
   cancelTouchable: {
-    marginTop: 18,
-    padding: 8,
+    marginTop: 16,
+    padding: 10,
   },
   cancelText: {
-    color: '#999',
-    fontSize: 16,
+    color: '#9CA3AF',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

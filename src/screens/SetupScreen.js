@@ -15,28 +15,24 @@ import { useApp } from '../context/AppContext';
 const PARENT_EMOJIS = ['👑', '🦸', '🧙', '⭐', '🏆', '💫', '🌟', '🎯'];
 const KID_EMOJIS = ['🦊', '🐱', '🐶', '🐸', '🐻', '🦁', '🐼', '🦄', '🐯', '🐰', '🦋', '🐬'];
 const KID_COLORS = [
-  '#FF6584',
-  '#FFD700',
-  '#43E97B',
-  '#00B4D8',
-  '#FF8C42',
-  '#9B59B6',
-  '#1ABC9C',
-  '#E74C3C',
+  '#FF6584', '#FFD700', '#43E97B', '#00B4D8',
+  '#FF8C42', '#9B59B6', '#1ABC9C', '#E74C3C',
 ];
 
 export default function SetupScreen() {
   const { setupFamily } = useApp();
   const [step, setStep] = useState(1);
 
-  // Step 1 state
+  // Step 1
   const [parentName, setParentName] = useState('');
+  const [parentPhone, setParentPhone] = useState('');
   const [parentPin, setParentPin] = useState('');
   const [parentEmoji, setParentEmoji] = useState('👑');
 
-  // Step 2 state
+  // Step 2
   const [kids, setKids] = useState([]);
   const [kidName, setKidName] = useState('');
+  const [kidPhone, setKidPhone] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🦊');
   const [selectedColor, setSelectedColor] = useState(KID_COLORS[0]);
 
@@ -57,15 +53,17 @@ export default function SetupScreen() {
       Alert.alert('Oops!', "Enter your kid's name! 👶");
       return;
     }
+    const nextIndex = kids.length + 1;
     const newKid = {
       id: Date.now().toString(),
       name: kidName.trim(),
       emoji: selectedEmoji,
       color: selectedColor,
+      phone: kidPhone.trim(),
     };
-    const nextIndex = kids.length + 1;
     setKids([...kids, newKid]);
     setKidName('');
+    setKidPhone('');
     setSelectedEmoji(KID_EMOJIS[nextIndex % KID_EMOJIS.length]);
     setSelectedColor(KID_COLORS[nextIndex % KID_COLORS.length]);
   }
@@ -77,6 +75,7 @@ export default function SetupScreen() {
     }
     await setupFamily({
       parentName: parentName.trim(),
+      parentPhone: parentPhone.trim(),
       parentPin,
       parentEmoji,
       kids,
@@ -84,31 +83,52 @@ export default function SetupScreen() {
   }
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={['#6C63FF', '#4834d4']} style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.appTitle}>⭐ ChoreQuest!</Text>
-        <Text style={styles.appSubtitle}>Let's set up your family</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.appTitle}>ChoreQuest ⭐</Text>
+          <Text style={styles.appSubtitle}>Let's get your family set up</Text>
+
+          {/* Step indicator */}
+          <View style={styles.stepRow}>
+            <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />
+            <View style={styles.stepLine} />
+            <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]} />
+          </View>
+          <Text style={styles.stepLabel}>Step {step} of 2</Text>
+        </View>
 
         {step === 1 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Parent Setup 👑</Text>
-            <Text style={styles.cardSubtitle}>Create your account first</Text>
+            <Text style={styles.cardSubtitle}>Create your parent account</Text>
 
-            <Text style={styles.label}>Your Name</Text>
+            <Text style={styles.label}>YOUR NAME</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Mom, Dad, Guardian..."
               value={parentName}
               onChangeText={setParentName}
-              placeholderTextColor="#ccc"
+              placeholderTextColor="#C4B5FD"
             />
 
-            <Text style={styles.label}>Choose Your Emoji</Text>
+            <Text style={styles.label}>PHONE NUMBER (optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 555-867-5309"
+              value={parentPhone}
+              onChangeText={setParentPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor="#C4B5FD"
+            />
+
+            <Text style={styles.label}>CHOOSE YOUR EMOJI</Text>
             <View style={styles.emojiGrid}>
               {PARENT_EMOJIS.map(e => (
                 <TouchableOpacity
@@ -121,22 +141,22 @@ export default function SetupScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>Secret 4-Digit PIN 🔒</Text>
-            <Text style={styles.hint}>This keeps kids out of parent controls</Text>
+            <Text style={styles.label}>SECRET 4-DIGIT PIN 🔒</Text>
+            <Text style={styles.hint}>Keeps kids out of parent controls</Text>
             <TextInput
-              style={[styles.input, styles.pinInputStyle]}
-              placeholder="••••"
+              style={[styles.input, styles.pinInput]}
+              placeholder="• • • •"
               value={parentPin}
               onChangeText={setParentPin}
               keyboardType="number-pad"
               maxLength={4}
               secureTextEntry
-              placeholderTextColor="#ccc"
+              placeholderTextColor="#C4B5FD"
               textAlign="center"
             />
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep1}>
-              <Text style={styles.primaryBtnText}>Next: Add Your Kids 👶</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep1} activeOpacity={0.88}>
+              <Text style={styles.primaryBtnText}>Next: Add Your Kids →</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -144,11 +164,14 @@ export default function SetupScreen() {
             <Text style={styles.cardTitle}>Add Your Kids! 👧👦</Text>
             <Text style={styles.cardSubtitle}>Add everyone who will use ChoreQuest</Text>
 
-            {/* Added kids */}
+            {/* Added kids list */}
             {kids.map(kid => (
               <View key={kid.id} style={[styles.kidChip, { backgroundColor: kid.color }]}>
                 <Text style={styles.kidChipEmoji}>{kid.emoji}</Text>
-                <Text style={styles.kidChipName}>{kid.name}</Text>
+                <View style={styles.kidChipInfo}>
+                  <Text style={styles.kidChipName}>{kid.name}</Text>
+                  {kid.phone ? <Text style={styles.kidChipPhone}>📞 {kid.phone}</Text> : null}
+                </View>
                 <TouchableOpacity
                   onPress={() => setKids(kids.filter(k => k.id !== kid.id))}
                   style={styles.removeKidBtn}
@@ -158,21 +181,27 @@ export default function SetupScreen() {
               </View>
             ))}
 
-            <Text style={styles.label}>Kid's Name</Text>
+            <Text style={styles.label}>KID'S NAME</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Lily, Jake, Sam..."
               value={kidName}
               onChangeText={setKidName}
-              placeholderTextColor="#ccc"
+              placeholderTextColor="#C4B5FD"
             />
 
-            <Text style={styles.label}>Choose an Emoji</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.emojiScroll}
-            >
+            <Text style={styles.label}>PHONE NUMBER (optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 555-123-4567"
+              value={kidPhone}
+              onChangeText={setKidPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor="#C4B5FD"
+            />
+
+            <Text style={styles.label}>CHOOSE AN EMOJI</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.emojiScroll}>
               {KID_EMOJIS.map(e => (
                 <TouchableOpacity
                   key={e}
@@ -184,7 +213,7 @@ export default function SetupScreen() {
               ))}
             </ScrollView>
 
-            <Text style={styles.label}>Choose a Color</Text>
+            <Text style={styles.label}>CHOOSE A COLOR</Text>
             <View style={styles.colorRow}>
               {KID_COLORS.map(c => (
                 <TouchableOpacity
@@ -199,12 +228,16 @@ export default function SetupScreen() {
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.primaryBtn, styles.addKidBtn]} onPress={addKid}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, styles.addKidBtn]}
+              onPress={addKid}
+              activeOpacity={0.88}
+            >
               <Text style={styles.primaryBtnText}>+ Add Kid</Text>
             </TouchableOpacity>
 
             {kids.length > 0 && (
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleFinish}>
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleFinish} activeOpacity={0.88}>
                 <Text style={styles.primaryBtnText}>Let's Go! 🚀</Text>
               </TouchableOpacity>
             )}
@@ -224,75 +257,101 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scroll: {
-    paddingTop: 70,
+    paddingTop: 64,
     paddingHorizontal: 20,
     paddingBottom: 50,
   },
+  header: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
   appTitle: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '900',
     color: 'white',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 1, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 0.5,
   },
   appSubtitle: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.85)',
-    textAlign: 'center',
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  stepDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  stepDotActive: {
+    backgroundColor: 'white',
+  },
+  stepLine: {
+    width: 48,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 6,
+  },
+  stepLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: '600',
-    marginBottom: 28,
-    marginTop: 8,
   },
   card: {
     backgroundColor: 'white',
-    borderRadius: 32,
-    padding: 26,
+    borderRadius: 28,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 24,
-    elevation: 12,
+    elevation: 10,
   },
   cardTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
-    color: '#333',
+    color: '#1A1A2E',
     textAlign: 'center',
     marginBottom: 4,
   },
   cardSubtitle: {
-    fontSize: 15,
-    color: '#888',
+    fontSize: 14,
+    color: '#9CA3AF',
     textAlign: 'center',
-    marginBottom: 22,
-    fontWeight: '600',
+    marginBottom: 20,
+    fontWeight: '500',
   },
   label: {
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#555',
+    color: '#9CA3AF',
     marginTop: 18,
     marginBottom: 8,
+    letterSpacing: 1,
   },
   hint: {
-    fontSize: 13,
-    color: '#aaa',
+    fontSize: 12,
+    color: '#C4B5FD',
     marginBottom: 8,
     fontWeight: '500',
     marginTop: -6,
   },
   input: {
-    borderWidth: 2.5,
-    borderColor: '#DDD0FF',
+    borderWidth: 1.5,
+    borderColor: '#EDE9FF',
     borderRadius: 14,
     padding: 14,
-    fontSize: 17,
-    color: '#333',
-    backgroundColor: '#FAFAFA',
+    fontSize: 16,
+    color: '#1A1A2E',
+    backgroundColor: '#FAFAFF',
   },
-  pinInputStyle: {
+  pinInput: {
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: 14,
@@ -300,61 +359,62 @@ const styles = StyleSheet.create({
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 6,
   },
   emojiScroll: {
     marginBottom: 4,
   },
   emojiBtn: {
     padding: 8,
-    borderRadius: 14,
-    borderWidth: 2.5,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: 'transparent',
-    backgroundColor: '#F5F0FF',
-    margin: 5,
+    backgroundColor: '#F5F3FF',
+    margin: 4,
   },
   emojiBtnSelected: {
     borderColor: '#6C63FF',
-    backgroundColor: '#EAE4FF',
+    backgroundColor: '#EDE9FF',
   },
   emojiText: {
-    fontSize: 32,
+    fontSize: 30,
   },
   colorRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 4,
   },
   colorDot: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    margin: 5,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   colorDotSelected: {
-    borderWidth: 3.5,
-    borderColor: '#333',
-    transform: [{ scale: 1.2 }],
+    borderWidth: 3,
+    borderColor: '#1A1A2E',
+    transform: [{ scale: 1.18 }],
   },
   primaryBtn: {
     backgroundColor: '#6C63FF',
-    borderRadius: 18,
-    paddingVertical: 18,
+    borderRadius: 100,
+    paddingVertical: 17,
     alignItems: 'center',
-    marginTop: 22,
+    marginTop: 20,
     shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   addKidBtn: {
-    backgroundColor: '#43E97B',
-    shadowColor: '#43E97B',
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
   },
   primaryBtnText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '800',
   },
   kidChip: {
     flexDirection: 'row',
@@ -364,31 +424,39 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   kidChipEmoji: {
-    fontSize: 28,
+    fontSize: 26,
     marginRight: 10,
+  },
+  kidChipInfo: {
+    flex: 1,
   },
   kidChipName: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    flex: 1,
+  },
+  kidChipPhone: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
   },
   removeKidBtn: {
-    padding: 4,
+    padding: 6,
   },
   removeKidText: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
   },
   backTextBtn: {
     alignItems: 'center',
-    marginTop: 18,
-    padding: 8,
+    marginTop: 16,
+    padding: 10,
   },
   backText: {
-    color: '#aaa',
-    fontSize: 15,
+    color: '#9CA3AF',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

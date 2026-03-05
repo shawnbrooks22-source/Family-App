@@ -26,7 +26,7 @@ const KID_COLORS = [
   '#FF8C42', '#9B59B6', '#1ABC9C', '#E74C3C',
 ];
 
-// ─── Approvals Tab ────────────────────────────────────────────────────────────
+// ─── Approvals Tab ─────────────────────────────────────────────────────────────
 
 function ApprovalsTab({ navigation }) {
   const { tasks, family, approveTask } = useApp();
@@ -39,22 +39,20 @@ function ApprovalsTab({ navigation }) {
   async function handleApprove(task) {
     const kid = getKid(task.assignedTo);
     await approveTask(task.id);
-    Alert.alert(
-      '🎉 Reward Released!',
-      `${kid?.name || 'Your kid'} can now claim: ${task.reward}!`,
-    );
+    Alert.alert('🎉 Reward Released!', `${kid?.name || 'Your kid'} can now claim: ${task.reward}!`);
   }
 
   return (
     <View style={styles.tabWrapper}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.tabScroll}>
-        <Text style={styles.tabTitle}>🔔 Waiting for Approval</Text>
+        <Text style={styles.tabTitle}>Approvals</Text>
+
         {pendingApproval.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>✨</Text>
             <Text style={styles.emptyText}>All caught up!</Text>
-            <Text style={styles.emptySubtext}>No completed tasks waiting.</Text>
+            <Text style={styles.emptySubtext}>No tasks waiting for approval.</Text>
           </View>
         ) : (
           pendingApproval.map(task => {
@@ -62,21 +60,28 @@ function ApprovalsTab({ navigation }) {
             return (
               <View key={task.id} style={styles.approvalCard}>
                 <View style={styles.approvalKidRow}>
-                  <Text style={styles.approvalKidEmoji}>{kid?.emoji || '🎉'}</Text>
-                  <Text style={styles.approvalKidName}>{kid?.name || 'Unknown'}</Text>
-                  <Text style={styles.approvalKidLabel}> completed a task!</Text>
+                  <View style={[styles.approvalKidAvatar, { backgroundColor: kid?.color || '#6C63FF' }]}>
+                    <Text style={styles.approvalKidAvatarText}>{kid?.emoji || '🎉'}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.approvalKidName}>{kid?.name || 'Unknown'}</Text>
+                    <Text style={styles.approvalKidLabel}>completed a task!</Text>
+                  </View>
                 </View>
+
                 <Text style={styles.approvalTaskTitle}>{task.emoji} {task.title}</Text>
+
                 <View style={styles.approvalRewardRow}>
-                  <Text style={styles.approvalRewardLabel}>Reward: </Text>
+                  <Text style={styles.approvalRewardLabel}>Reward</Text>
                   <Text style={styles.approvalRewardValue}>🎁 {task.reward}</Text>
                 </View>
+
                 <TouchableOpacity
                   style={styles.approveBtn}
                   onPress={() => handleApprove(task)}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.approveBtnText}>Release Reward! 🎉</Text>
+                  <Text style={styles.approveBtnText}>Release Reward 🎉</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -97,31 +102,28 @@ function AllTasksTab() {
   }
 
   function statusInfo(status) {
-    if (status === 'pending') return { label: '📋 To Do', color: '#FFD700' };
-    if (status === 'completed') return { label: '⏳ Waiting', color: '#FF8C42' };
-    return { label: '✅ Done', color: '#43E97B' };
+    if (status === 'pending') return { label: 'To Do', color: '#6C63FF' };
+    if (status === 'completed') return { label: 'Waiting', color: '#FF8C42' };
+    return { label: 'Done', color: '#10B981' };
   }
 
   function confirmDelete(task) {
-    Alert.alert(
-      'Delete Task?',
-      `Remove "${task.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
-      ],
-    );
+    Alert.alert('Delete Task?', `Remove "${task.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
+    ]);
   }
 
   return (
     <View style={styles.tabWrapper}>
       <ScrollView contentContainerStyle={styles.tabScroll}>
-        <Text style={styles.tabTitle}>📋 All Tasks</Text>
+        <Text style={styles.tabTitle}>All Tasks</Text>
+
         {tasks.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📝</Text>
             <Text style={styles.emptyText}>No tasks yet!</Text>
-            <Text style={styles.emptySubtext}>Add some tasks in the Add Task tab.</Text>
+            <Text style={styles.emptySubtext}>Add tasks in the Add tab.</Text>
           </View>
         ) : (
           tasks.map(task => {
@@ -132,13 +134,11 @@ function AllTasksTab() {
                 <Text style={styles.taskRowEmoji}>{task.emoji}</Text>
                 <View style={styles.taskRowMiddle}>
                   <Text style={styles.taskRowTitle} numberOfLines={1}>{task.title}</Text>
-                  <Text style={styles.taskRowKid}>
-                    {kid?.emoji} {kid?.name || 'Unknown'}
-                  </Text>
+                  <Text style={styles.taskRowKid}>{kid?.emoji} {kid?.name || 'Unknown'}</Text>
                 </View>
                 <View style={styles.taskRowRight}>
-                  <View style={[styles.statusPill, { backgroundColor: color }]}>
-                    <Text style={styles.statusPillText}>{label}</Text>
+                  <View style={[styles.statusPill, { backgroundColor: color + '22' }]}>
+                    <Text style={[styles.statusPillText, { color }]}>{label}</Text>
                   </View>
                   <TouchableOpacity onPress={() => confirmDelete(task)} style={styles.deleteBtn}>
                     <Text style={styles.deleteBtnText}>🗑️</Text>
@@ -167,13 +167,7 @@ function AddTaskTab() {
     if (!reward.trim()) { Alert.alert('Oops!', 'Enter a reward! 🎁'); return; }
     if (!selectedKid) { Alert.alert('Oops!', 'Choose a kid! 👧'); return; }
 
-    await addTask({
-      title: title.trim(),
-      reward: reward.trim(),
-      assignedTo: selectedKid,
-      emoji: selectedEmoji,
-    });
-
+    await addTask({ title: title.trim(), reward: reward.trim(), assignedTo: selectedKid, emoji: selectedEmoji });
     setTitle('');
     setReward('');
     setSelectedKid(null);
@@ -182,24 +176,21 @@ function AddTaskTab() {
 
   return (
     <View style={styles.tabWrapper}>
-      <ScrollView
-        contentContainerStyle={styles.tabScroll}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.tabTitle}>➕ Add New Task</Text>
+      <ScrollView contentContainerStyle={styles.tabScroll} keyboardShouldPersistTaps="handled">
+        <Text style={styles.tabTitle}>Add Task</Text>
 
         <View style={styles.formCard}>
-          <Text style={styles.formLabel}>Task Name</Text>
+          <Text style={styles.formLabel}>TASK NAME</Text>
           <TextInput
             style={styles.formInput}
             placeholder="e.g. Clean your room, Do homework..."
             value={title}
             onChangeText={setTitle}
-            placeholderTextColor="#ccc"
+            placeholderTextColor="#C4B5FD"
           />
 
-          <Text style={styles.formLabel}>Task Emoji</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Text style={styles.formLabel}>TASK ICON</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.emojiScroll}>
             {TASK_EMOJIS.map(e => (
               <TouchableOpacity
                 key={e}
@@ -211,23 +202,23 @@ function AddTaskTab() {
             ))}
           </ScrollView>
 
-          <Text style={styles.formLabel}>Reward 🎁</Text>
+          <Text style={styles.formLabel}>REWARD 🎁</Text>
           <TextInput
             style={styles.formInput}
             placeholder="e.g. 30 min screen time, Ice cream!"
             value={reward}
             onChangeText={setReward}
-            placeholderTextColor="#ccc"
+            placeholderTextColor="#C4B5FD"
           />
 
-          <Text style={styles.formLabel}>Assign To</Text>
+          <Text style={styles.formLabel}>ASSIGN TO</Text>
           <View style={styles.kidSelector}>
             {family.kids.map(kid => (
               <TouchableOpacity
                 key={kid.id}
                 style={[
                   styles.kidSelectBtn,
-                  { backgroundColor: kid.color },
+                  { backgroundColor: kid.color + (selectedKid === kid.id ? 'FF' : '55') },
                   selectedKid === kid.id && styles.kidSelectBtnActive,
                 ]}
                 onPress={() => setSelectedKid(kid.id)}
@@ -239,8 +230,8 @@ function AddTaskTab() {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.addTaskBtn} onPress={handleAdd} activeOpacity={0.85}>
-            <Text style={styles.addTaskBtnText}>Assign Quest! ✨</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd} activeOpacity={0.85}>
+            <Text style={styles.primaryBtnText}>Assign Quest ✨</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -254,63 +245,64 @@ function FamilyTab({ navigation }) {
   const { family, addKid, removeKid } = useApp();
   const [showAddForm, setShowAddForm] = useState(false);
   const [kidName, setKidName] = useState('');
+  const [kidPhone, setKidPhone] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🦊');
   const [selectedColor, setSelectedColor] = useState(KID_COLORS[0]);
 
   async function handleAddKid() {
     if (!kidName.trim()) { Alert.alert('Oops!', 'Enter a name!'); return; }
-    await addKid({ name: kidName.trim(), emoji: selectedEmoji, color: selectedColor });
+    await addKid({ name: kidName.trim(), emoji: selectedEmoji, color: selectedColor, phone: kidPhone.trim() });
     setKidName('');
+    setKidPhone('');
     setShowAddForm(false);
     Alert.alert('✅ Kid Added!', `${kidName} joined the family!`);
   }
 
   function confirmRemoveKid(kid) {
-    Alert.alert(
-      `Remove ${kid.name}?`,
-      'This will also remove all their tasks.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => removeKid(kid.id),
-        },
-      ],
-    );
+    Alert.alert(`Remove ${kid.name}?`, 'This will also remove all their tasks.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => removeKid(kid.id) },
+    ]);
   }
 
   return (
     <View style={styles.tabWrapper}>
-      <ScrollView
-        contentContainerStyle={styles.tabScroll}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.tabTitle}>👨‍👩‍👧‍👦 Family</Text>
+      <ScrollView contentContainerStyle={styles.tabScroll} keyboardShouldPersistTaps="handled">
+        <Text style={styles.tabTitle}>Family</Text>
 
         <View style={styles.formCard}>
-          {/* Parent row */}
-          <Text style={styles.sectionHeader}>Parent</Text>
+          {/* Parent */}
+          <Text style={styles.sectionHeader}>PARENT</Text>
           <View style={styles.memberRow}>
-            <View style={[styles.memberAvatarCircle, { backgroundColor: '#6C63FF' }]}>
+            <View style={[styles.memberAvatar, { backgroundColor: '#6C63FF' }]}>
               <Text style={styles.memberAvatarEmoji}>{family.parentEmoji}</Text>
             </View>
-            <Text style={styles.memberName}>{family.parentName}</Text>
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>{family.parentName}</Text>
+              {family.parentPhone ? (
+                <Text style={styles.memberPhone}>📞 {family.parentPhone}</Text>
+              ) : null}
+            </View>
             <View style={styles.parentPill}>
               <Text style={styles.parentPillText}>👑 Parent</Text>
             </View>
           </View>
 
           {/* Kids */}
-          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>Kids</Text>
+          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>KIDS</Text>
           {family.kids.map(kid => (
             <View key={kid.id} style={styles.memberRow}>
-              <View style={[styles.memberAvatarCircle, { backgroundColor: kid.color }]}>
+              <View style={[styles.memberAvatar, { backgroundColor: kid.color }]}>
                 <Text style={styles.memberAvatarEmoji}>{kid.emoji}</Text>
               </View>
-              <Text style={styles.memberName}>{kid.name}</Text>
-              <TouchableOpacity onPress={() => confirmRemoveKid(kid)}>
-                <Text style={styles.removeText}>Remove</Text>
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>{kid.name}</Text>
+                {kid.phone ? (
+                  <Text style={styles.memberPhone}>📞 {kid.phone}</Text>
+                ) : null}
+              </View>
+              <TouchableOpacity onPress={() => confirmRemoveKid(kid)} style={styles.removeBtn}>
+                <Text style={styles.removeBtnText}>Remove</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -322,16 +314,27 @@ function FamilyTab({ navigation }) {
             </TouchableOpacity>
           ) : (
             <View style={styles.addKidInlineForm}>
-              <Text style={styles.formLabel}>Kid's Name</Text>
+              <Text style={styles.formLabel}>KID'S NAME</Text>
               <TextInput
                 style={styles.formInput}
                 placeholder="Enter name..."
                 value={kidName}
                 onChangeText={setKidName}
-                placeholderTextColor="#ccc"
+                placeholderTextColor="#C4B5FD"
               />
-              <Text style={styles.formLabel}>Emoji</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+
+              <Text style={styles.formLabel}>PHONE NUMBER (optional)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g. 555-867-5309"
+                value={kidPhone}
+                onChangeText={setKidPhone}
+                keyboardType="phone-pad"
+                placeholderTextColor="#C4B5FD"
+              />
+
+              <Text style={styles.formLabel}>EMOJI</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.emojiScroll}>
                 {KID_EMOJIS.map(e => (
                   <TouchableOpacity
                     key={e}
@@ -342,7 +345,8 @@ function FamilyTab({ navigation }) {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-              <Text style={styles.formLabel}>Color</Text>
+
+              <Text style={styles.formLabel}>COLOR</Text>
               <View style={styles.colorRow}>
                 {KID_COLORS.map(c => (
                   <TouchableOpacity
@@ -356,12 +360,13 @@ function FamilyTab({ navigation }) {
                   />
                 ))}
               </View>
+
               <View style={styles.addKidFormActions}>
                 <TouchableOpacity
-                  style={[styles.addTaskBtn, { flex: 1, marginRight: 8 }]}
+                  style={[styles.primaryBtn, { flex: 1, marginRight: 8, marginTop: 0 }]}
                   onPress={handleAddKid}
                 >
-                  <Text style={styles.addTaskBtnText}>Add!</Text>
+                  <Text style={styles.primaryBtnText}>Add!</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.cancelBtn, { flex: 1 }]}
@@ -373,12 +378,11 @@ function FamilyTab({ navigation }) {
             </View>
           )}
 
-          {/* Back to home */}
           <TouchableOpacity
-            style={[styles.addTaskBtn, { backgroundColor: '#FF6584', marginTop: 28 }]}
+            style={[styles.primaryBtn, { backgroundColor: '#FF6584', marginTop: 24 }]}
             onPress={() => navigation.navigate('Home')}
           >
-            <Text style={styles.addTaskBtnText}>← Back to Home</Text>
+            <Text style={styles.primaryBtnText}>← Back to Home</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -386,7 +390,7 @@ function FamilyTab({ navigation }) {
   );
 }
 
-// ─── ParentDashboard (root screen with tab navigator) ──────────────────────────
+// ─── ParentDashboard root ──────────────────────────────────────────────────────
 
 export default function ParentDashboard({ navigation }) {
   return (
@@ -395,24 +399,15 @@ export default function ParentDashboard({ navigation }) {
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#aaa',
+        tabBarInactiveTintColor: '#9CA3AF',
         tabBarLabelStyle: styles.tabBarLabel,
-        tabBarShowIcon: false,
       }}
     >
       <Tab.Screen name="Approvals" options={{ tabBarLabel: '🔔 Approve' }}>
         {props => <ApprovalsTab {...props} navigation={navigation} />}
       </Tab.Screen>
-      <Tab.Screen
-        name="AllTasks"
-        component={AllTasksTab}
-        options={{ tabBarLabel: '📋 Tasks' }}
-      />
-      <Tab.Screen
-        name="AddTask"
-        component={AddTaskTab}
-        options={{ tabBarLabel: '➕ Add' }}
-      />
+      <Tab.Screen name="AllTasks" component={AllTasksTab} options={{ tabBarLabel: '📋 Tasks' }} />
+      <Tab.Screen name="AddTask" component={AddTaskTab} options={{ tabBarLabel: '➕ Add' }} />
       <Tab.Screen name="Family" options={{ tabBarLabel: '👨‍👩‍👧 Family' }}>
         {props => <FamilyTab {...props} navigation={navigation} />}
       </Tab.Screen>
@@ -425,7 +420,7 @@ export default function ParentDashboard({ navigation }) {
 const styles = StyleSheet.create({
   tabWrapper: {
     flex: 1,
-    backgroundColor: '#F5F0FF',
+    backgroundColor: '#F8F7FF',
   },
   tabScroll: {
     paddingTop: 64,
@@ -433,17 +428,18 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   tabTitle: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
-    color: '#333',
+    color: '#1A1A2E',
     marginBottom: 22,
   },
   tabBar: {
     backgroundColor: 'white',
-    borderTopWidth: 0,
-    shadowColor: '#000',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F0FF',
+    shadowColor: '#6C63FF',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 10,
     height: 68,
@@ -451,295 +447,330 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   tabBarLabel: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
-  // Empty state
+  // ─── Empty state
   emptyState: {
     alignItems: 'center',
     paddingVertical: 64,
   },
   emptyEmoji: {
-    fontSize: 72,
-    marginBottom: 16,
+    fontSize: 64,
+    marginBottom: 14,
   },
   emptyText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#555',
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#374151',
     marginBottom: 6,
   },
   emptySubtext: {
-    fontSize: 16,
-    color: '#aaa',
-    fontWeight: '600',
+    fontSize: 15,
+    color: '#9CA3AF',
+    fontWeight: '500',
     textAlign: 'center',
   },
 
-  // Approval card
+  // ─── Approval card
   approvalCard: {
     backgroundColor: 'white',
-    borderRadius: 22,
-    padding: 22,
-    marginBottom: 18,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 5,
-    borderLeftWidth: 6,
-    borderLeftColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6C63FF',
   },
   approvalKidRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  approvalKidEmoji: {
+  approvalKidAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  approvalKidAvatarText: {
     fontSize: 22,
-    marginRight: 6,
   },
   approvalKidName: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#555',
+    fontWeight: '800',
+    color: '#1A1A2E',
   },
   approvalKidLabel: {
-    fontSize: 15,
-    color: '#999',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   approvalTaskTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
-    color: '#333',
+    color: '#1A1A2E',
     marginBottom: 10,
   },
   approvalRewardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
+    gap: 8,
   },
   approvalRewardLabel: {
-    fontSize: 15,
-    color: '#999',
+    fontSize: 13,
+    color: '#9CA3AF',
     fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   approvalRewardValue: {
-    fontSize: 16,
-    color: '#555',
+    fontSize: 15,
+    color: '#374151',
     fontWeight: '700',
   },
   approveBtn: {
-    backgroundColor: '#43E97B',
-    borderRadius: 16,
-    paddingVertical: 16,
+    backgroundColor: '#10B981',
+    borderRadius: 100,
+    paddingVertical: 14,
     alignItems: 'center',
-    shadowColor: '#43E97B',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   approveBtnText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
   },
 
-  // Task row
+  // ─── Task row
   taskRow: {
     backgroundColor: 'white',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
   taskRowEmoji: {
-    fontSize: 32,
-    marginRight: 14,
+    fontSize: 28,
+    marginRight: 12,
   },
   taskRowMiddle: {
     flex: 1,
   },
   taskRowTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1A2E',
   },
   taskRowKid: {
     fontSize: 13,
-    color: '#aaa',
-    fontWeight: '700',
-    marginTop: 3,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginTop: 2,
   },
   taskRowRight: {
     alignItems: 'flex-end',
+    gap: 6,
   },
   statusPill: {
-    borderRadius: 10,
+    borderRadius: 100,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginBottom: 6,
+    paddingVertical: 4,
   },
   statusPillText: {
-    color: 'white',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   deleteBtn: {
     padding: 4,
   },
   deleteBtnText: {
-    fontSize: 20,
+    fontSize: 18,
   },
 
-  // Form card
+  // ─── Form card
   formCard: {
     backgroundColor: 'white',
-    borderRadius: 26,
-    padding: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 5,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#6C63FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
     marginBottom: 24,
   },
   formLabel: {
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#555',
-    marginTop: 16,
-    marginBottom: 9,
+    color: '#9CA3AF',
+    marginTop: 18,
+    marginBottom: 8,
+    letterSpacing: 1,
   },
   formInput: {
-    borderWidth: 2.5,
-    borderColor: '#DDD0FF',
+    borderWidth: 1.5,
+    borderColor: '#EDE9FF',
     borderRadius: 14,
     padding: 14,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: '#FAFAFA',
+    color: '#1A1A2E',
+    backgroundColor: '#FAFAFF',
+  },
+  emojiScroll: {
+    marginBottom: 4,
   },
   emojiBtn: {
     padding: 8,
     borderRadius: 12,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: 'transparent',
-    backgroundColor: '#F5F0FF',
+    backgroundColor: '#F5F3FF',
     marginRight: 8,
-    marginBottom: 6,
   },
   emojiBtnSelected: {
     borderColor: '#6C63FF',
-    backgroundColor: '#EAE4FF',
+    backgroundColor: '#EDE9FF',
   },
   emojiBtnText: {
-    fontSize: 28,
+    fontSize: 26,
   },
   kidSelector: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
     marginTop: 4,
   },
   kidSelectBtn: {
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     alignItems: 'center',
-    margin: 5,
-    opacity: 0.65,
   },
   kidSelectBtnActive: {
-    opacity: 1,
-    borderWidth: 3.5,
-    borderColor: '#333',
+    borderWidth: 3,
+    borderColor: '#1A1A2E',
   },
   kidSelectEmoji: {
-    fontSize: 28,
+    fontSize: 26,
   },
   kidSelectName: {
     color: 'white',
     fontWeight: '800',
-    fontSize: 13,
-    marginTop: 5,
+    fontSize: 12,
+    marginTop: 4,
   },
-  addTaskBtn: {
+  primaryBtn: {
     backgroundColor: '#6C63FF',
-    borderRadius: 16,
-    paddingVertical: 17,
+    borderRadius: 100,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 22,
+    marginTop: 20,
     shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  addTaskBtnText: {
+  primaryBtnText: {
     color: 'white',
-    fontSize: 17,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  cancelBtn: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 100,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '700',
   },
 
-  // Family tab
+  // ─── Family tab
   sectionHeader: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#444',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#9CA3AF',
     marginBottom: 12,
+    letterSpacing: 1,
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 4,
-    marginBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    marginBottom: 4,
   },
-  memberAvatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  memberAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
   memberAvatarEmoji: {
-    fontSize: 28,
+    fontSize: 26,
   },
-  memberName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#333',
+  memberInfo: {
     flex: 1,
   },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A2E',
+  },
+  memberPhone: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
+  },
   parentPill: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    backgroundColor: '#EDE9FF',
+    borderRadius: 100,
+    paddingHorizontal: 12,
     paddingVertical: 5,
   },
   parentPillText: {
-    color: 'white',
+    color: '#6C63FF',
     fontWeight: '800',
+    fontSize: 12,
+  },
+  removeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  removeBtnText: {
+    color: '#EF4444',
+    fontWeight: '700',
     fontSize: 13,
   },
-  removeText: {
-    color: '#FF6584',
-    fontWeight: '800',
-    fontSize: 14,
-  },
   addKidDashedBtn: {
-    borderWidth: 2.5,
-    borderColor: '#6C63FF',
+    borderWidth: 2,
+    borderColor: '#DDD6FE',
     borderStyle: 'dashed',
     borderRadius: 16,
     paddingVertical: 16,
@@ -748,44 +779,36 @@ const styles = StyleSheet.create({
   },
   addKidDashedText: {
     color: '#6C63FF',
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
   },
   addKidInlineForm: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: '#F8F5FF',
-    borderRadius: 18,
+    backgroundColor: '#FAFAFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EDE9FF',
   },
   colorRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 4,
   },
   colorDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    margin: 5,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   colorDotSelected: {
-    borderWidth: 3.5,
-    borderColor: '#333',
-    transform: [{ scale: 1.2 }],
+    borderWidth: 3,
+    borderColor: '#1A1A2E',
+    transform: [{ scale: 1.18 }],
   },
   addKidFormActions: {
     flexDirection: 'row',
     marginTop: 16,
-  },
-  cancelBtn: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 16,
-    paddingVertical: 17,
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    color: '#777',
-    fontSize: 16,
-    fontWeight: '700',
+    gap: 8,
   },
 });
