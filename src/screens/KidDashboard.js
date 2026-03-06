@@ -11,123 +11,170 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
-import { colors, shadows } from '../theme/index';
 
 const { width } = Dimensions.get('window');
 
-// ─── Color → gradient mapping ─────────────────────────────────────────────────
+// ─── Gradient map ──────────────────────────────────────────────────────────────
 const GRADIENT_MAP = {
-  '#FF6B6B': ['#FF6B6B', '#E63946'],
-  '#FF9F43': ['#FF9F43', '#E67E00'],
-  '#FEC600': ['#FEC600', '#F4A100'],
-  '#0BDA92': ['#0BDA92', '#00B074'],
-  '#18D4D4': ['#18D4D4', '#0097A7'],
-  '#54A8FF': ['#54A8FF', '#1565C0'],
-  '#A78BFA': ['#A78BFA', '#7C3AED'],
-  '#F472B6': ['#F472B6', '#DB2777'],
-  // Legacy colors fallbacks
-  '#FF6584': ['#FF6584', '#E63946'],
-  '#FFD700': ['#FEC600', '#F4A100'],
-  '#43E97B': ['#0BDA92', '#00B074'],
-  '#00B4D8': ['#18D4D4', '#0097A7'],
-  '#FF8C42': ['#FF9F43', '#E67E00'],
-  '#9B59B6': ['#A78BFA', '#7C3AED'],
-  '#1ABC9C': ['#0BDA92', '#00B074'],
-  '#E74C3C': ['#FF6B6B', '#E63946'],
+  '#FF6B6B': ['#FF6B6B', '#C0392B'],
+  '#FF9F43': ['#FF9F43', '#D35400'],
+  '#FEC600': ['#FEC600', '#E67E00'],
+  '#0BDA92': ['#0BDA92', '#00855A'],
+  '#18D4D4': ['#18D4D4', '#008080'],
+  '#54A8FF': ['#54A8FF', '#1A6FCC'],
+  '#A78BFA': ['#A78BFA', '#6D28D9'],
+  '#F472B6': ['#F472B6', '#BE185D'],
+  '#FF6584': ['#FF6B6B', '#C0392B'],
+  '#FFD700': ['#FEC600', '#E67E00'],
+  '#43E97B': ['#0BDA92', '#00855A'],
+  '#00B4D8': ['#18D4D4', '#008080'],
+  '#FF8C42': ['#FF9F43', '#D35400'],
+  '#9B59B6': ['#A78BFA', '#6D28D9'],
+  '#1ABC9C': ['#0BDA92', '#00855A'],
+  '#E74C3C': ['#FF6B6B', '#C0392B'],
 };
-
 function getGradient(color) {
-  return GRADIENT_MAP[color] || [colors.primary, colors.primaryDark];
+  return GRADIENT_MAP[color] || ['#5C5FE4', '#3D40C4'];
 }
 
-// ─── Task Card ─────────────────────────────────────────────────────────────────
-function TaskCard({ task, status, onDone }) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const doneAnim = useRef(new Animated.Value(1)).current;
+// ─── XP / level helpers ────────────────────────────────────────────────────────
+function getLevelInfo(totalStars) {
+  const level = Math.floor(totalStars / 5) + 1;
+  const starsInLevel = totalStars % 5;
+  return { level, starsInLevel, required: 5 };
+}
+
+// ─── Stat chip ─────────────────────────────────────────────────────────────────
+function StatChip({ emoji, value, label }) {
+  return (
+    <View style={styles.statChip}>
+      <Text style={styles.statEmoji}>{emoji}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── Active Quest Card ─────────────────────────────────────────────────────────
+function QuestCard({ task, index, onDone, kidColor }) {
+  const slideAnim = useRef(new Animated.Value(70)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const btnScale = useRef(new Animated.Value(1)).current;
+  const cardScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Staggered bounce-in entrance
+    Animated.sequence([
+      Animated.delay(index * 100),
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: 0, friction: 7, tension: 65, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]),
+    ]).start();
+
+    // Heartbeat pulse on DO IT button — keeps kids' eyes on it
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(btnScale, { toValue: 1.05, duration: 600, useNativeDriver: true }),
+        Animated.timing(btnScale, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.delay(800),
+      ])
+    ).start();
+  }, []);
 
   function handlePress() {
     Animated.sequence([
-      Animated.spring(scaleAnim, { toValue: 0.95, friction: 8, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
-    ]).start(() => {
-      if (onDone) onDone();
-    });
+      Animated.spring(cardScale, { toValue: 0.93, friction: 6, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, friction: 4, tension: 140, useNativeDriver: true }),
+    ]).start(() => onDone && onDone());
   }
 
-  const accent = {
-    pending: '#fff',
-    completed: 'rgba(255,255,255,0.5)',
-    approved: 'rgba(255,255,255,0.3)',
-  }[status];
-
-  const cardBg = {
-    pending: 'rgba(255,255,255,0.97)',
-    completed: 'rgba(255,255,255,0.75)',
-    approved: 'rgba(255,255,255,0.6)',
-  }[status];
-
   return (
-    <Animated.View style={[styles.taskCard, { backgroundColor: cardBg, transform: [{ scale: scaleAnim }] }]}>
-      {/* Left accent strip */}
-      <View
-        style={[
-          styles.taskStrip,
-          {
-            backgroundColor:
-              status === 'pending' ? 'rgba(92,95,228,0.8)' :
-              status === 'completed' ? 'rgba(245,158,11,0.8)' :
-              'rgba(16,185,129,0.8)',
-          },
-        ]}
-      />
+    <Animated.View
+      style={[
+        styles.questCard,
+        { opacity: opacityAnim, transform: [{ translateY: slideAnim }, { scale: cardScale }] },
+      ]}
+    >
+      {/* Color bar at top */}
+      <View style={[styles.questCardBar, { backgroundColor: kidColor }]} />
 
-      <View style={styles.taskCardBody}>
-        {/* Top row: emoji + info */}
-        <View style={styles.taskTopRow}>
-          <View style={styles.taskEmojiWrap}>
-            <Text style={styles.taskEmoji}>{task.emoji}</Text>
+      <View style={styles.questCardBody}>
+        {/* Emoji + title */}
+        <View style={styles.questTop}>
+          <View style={[styles.questEmojiBox, { backgroundColor: kidColor + '28' }]}>
+            <Text style={styles.questEmojiText}>{task.emoji}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.taskTitle}>{task.title}</Text>
-            <View style={styles.rewardRow}>
-              <Text style={styles.rewardIcon}>🎁</Text>
-              <Text style={styles.rewardText}>{task.reward}</Text>
+          <View style={styles.questInfo}>
+            <Text style={styles.questTitle}>{task.title}</Text>
+            <View style={styles.questRewardRow}>
+              <Text style={styles.questRewardStar}>⭐</Text>
+              <Text style={styles.questRewardText} numberOfLines={1}>
+                {task.reward}
+              </Text>
             </View>
           </View>
-
-          {/* Status badge for completed/approved */}
-          {status === 'completed' && (
-            <View style={styles.waitingBadge}>
-              <Text style={styles.waitingBadgeText}>⏳</Text>
-            </View>
-          )}
-          {status === 'approved' && (
-            <View style={styles.doneBadge}>
-              <Text style={styles.doneBadgeText}>✓</Text>
-            </View>
-          )}
         </View>
 
-        {/* Action row */}
-        {status === 'pending' && (
-          <TouchableOpacity style={styles.doneBtn} onPress={handlePress} activeOpacity={0.85}>
-            <Text style={styles.doneBtnText}>I Did It! ✅</Text>
+        {/* DO IT! button */}
+        <Animated.View style={[styles.doItWrap, { transform: [{ scale: btnScale }] }]}>
+          <TouchableOpacity onPress={handlePress} activeOpacity={0.88} style={styles.doItOuter}>
+            <LinearGradient
+              colors={['#FF8C00', '#FFE000']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.doItGradient}
+            >
+              <Text style={styles.doItText}>⚡  DO IT!</Text>
+            </LinearGradient>
           </TouchableOpacity>
-        )}
-
-        {status === 'completed' && (
-          <View style={styles.pendingApprovalRow}>
-            <Text style={styles.pendingApprovalText}>Waiting for parent to check…</Text>
-          </View>
-        )}
-
-        {status === 'approved' && (
-          <View style={styles.approvedRow}>
-            <Text style={styles.approvedText}>🌟 Reward collected!</Text>
-          </View>
-        )}
+        </Animated.View>
       </View>
     </Animated.View>
+  );
+}
+
+// ─── Waiting Card ──────────────────────────────────────────────────────────────
+function WaitingCard({ task }) {
+  const dotOpacity = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(dotOpacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={styles.waitingCard}>
+      <View style={styles.waitingEmojiBox}>
+        <Text style={{ fontSize: 26 }}>{task.emoji}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.waitingTitle}>{task.title}</Text>
+        <Animated.Text style={[styles.waitingStatus, { opacity: dotOpacity }]}>
+          ⏳ Parent is checking your work...
+        </Animated.Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Done Card ─────────────────────────────────────────────────────────────────
+function DoneCard({ task }) {
+  return (
+    <View style={styles.doneCard}>
+      <View style={styles.doneEmojiBox}>
+        <Text style={{ fontSize: 26 }}>{task.emoji}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.doneTitle}>{task.title}</Text>
+        <Text style={styles.doneReward}>⭐ {task.reward}</Text>
+      </View>
+      <Text style={styles.doneTick}>✅</Text>
+    </View>
   );
 }
 
@@ -143,31 +190,39 @@ export default function KidDashboard({ route, navigation }) {
   const approvedTasks = kidTasks.filter(t => t.status === 'approved');
   const celebratedTasks = approvedTasks.filter(t => t.celebrated);
 
-  const totalTasks = kidTasks.length;
+  const totalStars = approvedTasks.length;
   const doneTasks = waitingTasks.length + approvedTasks.length;
-  const progress = totalTasks > 0 ? doneTasks / totalTasks : 0;
+  const { level, starsInLevel, required } = getLevelInfo(totalStars);
 
-  // Animations
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const headerScale = useRef(new Animated.Value(0.8)).current;
+  // Header animations
   const headerOpacity = useRef(new Animated.Value(0)).current;
+  const avatarScale = useRef(new Animated.Value(0.7)).current;
+  const glowScale = useRef(new Animated.Value(1)).current;
+  const xpAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(headerScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-      Animated.timing(headerOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(headerOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
+      Animated.spring(avatarScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
     ]).start();
-  }, []);
 
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 800,
+    Animated.timing(xpAnim, {
+      toValue: starsInLevel / required,
+      duration: 1100,
+      delay: 600,
       useNativeDriver: false,
     }).start();
-  }, [progress]);
 
-  // Navigate to celebration for newly approved, uncelebrated tasks
+    // Pulsing glow ring behind avatar
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowScale, { toValue: 1.18, duration: 1400, useNativeDriver: true }),
+        Animated.timing(glowScale, { toValue: 1, duration: 1400, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  // Auto-navigate to celebration for newly approved tasks
   useEffect(() => {
     const uncelebrated = approvedTasks.filter(t => !t.celebrated);
     if (uncelebrated.length > 0) {
@@ -181,21 +236,19 @@ export default function KidDashboard({ route, navigation }) {
 
   if (!kid) return null;
 
-  const gradientColors = getGradient(kid.color);
-  const progressPercent = Math.round(progress * 100);
+  const gradient = getGradient(kid.color);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 60 }}
       >
-        {/* ─── Gradient Header ─────────────────────────────────────────────── */}
-        <LinearGradient colors={gradientColors} style={styles.header}>
-          {/* Back */}
+        {/* ─── Gradient Header ──────────────────────────────────────────────── */}
+        <LinearGradient colors={[gradient[0], gradient[1]]} style={styles.header}>
+          {/* Back button */}
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
@@ -204,85 +257,137 @@ export default function KidDashboard({ route, navigation }) {
             <Text style={styles.backBtnText}>← Home</Text>
           </TouchableOpacity>
 
-          {/* Kid info */}
-          <Animated.View
-            style={[
-              styles.kidInfoBlock,
-              { transform: [{ scale: headerScale }], opacity: headerOpacity },
-            ]}
-          >
-            <View style={styles.kidAvatarCircle}>
-              <Text style={styles.kidAvatarEmoji}>{kid.emoji}</Text>
+          <Animated.View style={[styles.headerMain, { opacity: headerOpacity }]}>
+            {/* Avatar with glow ring */}
+            <View style={styles.avatarWrapper}>
+              <Animated.View
+                style={[
+                  styles.glowRing,
+                  { backgroundColor: '#ffffff28', transform: [{ scale: glowScale }] },
+                ]}
+              />
+              <Animated.View
+                style={[styles.avatarCircle, { transform: [{ scale: avatarScale }] }]}
+              >
+                <Text style={styles.avatarEmoji}>{kid.emoji}</Text>
+              </Animated.View>
             </View>
-            <Text style={styles.kidName}>{kid.name}</Text>
-            {totalTasks > 0 && (
-              <Text style={styles.kidSubline}>
-                {doneTasks} of {totalTasks} quests done
-              </Text>
-            )}
-          </Animated.View>
 
-          {/* Progress bar */}
-          {totalTasks > 0 && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressTrack}>
+            {/* Name */}
+            <Text style={styles.kidName}>{kid.name.toUpperCase()}</Text>
+
+            {/* Level badge */}
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>🏆  LEVEL {level}  HERO</Text>
+            </View>
+
+            {/* Stats row */}
+            <View style={styles.statsRow}>
+              <StatChip emoji="⭐" value={totalStars} label="Stars" />
+              <View style={styles.statDivider} />
+              <StatChip emoji="🏆" value={`Lv ${level}`} label="Level" />
+              <View style={styles.statDivider} />
+              <StatChip emoji="✅" value={doneTasks} label="Done" />
+            </View>
+
+            {/* XP progress bar */}
+            <View style={styles.xpSection}>
+              <View style={styles.xpLabelRow}>
+                <Text style={styles.xpLabel}>Progress to Level {level + 1}</Text>
+                <Text style={styles.xpCount}>{starsInLevel} / {required} ⭐</Text>
+              </View>
+              <View style={styles.xpTrack}>
                 <Animated.View
                   style={[
-                    styles.progressFill,
+                    styles.xpFill,
                     {
-                      width: progressAnim.interpolate({
+                      width: xpAnim.interpolate({
                         inputRange: [0, 1],
                         outputRange: ['0%', '100%'],
                       }),
                     },
                   ]}
                 />
+                {/* Milestone notches */}
+                {[1, 2, 3, 4].map(i => (
+                  <View key={i} style={[styles.xpNotch, { left: `${i * 20}%` }]} />
+                ))}
               </View>
-              <Text style={styles.progressLabel}>{progressPercent}%</Text>
             </View>
-          )}
+          </Animated.View>
         </LinearGradient>
 
-        {/* ─── Task content ─────────────────────────────────────────────────── */}
-        <View style={styles.taskContent}>
-          {totalTasks === 0 && (
+        {/* ─── Quest Board Content ───────────────────────────────────────────── */}
+        <View style={styles.content}>
+          {/* Empty state */}
+          {kidTasks.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>🎉</Text>
-              <Text style={styles.emptyTitle}>No quests yet!</Text>
-              <Text style={styles.emptySub}>Ask your parent to add some chores for you.</Text>
+              <Text style={styles.emptyEmoji}>🎯</Text>
+              <Text style={styles.emptyTitle}>No Quests Yet!</Text>
+              <Text style={styles.emptySub}>
+                Ask Mom or Dad to add some awesome quests for you!
+              </Text>
             </View>
           )}
 
-          {/* Pending */}
+          {/* All done! */}
+          {kidTasks.length > 0 && pendingTasks.length === 0 && waitingTasks.length === 0 && (
+            <View style={styles.allDoneCard}>
+              <Text style={styles.allDoneEmoji}>🎊</Text>
+              <Text style={styles.allDoneTitle}>YOU'RE A STAR!</Text>
+              <Text style={styles.allDoneSub}>All quests complete! Ask for more adventures!</Text>
+            </View>
+          )}
+
+          {/* ── Active quests */}
           {pendingTasks.length > 0 && (
-            <Section title="Your Quests" count={pendingTasks.length} accent={colors.primary}>
-              {pendingTasks.map(task => (
-                <TaskCard
+            <View style={styles.section}>
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>⚡ ACTIVE QUESTS</Text>
+                <View style={[styles.sectionBadge, { backgroundColor: '#FF8C00' }]}>
+                  <Text style={styles.sectionBadgeText}>{pendingTasks.length}</Text>
+                </View>
+              </View>
+              {pendingTasks.map((task, i) => (
+                <QuestCard
                   key={task.id}
                   task={task}
-                  status="pending"
+                  index={i}
+                  kidColor={kid.color}
                   onDone={() => completeTask(task.id)}
                 />
               ))}
-            </Section>
+            </View>
           )}
 
-          {/* Waiting */}
+          {/* ── Waiting for approval */}
           {waitingTasks.length > 0 && (
-            <Section title="Waiting for Approval" count={waitingTasks.length} accent={colors.warning}>
+            <View style={styles.section}>
+              <View style={styles.sectionHead}>
+                <Text style={[styles.sectionTitle, { color: '#B45309' }]}>⏳ BEING CHECKED</Text>
+                <View style={[styles.sectionBadge, { backgroundColor: '#F59E0B' }]}>
+                  <Text style={styles.sectionBadgeText}>{waitingTasks.length}</Text>
+                </View>
+              </View>
               {waitingTasks.map(task => (
-                <TaskCard key={task.id} task={task} status="completed" />
+                <WaitingCard key={task.id} task={task} />
               ))}
-            </Section>
+            </View>
           )}
 
-          {/* Done */}
+          {/* ── Rewards won */}
           {celebratedTasks.length > 0 && (
-            <Section title="Rewards Collected" count={celebratedTasks.length} accent={colors.success}>
+            <View style={styles.section}>
+              <View style={styles.sectionHead}>
+                <Text style={[styles.sectionTitle, { color: '#065F46' }]}>🏆 REWARDS WON</Text>
+                <View style={[styles.sectionBadge, { backgroundColor: '#10B981' }]}>
+                  <Text style={styles.sectionBadgeText}>{celebratedTasks.length}</Text>
+                </View>
+              </View>
               {celebratedTasks.map(task => (
-                <TaskCard key={task.id} task={task} status="approved" />
+                <DoneCard key={task.id} task={task} />
               ))}
-            </Section>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -290,34 +395,15 @@ export default function KidDashboard({ route, navigation }) {
   );
 }
 
-// ─── Section wrapper ──────────────────────────────────────────────────────────
-function Section({ title, count, accent, children }) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <View style={[styles.sectionAccentDot, { backgroundColor: accent }]} />
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <View style={[styles.sectionCount, { backgroundColor: accent + '20' }]}>
-          <Text style={[styles.sectionCountText, { color: accent }]}>{count}</Text>
-        </View>
-      </View>
-      {children}
-    </View>
-  );
-}
-
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F0F4F8',
-  },
+  container: { flex: 1, backgroundColor: '#F8F9FF' },
 
   // ─── Header
   header: {
     paddingTop: 56,
     paddingBottom: 32,
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
   },
   backBtn: {
     alignSelf: 'flex-start',
@@ -325,248 +411,320 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  backBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  kidInfoBlock: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  kidAvatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+  backBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  headerMain: { alignItems: 'center' },
+
+  // Avatar
+  avatarWrapper: {
+    width: 130,
+    height: 130,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.5)',
+    marginBottom: 14,
   },
-  kidAvatarEmoji: {
-    fontSize: 54,
+  glowRing: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
   },
+  avatarCircle: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 3.5,
+    borderColor: 'rgba(255,255,255,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarEmoji: { fontSize: 60 },
+
+  // Name + badge
   kidName: {
-    fontSize: 30,
-    fontWeight: '800',
+    fontSize: 32,
+    fontWeight: '900',
     color: '#fff',
-    letterSpacing: -0.4,
-    marginBottom: 4,
+    letterSpacing: 3,
+    marginBottom: 10,
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
-  kidSubline: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '600',
+  levelBadge: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 100,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginBottom: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.45)',
+  },
+  levelBadgeText: {
+    color: '#FFE000',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
 
-  // Progress
-  progressSection: {
+  // Stats
+  statsRow: {
     flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    marginBottom: 18,
+    width: '100%',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-around',
   },
-  progressTrack: {
-    flex: 1,
-    height: 10,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+  statChip: { alignItems: 'center', flex: 1 },
+  statEmoji: { fontSize: 22, marginBottom: 4 },
+  statValue: { fontSize: 22, fontWeight: '900', color: '#fff' },
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '700',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' },
+
+  // XP bar
+  xpSection: { width: '100%' },
+  xpLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 7,
+  },
+  xpLabel: { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+  xpCount: { fontSize: 12, color: '#FFE000', fontWeight: '800' },
+  xpTrack: {
+    height: 16,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderRadius: 100,
     overflow: 'hidden',
+    position: 'relative',
   },
-  progressFill: {
+  xpFill: {
     position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#fff',
+    left: 0, top: 0, bottom: 0,
+    backgroundColor: '#FFE000',
     borderRadius: 100,
   },
-  progressLabel: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    fontWeight: '700',
-    minWidth: 36,
-    textAlign: 'right',
+  xpNotch: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -5,
+    width: 2,
+    height: 10,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 1,
   },
 
-  // ─── Task content area
-  taskContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-  },
+  // ─── Content
+  content: { padding: 20 },
 
-  // ─── Section
-  section: {
-    marginBottom: 28,
-  },
-  sectionHeader: {
+  // Section
+  section: { marginBottom: 30 },
+  sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionAccentDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    gap: 10,
+    marginBottom: 14,
   },
   sectionTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.text1,
-    letterSpacing: -0.2,
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
-  sectionCount: {
+  sectionBadge: {
     borderRadius: 100,
-    minWidth: 24,
-    height: 24,
+    minWidth: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
   },
-  sectionCountText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  sectionBadgeText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
-  // ─── Task card
-  taskCard: {
-    borderRadius: 18,
-    marginBottom: 12,
-    flexDirection: 'row',
+  // ─── Quest card
+  questCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    marginBottom: 16,
     overflow: 'hidden',
-    ...shadows.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 6,
   },
-  taskStrip: {
-    width: 5,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
+  questCardBar: {
+    height: 5,
+    width: '100%',
   },
-  taskCardBody: {
-    flex: 1,
-    padding: 16,
-  },
-  taskTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  taskEmojiWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  taskEmoji: {
-    fontSize: 26,
-  },
-  taskTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.text1,
-    marginBottom: 4,
-    letterSpacing: -0.2,
-    lineHeight: 22,
-  },
-  rewardRow: {
+  questCardBody: { padding: 18 },
+  questTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    marginBottom: 16,
   },
-  rewardIcon: { fontSize: 13 },
-  rewardText: {
-    fontSize: 13,
-    color: colors.text2,
-    fontWeight: '600',
-    flex: 1,
-  },
-  waitingBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.warningLight,
+  questEmojiBox: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    marginRight: 14,
   },
-  waitingBadgeText: { fontSize: 15 },
-  doneBadge: {
-    width: 32,
-    height: 32,
+  questEmojiText: { fontSize: 32 },
+  questInfo: { flex: 1 },
+  questTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 6,
+    lineHeight: 24,
+  },
+  questRewardRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  questRewardStar: { fontSize: 15 },
+  questRewardText: { fontSize: 14, color: '#64748B', fontWeight: '600', flex: 1 },
+
+  // DO IT button
+  doItWrap: {
     borderRadius: 16,
-    backgroundColor: colors.successLight,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  doItOuter: { borderRadius: 16, overflow: 'hidden' },
+  doItGradient: {
+    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
   },
-  doneBadgeText: {
-    fontSize: 14,
-    color: colors.success,
-    fontWeight: '800',
+  doItText: {
+    color: '#1A0800',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 2,
   },
 
-  // Action rows
-  doneBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 100,
-    paddingVertical: 13,
+  // ─── Waiting card
+  waitingCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#FCD34D',
   },
-  doneBtnText: {
-    color: '#fff',
+  waitingEmojiBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  waitingTitle: {
     fontSize: 16,
     fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 5,
   },
-  pendingApprovalRow: {
-    backgroundColor: colors.warningLight,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-  },
-  pendingApprovalText: {
-    color: colors.warning,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  approvedRow: {
-    backgroundColor: colors.successLight,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-  },
-  approvedText: {
-    color: colors.success,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  waitingStatus: { fontSize: 13, color: '#D97706', fontWeight: '700' },
 
-  // Empty
+  // ─── Done card
+  doneCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#6EE7B7',
+  },
+  doneEmojiBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  doneTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  doneReward: { fontSize: 13, color: '#059669', fontWeight: '700' },
+  doneTick: { fontSize: 24, marginLeft: 8 },
+
+  // ─── States
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 56,
+    paddingVertical: 60,
+    paddingHorizontal: 24,
   },
-  emptyEmoji: { fontSize: 64, marginBottom: 16 },
+  emptyEmoji: { fontSize: 72, marginBottom: 16 },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text1,
-    marginBottom: 8,
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptySub: {
     fontSize: 15,
-    color: colors.text3,
+    color: '#94A3B8',
     fontWeight: '500',
     textAlign: 'center',
-    maxWidth: 240,
+    lineHeight: 22,
+  },
+  allDoneCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFBF0',
+    borderRadius: 28,
+    padding: 32,
+    marginBottom: 24,
+    borderWidth: 3,
+    borderColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  allDoneEmoji: { fontSize: 64, marginBottom: 12 },
+  allDoneTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  allDoneSub: {
+    fontSize: 15,
+    color: '#64748B',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
