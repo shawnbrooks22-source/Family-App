@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   StatusBar,
   Pressable,
   Modal,
+  AppState,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -1218,8 +1219,56 @@ function FormLabel({ label }) {
 // ─── ParentDashboard root ──────────────────────────────────────────────────────
 
 export default function ParentDashboard({ navigation }) {
-  const { tasks } = useApp();
+  const { tasks, checkParentSession, refreshParentSession } = useApp();
   const pendingCount = tasks.filter(t => t.status === 'completed').length;
+  const sessionCheckRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
+
+  // ─── Session guard: auto-lock after 30 min inactivity ──────────────────────
+  async function guardSession() {
+    const valid = await checkParentSession();
+    if (!valid) {
+      // Clear any pending checks
+      if (sessionCheckRef.current) clearInterval(sessionCheckRef.current);
+      // Navigate back to Home — parent must re-enter PIN
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Home');
+      }
+      Alert.alert(
+        '🔒 Parent Zone Locked',
+        'Your session expired after 30 minutes of inactivity. Please enter your PIN again.',
+        [{ text: 'OK' }]
+      );
+    }
+  }
+
+  useEffect(() => {
+    // Check session validity immediately on mount
+    guardSession();
+
+    // Poll every 60 seconds
+    sessionCheckRef.current = setInterval(guardSession, 60_000);
+
+    // Also check when app comes back to foreground
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        guardSession();
+      }
+      appStateRef.current = nextState;
+    });
+
+    return () => {
+      clearInterval(sessionCheckRef.current);
+      sub.remove();
+    };
+  }, []);
+
+  // Extend session on any user interaction within the dashboard
+  function onUserInteraction() {
+    refreshParentSession?.();
+  }
 
   return (
     <Tab.Navigator

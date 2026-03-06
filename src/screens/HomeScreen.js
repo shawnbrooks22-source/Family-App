@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { colors, shadows } from '../theme/index';
+import {
+  recordPinFailure,
+  clearPinFailures,
+  getPinLockoutStatus,
+} from '../lib/security';
 
 const { width } = Dimensions.get('window');
 
@@ -49,9 +54,9 @@ function getStarTitle(stars) {
 }
 
 // ─── Custom In-App Numpad ───────────────────────────────────────────────────────
-function NumPad({ onPress, onBackspace }) {
+function NumPad({ onPress, onBackspace, disabled = false }) {
   return (
-    <View style={styles.numpad}>
+    <View style={[styles.numpad, disabled && { opacity: 0.35 }]}>
       {NUMPAD_ROWS.map((row, ri) => (
         <View key={ri} style={styles.numpadRow}>
           {row.map((key, ki) => {
@@ -63,8 +68,9 @@ function NumPad({ onPress, onBackspace }) {
                 <TouchableOpacity
                   key={ki}
                   style={[styles.numpadKey, styles.numpadBackspaceKey]}
-                  onPress={onBackspace}
-                  activeOpacity={0.6}
+                  onPress={disabled ? undefined : onBackspace}
+                  activeOpacity={disabled ? 1 : 0.6}
+                  disabled={disabled}
                 >
                   <Text style={styles.numpadBackspaceText}>⌫</Text>
                 </TouchableOpacity>
@@ -74,8 +80,9 @@ function NumPad({ onPress, onBackspace }) {
               <TouchableOpacity
                 key={ki}
                 style={styles.numpadKey}
-                onPress={() => onPress(key)}
-                activeOpacity={0.6}
+                onPress={disabled ? undefined : () => onPress(key)}
+                activeOpacity={disabled ? 1 : 0.6}
+                disabled={disabled}
               >
                 <Text style={styles.numpadKeyText}>{key}</Text>
               </TouchableOpacity>
@@ -85,6 +92,14 @@ function NumPad({ onPress, onBackspace }) {
       ))}
     </View>
   );
+}
+
+function formatLockoutTime(seconds) {
+  if (seconds <= 0) return '';
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 // ─── Kid Profile Card ───────────────────────────────────────────────────────────
@@ -452,17 +467,40 @@ const wStyles = StyleSheet.create({
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const { family, tasks, verifyPin } = useApp();
-  const [showPin,    setShowPin]    = useState(false);
-  const [showWeekly, setShowWeekly] = useState(false);
-  const [pin, setPin]               = useState('');
-  const [pinError, setPinError] = useState(false);
+  const [showPin,      setShowPin]      = useState(false);
+  const [showWeekly,   setShowWeekly]   = useState(false);
+  const [pin,          setPin]          = useState('');
+  const [pinError,     setPinError]     = useState(false);
+  const [lockoutSecs,  setLockoutSecs]  = useState(0);
+  const [pinAttempts,  setPinAttempts]  = useState(0);
   // Which digit index is currently visible as a number (not a dot)
-  const [revealIdx, setRevealIdx] = useState(-1);
-  const revealTimer = useRef(null);
+  const [revealIdx,    setRevealIdx]    = useState(-1);
+  const revealTimer   = useRef(null);
+  const lockoutTimer  = useRef(null);
 
   const shakeAnim   = useRef(new Animated.Value(0)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(600)).current;
+
+  const lockoutActive = lockoutSecs > 0;
+
+  // ─── Lockout countdown tick ───────────────────────────────────────────────
+  useEffect(() => {
+    if (lockoutSecs <= 0) {
+      if (lockoutTimer.current) clearInterval(lockoutTimer.current);
+      return;
+    }
+    lockoutTimer.current = setInterval(() => {
+      setLockoutSecs(s => {
+        if (s <= 1) {
+          clearInterval(lockoutTimer.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(lockoutTimer.current);
+  }, [lockoutSecs > 0]);
 
   // Per-kid star counts
   const kidStarsMap = {};
@@ -501,7 +539,16 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   // ─── PIN sheet ───────────────────────────────────────────────────────────────
-  function openPin() {
+  async function openPin() {
+    // Always check current lockout state when opening
+    const status = await getPinLockoutStatus();
+    if (status.locked) {
+      setLockoutSecs(status.secondsLeft);
+      setPinAttempts(status.attempts);
+    } else {
+      setLockoutSecs(0);
+      setPinAttempts(status.attempts);
+    }
     setPin('');
     setPinError(false);
     setRevealIdx(-1);
@@ -514,10 +561,16 @@ export default function HomeScreen({ navigation }) {
 
   function closePin() {
     if (revealTimer.current) clearTimeout(revealTimer.current);
+    if (lockoutTimer.current) clearInterval(lockoutTimer.current);
     Animated.parallel([
       Animated.timing(overlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       Animated.timing(sheetAnim,   { toValue: 600, duration: 230, useNativeDriver: true }),
-    ]).start(() => { setShowPin(false); setPin(''); setPinError(false); setRevealIdx(-1); });
+    ]).start(() => {
+      setShowPin(false);
+      setPin('');
+      setPinError(false);
+      setRevealIdx(-1);
+    });
   }
 
   function shakeAndClear() {
@@ -530,8 +583,8 @@ export default function HomeScreen({ navigation }) {
     ]).start(() => setPin(''));
   }
 
-  function handleNumPress(digit) {
-    if (pin.length >= 4) return;
+  async function handleNumPress(digit) {
+    if (pin.length >= 4 || lockoutActive) return;
     const idx    = pin.length;
     const newPin = pin + digit;
 
@@ -546,17 +599,31 @@ export default function HomeScreen({ navigation }) {
     if (newPin.length === 4) {
       clearTimeout(revealTimer.current);
       setRevealIdx(-1);
-      if (verifyPin(newPin)) {
+
+      const ok = await verifyPin(newPin);
+      if (ok) {
+        await clearPinFailures();
+        setPinAttempts(0);
+        setLockoutSecs(0);
         closePin();
         setTimeout(() => navigation.navigate('Parent'), 280);
       } else {
-        setPinError(true);
-        shakeAndClear();
+        const lockStatus = await recordPinFailure();
+        setPinAttempts(lockStatus.attempts);
+        if (lockStatus.locked) {
+          setLockoutSecs(lockStatus.secondsLeft);
+          setPin('');
+          setPinError(false);
+        } else {
+          setPinError(true);
+          shakeAndClear();
+        }
       }
     }
   }
 
   function handleBackspace() {
+    if (lockoutActive) return;
     if (revealTimer.current) clearTimeout(revealTimer.current);
     setRevealIdx(-1);
     setPin(p => p.slice(0, -1));
@@ -646,37 +713,63 @@ export default function HomeScreen({ navigation }) {
             </View>
 
             <Text style={styles.pinSheetTitle}>Parent Zone</Text>
-            <Text style={styles.pinSheetSub}>Enter your 4-digit PIN</Text>
+            <Text style={styles.pinSheetSub}>
+              {lockoutActive ? '🔒 Too many attempts' : 'Enter your 4-digit PIN'}
+            </Text>
+
+            {/* Lockout banner */}
+            {lockoutActive && (
+              <View style={styles.lockoutBanner}>
+                <Text style={styles.lockoutEmoji}>⏳</Text>
+                <View>
+                  <Text style={styles.lockoutTitle}>Try again in</Text>
+                  <Text style={styles.lockoutTimer}>{formatLockoutTime(lockoutSecs)}</Text>
+                </View>
+              </View>
+            )}
 
             {/* PIN boxes */}
-            <Animated.View style={[styles.pinBoxRow, { transform: [{ translateX: shakeAnim }] }]}>
-              {[0, 1, 2, 3].map(idx => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.pinBox,
-                    pin.length > idx  && styles.pinBoxFilled,
-                    pin.length === idx && !pinError && styles.pinBoxCurrent,
-                    pinError && styles.pinBoxError,
-                  ]}
-                >
-                  {pin.length > idx && revealIdx === idx ? (
-                    /* Show the actual digit for 600ms */
-                    <Text style={[styles.pinDigitText, pinError && styles.pinDigitError]}>
-                      {pin[idx]}
-                    </Text>
-                  ) : pin.length > idx ? (
-                    /* Show a dot */
-                    <View style={[styles.pinDot, pinError && styles.pinDotError]} />
-                  ) : null}
-                </View>
-              ))}
-            </Animated.View>
+            {!lockoutActive && (
+              <>
+                <Animated.View style={[styles.pinBoxRow, { transform: [{ translateX: shakeAnim }] }]}>
+                  {[0, 1, 2, 3].map(idx => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.pinBox,
+                        pin.length > idx  && styles.pinBoxFilled,
+                        pin.length === idx && !pinError && styles.pinBoxCurrent,
+                        pinError && styles.pinBoxError,
+                      ]}
+                    >
+                      {pin.length > idx && revealIdx === idx ? (
+                        /* Show the actual digit for 600ms */
+                        <Text style={[styles.pinDigitText, pinError && styles.pinDigitError]}>
+                          {pin[idx]}
+                        </Text>
+                      ) : pin.length > idx ? (
+                        /* Show a dot */
+                        <View style={[styles.pinDot, pinError && styles.pinDotError]} />
+                      ) : null}
+                    </View>
+                  ))}
+                </Animated.View>
 
-            {pinError && <Text style={styles.pinErrorText}>Incorrect PIN — try again</Text>}
+                {pinError && (
+                  <Text style={styles.pinErrorText}>
+                    Incorrect PIN — {pinAttempts >= 9 ? 'last chance before 30-min lockout' :
+                      pinAttempts >= 4 ? 'next failure locks for 5 min' : 'try again'}
+                  </Text>
+                )}
+              </>
+            )}
 
             {/* ── Custom Numpad ── */}
-            <NumPad onPress={handleNumPress} onBackspace={handleBackspace} />
+            <NumPad
+              onPress={handleNumPress}
+              onBackspace={handleBackspace}
+              disabled={lockoutActive}
+            />
 
             <TouchableOpacity style={styles.cancelBtn} onPress={closePin}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -951,10 +1044,40 @@ const styles = StyleSheet.create({
   pinDigitError: { color: colors.error },
   pinErrorText: {
     color: colors.error,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 4,
+    paddingHorizontal: 16,
+  },
+
+  lockoutBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#FFB74D',
+    width: '100%',
+  },
+  lockoutEmoji: { fontSize: 32 },
+  lockoutTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E65100',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  lockoutTimer: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#BF360C',
+    letterSpacing: -1,
+    lineHeight: 40,
   },
 
   // ─── Custom Numpad

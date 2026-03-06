@@ -89,9 +89,195 @@ const fieldStyles = StyleSheet.create({
   },
 });
 
+// ─── COPPA Consent Screen ──────────────────────────────────────────────────────
+function ConsentScreen({ onAccept }) {
+  const [checked, setChecked] = useState(false);
+
+  return (
+    <ScrollView
+      contentContainerStyle={consentStyles.scroll}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={consentStyles.shield}>🛡️</Text>
+      <Text style={consentStyles.title}>Your family's privacy{'\n'}comes first</Text>
+      <Text style={consentStyles.sub}>
+        Before we begin, please review how Kindo handles your family's data.
+      </Text>
+
+      <View style={consentStyles.card}>
+        <Text style={consentStyles.cardTitle}>What we collect</Text>
+        {[
+          ['👤', 'Parent & kid first names or nicknames'],
+          ['✅', 'Chore completion records and star counts'],
+          ['📱', 'Optional phone numbers for notifications'],
+          ['🔒', 'Hashed PIN (never stored in plain text)'],
+        ].map(([icon, text]) => (
+          <View key={text} style={consentStyles.bullet}>
+            <Text style={consentStyles.bulletIcon}>{icon}</Text>
+            <Text style={consentStyles.bulletText}>{text}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={consentStyles.card}>
+        <Text style={consentStyles.cardTitle}>How we protect it</Text>
+        {[
+          ['🔐', 'PIN is SHA-256 hashed before storage'],
+          ['📴', 'No ads, no third-party tracking, no data selling'],
+          ['👨‍👩‍👧', 'Children\'s data used only within your family'],
+          ['🗑️', 'Delete all data anytime in Parent Settings'],
+        ].map(([icon, text]) => (
+          <View key={text} style={consentStyles.bullet}>
+            <Text style={consentStyles.bulletIcon}>{icon}</Text>
+            <Text style={consentStyles.bulletText}>{text}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={consentStyles.coppaNote}>
+        <Text style={consentStyles.coppaTitle}>COPPA Notice</Text>
+        <Text style={consentStyles.coppaText}>
+          Kindo is designed for family use and may be used by children under 13
+          under parental supervision. As the parent or guardian setting up this
+          account, you are providing consent for your child's limited information
+          (name, chore data) to be stored on this device and, if enabled, in our
+          secure cloud database.
+        </Text>
+      </View>
+
+      {/* Checkbox */}
+      <TouchableOpacity
+        style={consentStyles.checkRow}
+        onPress={() => setChecked(c => !c)}
+        activeOpacity={0.7}
+      >
+        <View style={[consentStyles.checkbox, checked && consentStyles.checkboxChecked]}>
+          {checked && <Text style={consentStyles.checkmark}>✓</Text>}
+        </View>
+        <Text style={consentStyles.checkLabel}>
+          I am the parent or guardian and I agree to the above
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[consentStyles.acceptBtn, !checked && { opacity: 0.4 }]}
+        onPress={checked ? onAccept : undefined}
+        activeOpacity={checked ? 0.85 : 1}
+        disabled={!checked}
+      >
+        <Text style={consentStyles.acceptBtnText}>Set Up My Family →</Text>
+      </TouchableOpacity>
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  );
+}
+
+const consentStyles = StyleSheet.create({
+  scroll: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 20 },
+  shield: { fontSize: 56, textAlign: 'center', marginBottom: 16 },
+  title: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: colors.text1,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    lineHeight: 38,
+    marginBottom: 10,
+  },
+  sub: {
+    fontSize: 15,
+    color: colors.text3,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  card: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.text2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+  bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 9 },
+  bulletIcon: { fontSize: 16, width: 22, textAlign: 'center', marginTop: 1 },
+  bulletText: { flex: 1, fontSize: 14, color: colors.text2, fontWeight: '500', lineHeight: 20 },
+  coppaNote: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  coppaTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1E40AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  coppaText: {
+    fontSize: 13,
+    color: '#1D4ED8',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 20,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkmark: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  checkLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text1,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  acceptBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 100,
+    paddingVertical: 17,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  acceptBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+});
+
 // ─── Main SetupScreen ──────────────────────────────────────────────────────────
 export default function SetupScreen() {
   const { setupFamily } = useApp();
+  const [consentGiven, setConsentGiven] = useState(false);
   const [step, setStep]       = useState(1);
   const [saving, setSaving]   = useState(false);
   const progressAnim = useRef(new Animated.Value(0.5)).current;
@@ -174,6 +360,22 @@ export default function SetupScreen() {
     inputRange: [0, 1],
     outputRange: ['0%', '100%'],
   });
+
+  // ─── Consent gate ──────────────────────────────────────────────────────────
+  if (!consentGiven) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+        <SafeAreaView style={{ backgroundColor: colors.surface }}>
+          <View style={styles.header}>
+            <Text style={styles.logoText}>🌟 Kindo</Text>
+            <Text style={styles.stepBadge}>Privacy</Text>
+          </View>
+        </SafeAreaView>
+        <ConsentScreen onAccept={() => setConsentGiven(true)} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

@@ -13,6 +13,18 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import {
+  hashPin,
+  checkPin,
+  secureSave,
+  secureLoad,
+  secureDelete,
+  sanitize,
+  startParentSession,
+  touchParentSession,
+  isParentSessionValid,
+  endParentSession,
+} from './security';
 
 // ─── Supabase (optional — falls back to AsyncStorage if unconfigured) ──────────
 let supabase = null;
@@ -42,8 +54,10 @@ Notifications.setNotificationHandler({
 
 const AppContext = createContext(null);
 
-const FAMILY_KEY = '@kindo_family';
-const TASKS_KEY  = '@kindo_tasks';
+const FAMILY_KEY     = '@kindo_family';
+const TASKS_KEY      = '@kindo_tasks';
+const FAMILY_ID_KEY  = '@kindo_family_id';   // stored in SecureStore
+const PARENT_PIN_KEY = '@kindo_parent_pin';  // stored in SecureStore (hashed)
 
 async function requestNotifPermissions() {
   try {
@@ -119,10 +133,10 @@ export function AppProvider({ children }) {
   // ── Load family data ───────────────────────────────────────────────────────
   async function loadData() {
     try {
-      // Check for stored family ID (cloud) or family data (local)
+      // Family ID is stored in SecureStore; everything else in AsyncStorage cache
       const [storedFamilyId, familyRaw, tasksRaw] = await Promise.all([
-        AsyncStorage.getItem('@kindo_family_id'),
-        AsyncStorage.getItem(FAMILY_KEY),
+        secureLoad(FAMILY_ID_KEY),          // SecureStore (encrypted)
+        AsyncStorage.getItem(FAMILY_KEY),   // AsyncStorage cache
         AsyncStorage.getItem(TASKS_KEY),
       ]);
 
@@ -211,10 +225,19 @@ export function AppProvider({ children }) {
 
   // ── Setup family (first-time) ──────────────────────────────────────────────
   async function setupFamily(data) {
+    // Hash the PIN before it ever touches storage
+    const pinHash = await hashPin(data.parentPin);
+    const safeData = {
+      ...data,
+      parentName:  sanitize(data.parentName, 60),
+      parentPhone: sanitize(data.parentPhone, 20),
+      parentPin:   pinHash,   // store hash, never plain text
+      kids: (data.kids || []).map(k => ({ ...k, name: sanitize(k.name, 60) })),
+    };
     if (SUPABASE_READY) {
-      await setupFamilyInSupabase(data);
+      await setupFamilyInSupabase(safeData);
     } else {
-      await saveFamily(data);
+      await saveFamily(safeData);
     }
   }
 
@@ -255,7 +278,8 @@ export function AppProvider({ children }) {
       });
     }
 
-    await AsyncStorage.setItem('@kindo_family_id', fid);
+    // Persist family ID in SecureStore (encrypted on device)
+    await secureSave(FAMILY_ID_KEY, fid);
     setFamilyId(fid);
     await loadFamilyFromSupabase(fid);
     subscribeRealtime(fid);
@@ -267,11 +291,11 @@ export function AppProvider({ children }) {
     const { data: famRow, error } = await supabase
       .from('families')
       .select('*')
-      .eq('invite_code', code.trim().toUpperCase())
+      .eq('invite_code', sanitize(code).toUpperCase())
       .single();
     if (error || !famRow) throw new Error('Invalid invite code — please check and try again.');
     const fid = famRow.id;
-    await AsyncStorage.setItem('@kindo_family_id', fid);
+    await secureSave(FAMILY_ID_KEY, fid);
     setFamilyId(fid);
     await Promise.all([
       loadFamilyFromSupabase(fid),
@@ -500,15 +524,23 @@ export function AppProvider({ children }) {
 
   // ── Parent profile update ──────────────────────────────────────────────────
   async function updateParentProfile(updates) {
+    // If a new plain-text PIN is being set, hash it first
+    let processedUpdates = { ...updates };
+    if (updates.parentPin && updates.parentPin.length === 4 && /^\d{4}$/.test(updates.parentPin)) {
+      processedUpdates.parentPin = await hashPin(updates.parentPin, familyId || 'local');
+    }
+    if (updates.parentName)  processedUpdates.parentName  = sanitize(updates.parentName, 60);
+    if (updates.parentPhone) processedUpdates.parentPhone = sanitize(updates.parentPhone, 20);
+
     if (SUPABASE_READY && familyId && family?.parentId) {
       const dbUpdates = {};
-      if (updates.parentName)  dbUpdates.name       = updates.parentName;
-      if (updates.parentEmoji) dbUpdates.emoji      = updates.parentEmoji;
-      if (updates.parentPhone !== undefined) dbUpdates.phone = updates.parentPhone;
-      if (updates.parentPin)   dbUpdates.parent_pin = updates.parentPin;
+      if (processedUpdates.parentName)  dbUpdates.name       = processedUpdates.parentName;
+      if (processedUpdates.parentEmoji) dbUpdates.emoji      = processedUpdates.parentEmoji;
+      if (processedUpdates.parentPhone !== undefined) dbUpdates.phone = processedUpdates.parentPhone;
+      if (processedUpdates.parentPin)   dbUpdates.parent_pin = processedUpdates.parentPin;
       await supabase.from('profiles').update(dbUpdates).eq('id', family.parentId);
     } else {
-      const updated = { ...family, ...updates };
+      const updated = { ...family, ...processedUpdates };
       await saveFamily(updated);
     }
   }
@@ -520,7 +552,9 @@ export function AppProvider({ children }) {
         // Delete family and all related data (cascade)
         await supabase.from('families').delete().eq('id', familyId);
       }
-      await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY, '@kindo_family_id']);
+      await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY]);
+      await secureDelete(FAMILY_ID_KEY);
+      await endParentSession();
       realtimeSub.current?.unsubscribe();
       setTasks([]);
       setFamily(null);
@@ -530,8 +564,44 @@ export function AppProvider({ children }) {
     }
   }
 
-  function verifyPin(pin) {
-    return family?.parentPin === pin;
+  /**
+   * Verify a PIN against the stored hash.
+   * Supports legacy plain-text PINs (first login after upgrade) by falling
+   * back to direct comparison, then auto-migrating to the hashed version.
+   */
+  async function verifyPin(pin) {
+    if (!family?.parentPin) return false;
+    const storedPin = family.parentPin;
+
+    // Already a SHA-256 hex hash (64 chars) — use secure comparison
+    if (storedPin.length === 64) {
+      const fid = familyId || 'local';
+      return checkPin(pin, storedPin, fid);
+    }
+
+    // Legacy plain-text PIN — verify then silently migrate to hashed version
+    if (storedPin === pin) {
+      const hashed = await hashPin(pin, familyId || 'local');
+      await updateParentProfile({ parentPin: hashed });
+      return true;
+    }
+    return false;
+  }
+
+  async function lockParentZone() {
+    await endParentSession();
+  }
+
+  async function unlockParentZone() {
+    await startParentSession();
+  }
+
+  async function checkParentSession() {
+    return isParentSessionValid();
+  }
+
+  async function refreshParentSession() {
+    await touchParentSession();
   }
 
   return (
@@ -560,7 +630,12 @@ export function AppProvider({ children }) {
         // Profile
         updateParentProfile,
         clearAllData,
+        // Auth / session
         verifyPin,
+        lockParentZone,
+        unlockParentZone,
+        checkParentSession,
+        refreshParentSession,
       }}
     >
       {children}
