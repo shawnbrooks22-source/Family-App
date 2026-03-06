@@ -10,6 +10,7 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
@@ -91,7 +92,8 @@ const fieldStyles = StyleSheet.create({
 // ─── Main SetupScreen ──────────────────────────────────────────────────────────
 export default function SetupScreen() {
   const { setupFamily } = useApp();
-  const [step, setStep] = useState(1);
+  const [step, setStep]       = useState(1);
+  const [saving, setSaving]   = useState(false);
   const progressAnim = useRef(new Animated.Value(0.5)).current;
 
   // Step 1 state
@@ -152,13 +154,20 @@ export default function SetupScreen() {
       Alert.alert('Add a kid', 'Add at least one kid to get started!');
       return;
     }
-    await setupFamily({
-      parentName: parentName.trim(),
-      parentPhone: parentPhone.trim(),
-      parentPin,
-      parentEmoji,
-      kids,
-    });
+    setSaving(true);
+    try {
+      await setupFamily({
+        parentName: parentName.trim(),
+        parentPhone: parentPhone.trim(),
+        parentPin,
+        parentEmoji,
+        kids,
+      });
+    } catch (e) {
+      Alert.alert('Setup failed', e?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const progressWidth = progressAnim.interpolate({
@@ -173,7 +182,7 @@ export default function SetupScreen() {
       <SafeAreaView style={{ backgroundColor: colors.surface }}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.logoText}>⭐ ChoreQuest</Text>
+          <Text style={styles.logoText}>🌟 Kindo</Text>
           <Text style={styles.stepBadge}>Step {step} / 2</Text>
         </View>
 
@@ -215,6 +224,7 @@ export default function SetupScreen() {
             onAddKid={addKid}
             onFinish={handleFinish}
             onBack={goBack}
+            saving={saving}
           />
         )}
       </ScrollView>
@@ -294,12 +304,12 @@ function Step2({
   kidPhone, setKidPhone,
   kidEmoji, setKidEmoji,
   kidColor, setKidColor,
-  onAddKid, onFinish, onBack,
+  onAddKid, onFinish, onBack, saving,
 }) {
   return (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Add your kids</Text>
-      <Text style={styles.stepSub}>Everyone who'll use ChoreQuest</Text>
+      <Text style={styles.stepSub}>Everyone who'll use Kindo</Text>
 
       {/* Kids list */}
       {kids.map(kid => (
@@ -393,8 +403,16 @@ function Step2({
       </View>
 
       {kids.length > 0 && (
-        <TouchableOpacity style={styles.primaryBtn} onPress={onFinish} activeOpacity={0.85}>
-          <Text style={styles.primaryBtnText}>Let's Go! 🚀</Text>
+        <TouchableOpacity
+          style={[styles.primaryBtn, saving && { opacity: 0.7 }]}
+          onPress={onFinish}
+          disabled={saving}
+          activeOpacity={0.85}
+        >
+          {saving
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.primaryBtnText}>Let's Go! 🚀</Text>
+          }
         </TouchableOpacity>
       )}
 

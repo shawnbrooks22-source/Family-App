@@ -235,7 +235,7 @@ export default function CelebrationScreen({ route, navigation }) {
   // ─── SUSPENSE + REVEALING ────────────────────────────────────────────────────
   if (phase === 'suspense' || phase === 'revealing') {
     return (
-      <LinearGradient colors={['#0D0B30', '#1A1560', '#0D0B30']} style={styles.container}>
+      <LinearGradient colors={['#0D0020', '#2D1B69', '#0D0020']} style={styles.container}>
         <StatusBar barStyle="light-content" />
 
         {/* Blinding white flash */}
@@ -254,7 +254,7 @@ export default function CelebrationScreen({ route, navigation }) {
         <View style={styles.suspenseCenter}>
           {/* QUEST COMPLETE badge */}
           <View style={styles.questBadge}>
-            <Text style={styles.questBadgeText}>⚡  QUEST COMPLETE  ⚡</Text>
+            <Text style={styles.questBadgeText}>🌟  KINDO  ·  QUEST COMPLETE  ⚡</Text>
           </View>
 
           {kidName ? (

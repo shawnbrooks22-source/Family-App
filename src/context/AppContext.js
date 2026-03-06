@@ -315,15 +315,25 @@ export function AppProvider({ children }) {
   }
 
   async function completeTask(taskId) {
+    const task = tasks.find(t => t.id === taskId);
     const updates = { status: 'completed', completed_at: Date.now() };
+
     if (SUPABASE_READY && familyId) {
       await supabase.from('tasks').update(updates).eq('id', taskId);
     } else {
       await saveTasks(tasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
     }
-    // Update streak for the kid
-    const task = tasks.find(t => t.id === taskId);
-    if (task) await updateStreak(task.assignedTo || task.assigned_to);
+
+    // Update the kid's daily streak
+    const kidId = task?.assignedTo || task?.assigned_to;
+    if (kidId) await updateStreak(kidId);
+
+    // Notify the parent so they can approve quickly
+    const kid = family?.kids?.find(k => k.id === kidId);
+    await sendNotif(
+      '⚡ Quest Complete — Review Needed!',
+      `${kid?.name || 'Your kid'} finished "${task?.emoji || ''} ${task?.title || 'a quest'}" and is waiting for your approval! 🎉`
+    );
   }
 
   async function approveTask(taskId) {

@@ -12,6 +12,7 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { colors, shadows } from '../theme/index';
@@ -215,11 +216,245 @@ function LeaderboardBanner({ kidStars }) {
   );
 }
 
+// ─── Weekly Summary Modal ───────────────────────────────────────────────────────
+function WeeklySummaryModal({ visible, onClose, tasks, family }) {
+  const slideAnim   = useRef(new Animated.Value(700)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(slideAnim,   { toValue: 0, friction: 8, tension: 90, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(overlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(slideAnim,   { toValue: 700, duration: 230, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
+  // Date range: start of this week (Monday) → today
+  const now = new Date();
+  const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // Mon=1 ... Sun=7
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - (dayOfWeek - 1));
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartMs = weekStart.getTime();
+
+  const weekLabel = weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const todayLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  const completedThisWeek = tasks.filter(
+    t => t.status === 'approved' && t.approvedAt && t.approvedAt >= weekStartMs
+  );
+
+  const kidStats = (family?.kids || []).map(kid => ({
+    kid,
+    weekStars: completedThisWeek.filter(t => (t.assignedTo || t.assigned_to) === kid.id).length,
+    totalStars: tasks.filter(t => (t.assignedTo || t.assigned_to) === kid.id && t.status === 'approved').length,
+    streak: kid.streak || 0,
+  })).sort((a, b) => b.weekStars - a.weekStars);
+
+  const totalThisWeek = completedThisWeek.length;
+  const topKid = kidStats[0];
+
+  function getEncouragement() {
+    if (totalThisWeek === 0) return "No quests finished yet this week — time to get questing! 🚀";
+    if (totalThisWeek < 3)   return "Good start! Keep building that momentum 💪";
+    if (totalThisWeek < 7)   return "Nice work this week! The family is crushing it 🔥";
+    return "INCREDIBLE week! Your family is on fire! 🏆🔥";
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <View style={wStyles.root}>
+        <Animated.View style={[wStyles.backdrop, { opacity: overlayAnim }]} pointerEvents="box-none">
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
+
+        <Animated.View style={[wStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          <View style={wStyles.handle} />
+
+          {/* Header gradient */}
+          <LinearGradient
+            colors={['#7C3AED', '#4F46E5']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={wStyles.headerGrad}
+          >
+            <View>
+              <Text style={wStyles.headerTitle}>📊 Weekly Report</Text>
+              <Text style={wStyles.headerSub}>{weekLabel} – {todayLabel}</Text>
+            </View>
+            <View style={wStyles.totalBubble}>
+              <Text style={wStyles.totalNum}>{totalThisWeek}</Text>
+              <Text style={wStyles.totalLabel}>quests{'\n'}done</Text>
+            </View>
+          </LinearGradient>
+
+          <ScrollView
+            contentContainerStyle={wStyles.body}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Encouragement */}
+            <View style={wStyles.encourageCard}>
+              <Text style={wStyles.encourageText}>{getEncouragement()}</Text>
+            </View>
+
+            {/* Per-kid breakdown */}
+            {kidStats.map((item, idx) => (
+              <View key={item.kid.id} style={wStyles.kidRow}>
+                {/* Rank + avatar */}
+                <Text style={wStyles.kidRank}>
+                  {idx === 0 && item.weekStars > 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                </Text>
+                <View style={[wStyles.kidAvatar, { backgroundColor: item.kid.color }]}>
+                  <Text style={{ fontSize: 20 }}>{item.kid.emoji}</Text>
+                </View>
+
+                {/* Name + bar */}
+                <View style={{ flex: 1 }}>
+                  <View style={wStyles.kidNameRow}>
+                    <Text style={wStyles.kidName}>{item.kid.name}</Text>
+                    {item.streak >= 2 && (
+                      <Text style={wStyles.streakPill}>🔥 {item.streak}d</Text>
+                    )}
+                  </View>
+                  {/* Progress bar proportional to week leader */}
+                  <View style={wStyles.barTrack}>
+                    <View
+                      style={[
+                        wStyles.barFill,
+                        {
+                          backgroundColor: item.kid.color,
+                          width: kidStats[0]?.weekStars > 0
+                            ? `${Math.round((item.weekStars / kidStats[0].weekStars) * 100)}%`
+                            : '0%',
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Star counts */}
+                <View style={wStyles.kidStarCol}>
+                  <Text style={wStyles.kidWeekStars}>+{item.weekStars} ⭐</Text>
+                  <Text style={wStyles.kidTotalStars}>{item.totalStars} total</Text>
+                </View>
+              </View>
+            ))}
+
+            {kidStats.length === 0 && (
+              <Text style={wStyles.noKids}>Add kids to see their weekly progress!</Text>
+            )}
+
+            <TouchableOpacity style={wStyles.closeBtn} onPress={onClose} activeOpacity={0.85}>
+              <Text style={wStyles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+const wStyles = StyleSheet.create({
+  root:    { flex: 1, justifyContent: 'flex-end' },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '88%',
+    ...shadows.lg,
+  },
+  handle: {
+    width: 40, height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 0,
+  },
+  headerGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    borderRadius: 0,
+  },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: -0.4 },
+  headerSub:   { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '600', marginTop: 3 },
+  totalBubble: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  totalNum:   { fontSize: 32, fontWeight: '900', color: '#FFE000', lineHeight: 34 },
+  totalLabel: { fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: '700', textAlign: 'center', marginTop: 2 },
+
+  body: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10, gap: 14 },
+
+  encourageCard: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  encourageText: { fontSize: 15, fontWeight: '700', color: colors.primary, lineHeight: 22, textAlign: 'center' },
+
+  kidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8F9FF',
+    borderRadius: 18,
+    padding: 14,
+  },
+  kidRank:   { fontSize: 20, width: 28, textAlign: 'center' },
+  kidAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  kidNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  kidName:   { fontSize: 15, fontWeight: '800', color: colors.text1 },
+  streakPill: {
+    fontSize: 11, fontWeight: '700', color: '#E65100',
+    backgroundColor: '#FFF3E0', borderRadius: 100,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  barTrack: { height: 8, backgroundColor: colors.divider, borderRadius: 100, overflow: 'hidden' },
+  barFill:  { height: 8, borderRadius: 100, minWidth: 4 },
+  kidStarCol:      { alignItems: 'flex-end' },
+  kidWeekStars:    { fontSize: 15, fontWeight: '900', color: '#F59E0B' },
+  kidTotalStars:   { fontSize: 11, fontWeight: '600', color: colors.text3, marginTop: 2 },
+
+  noKids: { textAlign: 'center', color: colors.text3, fontSize: 15, fontWeight: '500', paddingVertical: 24 },
+
+  closeBtn: {
+    backgroundColor: colors.divider,
+    borderRadius: 100,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  closeBtnText: { color: colors.text2, fontSize: 15, fontWeight: '700' },
+});
+
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const { family, tasks, verifyPin } = useApp();
-  const [showPin, setShowPin]   = useState(false);
-  const [pin, setPin]           = useState('');
+  const [showPin,    setShowPin]    = useState(false);
+  const [showWeekly, setShowWeekly] = useState(false);
+  const [pin, setPin]               = useState('');
   const [pinError, setPinError] = useState(false);
   // Which digit index is currently visible as a number (not a dot)
   const [revealIdx, setRevealIdx] = useState(-1);
@@ -342,7 +577,16 @@ export default function HomeScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.greeting}>{getGreeting()}! 👋</Text>
         <Text style={styles.whoTitle}>Who's here?</Text>
-        <Text style={styles.familySub}>{family.parentName}'s Family</Text>
+        <View style={styles.familySubRow}>
+          <Text style={styles.familySub}>{family.parentName}'s Family</Text>
+          <TouchableOpacity
+            style={styles.weeklyBtn}
+            onPress={() => setShowWeekly(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.weeklyBtnText}>📊 This Week</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.profileGrid}>
           {allProfiles.map((profile, i) => {
@@ -374,6 +618,14 @@ export default function HomeScreen({ navigation }) {
           <LeaderboardBanner kidStars={kidStarsForLeaderboard} />
         )}
       </ScrollView>
+
+      {/* ─── Weekly Summary Modal ─────────────────────────────────────────────── */}
+      <WeeklySummaryModal
+        visible={showWeekly}
+        onClose={() => setShowWeekly(false)}
+        tasks={tasks}
+        family={family}
+      />
 
       {/* ─── PIN Bottom Sheet ─────────────────────────────────────────────────── */}
       <Modal visible={showPin} transparent animationType="none" onRequestClose={closePin}>
@@ -474,13 +726,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: -0.6,
   },
+  familySubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 36,
+  },
   familySub: {
     fontSize: 15,
     color: colors.text3,
-    textAlign: 'center',
     fontWeight: '500',
-    marginTop: 6,
-    marginBottom: 36,
+  },
+  weeklyBtn: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
+  },
+  weeklyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
 
   // ─── Profile grid
