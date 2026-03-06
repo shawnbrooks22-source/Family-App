@@ -30,12 +30,15 @@ function getGreeting() {
   return 'Good evening';
 }
 
-function getLevelInfo(totalStars) {
-  return Math.floor(totalStars / 5) + 1;
+function getStarTitle(stars) {
+  if (stars >= 30) return '✨ Legend';
+  if (stars >= 15) return '💫 Hero';
+  if (stars >= 5)  return '⭐ Collector';
+  return '🌟 Rising Star';
 }
 
 // ─── Kid Profile Card with glow + stats ───────────────────────────────────────
-function KidCard({ profile, onPress, stars, level }) {
+function KidCard({ profile, onPress, stars }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(1)).current;
 
@@ -95,11 +98,11 @@ function KidCard({ profile, onPress, stars, level }) {
 
         <Text style={styles.profileName} numberOfLines={1}>{profile.name}</Text>
 
-        {/* Stars + level */}
+        {/* Stars + rank */}
         <View style={styles.kidStatsRow}>
           <Text style={styles.kidStat}>⭐{stars}</Text>
           <Text style={styles.kidStatDot}>·</Text>
-          <Text style={styles.kidStat}>🏆Lv{level}</Text>
+          <Text style={styles.kidStat}>{getStarTitle(stars)}</Text>
         </View>
       </Pressable>
     </Animated.View>
@@ -162,7 +165,7 @@ export default function HomeScreen({ navigation }) {
   const kidStatsMap = {};
   family.kids.forEach(kid => {
     const approved = tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length;
-    kidStatsMap[kid.id] = { stars: approved, level: getLevelInfo(approved) };
+    kidStatsMap[kid.id] = { stars: approved };
   });
 
   const allProfiles = [
@@ -247,7 +250,7 @@ export default function HomeScreen({ navigation }) {
           {allProfiles.map((profile, i) => {
             const isParent = profile.type === 'parent';
             const ea = entryAnims[i];
-            const stats = kidStatsMap[profile.id] || { stars: 0, level: 1 };
+            const stats = kidStatsMap[profile.id] || { stars: 0 };
 
             return (
               <Animated.View
@@ -260,7 +263,6 @@ export default function HomeScreen({ navigation }) {
                   <KidCard
                     profile={profile}
                     stars={stats.stars}
-                    level={stats.level}
                     onPress={() => navigation.navigate('Kid', { kidId: profile.id })}
                   />
                 )}

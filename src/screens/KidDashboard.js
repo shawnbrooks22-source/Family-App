@@ -37,11 +37,12 @@ function getGradient(color) {
   return GRADIENT_MAP[color] || ['#5C5FE4', '#3D40C4'];
 }
 
-// ─── XP / level helpers ────────────────────────────────────────────────────────
-function getLevelInfo(totalStars) {
-  const level = Math.floor(totalStars / 5) + 1;
-  const starsInLevel = totalStars % 5;
-  return { level, starsInLevel, required: 5 };
+// ─── Star rank ─────────────────────────────────────────────────────────────────
+function getStarTitle(stars) {
+  if (stars >= 30) return '✨ STAR LEGEND';
+  if (stars >= 15) return '💫 STAR HERO';
+  if (stars >= 5)  return '⭐ STAR COLLECTOR';
+  return '🌟 RISING STAR';
 }
 
 // ─── Stat chip ─────────────────────────────────────────────────────────────────
@@ -191,14 +192,15 @@ export default function KidDashboard({ route, navigation }) {
   const celebratedTasks = approvedTasks.filter(t => t.celebrated);
 
   const totalStars = approvedTasks.length;
-  const doneTasks = waitingTasks.length + approvedTasks.length;
-  const { level, starsInLevel, required } = getLevelInfo(totalStars);
+  const completedCount = waitingTasks.length + approvedTasks.length;
+  const totalCount = kidTasks.length;
+  const goalProgress = totalCount > 0 ? completedCount / totalCount : 0;
 
   // Header animations
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const avatarScale = useRef(new Animated.Value(0.7)).current;
   const glowScale = useRef(new Animated.Value(1)).current;
-  const xpAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -206,8 +208,8 @@ export default function KidDashboard({ route, navigation }) {
       Animated.spring(avatarScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
     ]).start();
 
-    Animated.timing(xpAnim, {
-      toValue: starsInLevel / required,
+    Animated.timing(progressAnim, {
+      toValue: goalProgress,
       duration: 1100,
       delay: 600,
       useNativeDriver: false,
@@ -276,44 +278,42 @@ export default function KidDashboard({ route, navigation }) {
             {/* Name */}
             <Text style={styles.kidName}>{kid.name.toUpperCase()}</Text>
 
-            {/* Level badge */}
+            {/* Star rank badge */}
             <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>🏆  LEVEL {level}  HERO</Text>
+              <Text style={styles.levelBadgeText}>{getStarTitle(totalStars)}</Text>
             </View>
 
             {/* Stats row */}
             <View style={styles.statsRow}>
               <StatChip emoji="⭐" value={totalStars} label="Stars" />
               <View style={styles.statDivider} />
-              <StatChip emoji="🏆" value={`Lv ${level}`} label="Level" />
+              <StatChip emoji="✅" value={completedCount} label="Done" />
               <View style={styles.statDivider} />
-              <StatChip emoji="✅" value={doneTasks} label="Done" />
+              <StatChip emoji="🎯" value={totalCount} label="Quests" />
             </View>
 
-            {/* XP progress bar */}
-            <View style={styles.xpSection}>
-              <View style={styles.xpLabelRow}>
-                <Text style={styles.xpLabel}>Progress to Level {level + 1}</Text>
-                <Text style={styles.xpCount}>{starsInLevel} / {required} ⭐</Text>
+            {/* Today's goal bar */}
+            {totalCount > 0 && (
+              <View style={styles.xpSection}>
+                <View style={styles.xpLabelRow}>
+                  <Text style={styles.xpLabel}>Today's Goal</Text>
+                  <Text style={styles.xpCount}>{completedCount} / {totalCount} done</Text>
+                </View>
+                <View style={styles.xpTrack}>
+                  <Animated.View
+                    style={[
+                      styles.xpFill,
+                      {
+                        width: progressAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0%', '100%'],
+                        }),
+                      },
+                    ]}
+                  />
+                </View>
               </View>
-              <View style={styles.xpTrack}>
-                <Animated.View
-                  style={[
-                    styles.xpFill,
-                    {
-                      width: xpAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                />
-                {/* Milestone notches */}
-                {[1, 2, 3, 4].map(i => (
-                  <View key={i} style={[styles.xpNotch, { left: `${i * 20}%` }]} />
-                ))}
-              </View>
-            </View>
+            )}
           </Animated.View>
         </LinearGradient>
 
@@ -457,17 +457,17 @@ const styles = StyleSheet.create({
   levelBadge: {
     backgroundColor: 'rgba(255,255,255,0.22)',
     borderRadius: 100,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 7,
     marginBottom: 18,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.45)',
   },
   levelBadgeText: {
     color: '#FFE000',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
 
   // Stats
@@ -516,15 +516,6 @@ const styles = StyleSheet.create({
     left: 0, top: 0, bottom: 0,
     backgroundColor: '#FFE000',
     borderRadius: 100,
-  },
-  xpNotch: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -5,
-    width: 2,
-    height: 10,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-    borderRadius: 1,
   },
 
   // ─── Content
