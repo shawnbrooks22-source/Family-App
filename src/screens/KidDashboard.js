@@ -256,10 +256,14 @@ export default function KidDashboard({ route, navigation }) {
     ).start();
   }, []);
 
-  // Auto-navigate to celebration for newly approved tasks
+  // Guard flag — prevents stacking multiple navigation calls at once
+  const isCelebrating = useRef(false);
+
+  // Auto-navigate to celebration for newly approved tasks — one at a time
   useEffect(() => {
     const uncelebrated = approvedTasks.filter(t => !t.celebrated);
-    if (uncelebrated.length > 0) {
+    if (uncelebrated.length > 0 && !isCelebrating.current) {
+      isCelebrating.current = true;
       navigation.navigate('Celebration', {
         taskId: uncelebrated[0].id,
         reward: uncelebrated[0].reward,
@@ -267,6 +271,15 @@ export default function KidDashboard({ route, navigation }) {
       });
     }
   }, [tasks]);
+
+  // When kid returns from a celebration, reset the guard so the next
+  // uncelebrated reward (if any) triggers automatically
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      isCelebrating.current = false;
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   if (!kid) return null;
 
