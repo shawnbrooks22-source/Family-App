@@ -197,11 +197,11 @@ export default function KidDashboard({ route, navigation }) {
   const totalStars = approvedTasks.length;
   const completedCount = waitingTasks.length + approvedTasks.length;
   const totalCount = kidTasks.length;
-  const goalProgress = totalCount > 0 ? completedCount / totalCount : 0;
+  const todayProgress = totalCount > 0 ? completedCount / totalCount : 0;
 
   // Goal state
   const goal = kid?.goal || null; // { name, stars } | null
-  const goalProgress = goal ? Math.min(totalStars / goal.stars, 1) : 0;
+  const starGoalProgress = goal ? Math.min(totalStars / goal.stars, 1) : 0;
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalNameInput, setGoalNameInput] = useState('');
   const [goalStarsInput, setGoalStarsInput] = useState('');
@@ -234,14 +234,14 @@ export default function KidDashboard({ route, navigation }) {
     ]).start();
 
     Animated.timing(progressAnim, {
-      toValue: goalProgress,
+      toValue: todayProgress,
       duration: 1100,
       delay: 600,
       useNativeDriver: false,
     }).start();
 
     Animated.timing(goalAnim, {
-      toValue: goalProgress,
+      toValue: starGoalProgress,
       duration: 1200,
       delay: 700,
       useNativeDriver: false,
