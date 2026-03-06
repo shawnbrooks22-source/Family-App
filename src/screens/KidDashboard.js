@@ -1,13 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
   ScrollView,
   Animated,
   StatusBar,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
@@ -182,7 +185,7 @@ function DoneCard({ task }) {
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function KidDashboard({ route, navigation }) {
   const { kidId } = route.params;
-  const { family, tasks, completeTask } = useApp();
+  const { family, tasks, completeTask, setKidGoal } = useApp();
   const kid = family.kids.find(k => k.id === kidId);
 
   const kidTasks = tasks.filter(t => t.assignedTo === kidId);
@@ -196,11 +199,33 @@ export default function KidDashboard({ route, navigation }) {
   const totalCount = kidTasks.length;
   const goalProgress = totalCount > 0 ? completedCount / totalCount : 0;
 
+  // Goal state
+  const goal = kid?.goal || null; // { name, stars } | null
+  const goalProgress = goal ? Math.min(totalStars / goal.stars, 1) : 0;
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [goalNameInput, setGoalNameInput] = useState('');
+  const [goalStarsInput, setGoalStarsInput] = useState('');
+
+  async function handleSaveGoal() {
+    const stars = parseInt(goalStarsInput, 10);
+    if (!goalNameInput.trim() || isNaN(stars) || stars < 1) return;
+    await setKidGoal(kidId, { name: goalNameInput.trim(), stars });
+    setShowGoalForm(false);
+    setGoalNameInput('');
+    setGoalStarsInput('');
+  }
+
+  async function handleClearGoal() {
+    await setKidGoal(kidId, null);
+    setShowGoalForm(false);
+  }
+
   // Header animations
   const headerOpacity = useRef(new Animated.Value(0)).current;
-  const avatarScale = useRef(new Animated.Value(0.7)).current;
-  const glowScale = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const avatarScale   = useRef(new Animated.Value(0.7)).current;
+  const glowScale     = useRef(new Animated.Value(1)).current;
+  const progressAnim  = useRef(new Animated.Value(0)).current;
+  const goalAnim      = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -212,6 +237,13 @@ export default function KidDashboard({ route, navigation }) {
       toValue: goalProgress,
       duration: 1100,
       delay: 600,
+      useNativeDriver: false,
+    }).start();
+
+    Animated.timing(goalAnim, {
+      toValue: goalProgress,
+      duration: 1200,
+      delay: 700,
       useNativeDriver: false,
     }).start();
 
@@ -319,6 +351,78 @@ export default function KidDashboard({ route, navigation }) {
 
         {/* ─── Quest Board Content ───────────────────────────────────────────── */}
         <View style={styles.content}>
+
+          {/* ── Star Goal Card ─────────────────────────────────────────────── */}
+          <View style={styles.goalCard}>
+            {goal ? (
+              /* Goal exists — show progress */
+              <>
+                <View style={styles.goalCardHeader}>
+                  <Text style={styles.goalCardTitle}>🎯 {goal.name}</Text>
+                  <TouchableOpacity onPress={handleClearGoal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.goalChangeBtn}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.goalCountRow}>
+                  <Text style={styles.goalCountText}>
+                    {Math.min(totalStars, goal.stars)} / {goal.stars} ⭐
+                  </Text>
+                  {totalStars >= goal.stars && (
+                    <Text style={styles.goalReachedText}>🏆 Goal Reached!</Text>
+                  )}
+                </View>
+                <View style={styles.goalTrack}>
+                  <Animated.View
+                    style={[
+                      styles.goalFill,
+                      {
+                        width: goalAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0%', '100%'],
+                        }),
+                      },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : showGoalForm ? (
+              /* Goal form */
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                <Text style={styles.goalFormTitle}>Set a Goal 🎯</Text>
+                <TextInput
+                  style={styles.goalInput}
+                  placeholder="What do you want? (e.g. New toy 🧸)"
+                  placeholderTextColor="#94A3B8"
+                  value={goalNameInput}
+                  onChangeText={setGoalNameInput}
+                />
+                <TextInput
+                  style={[styles.goalInput, { marginTop: 8 }]}
+                  placeholder="How many stars to earn it?"
+                  placeholderTextColor="#94A3B8"
+                  value={goalStarsInput}
+                  onChangeText={setGoalStarsInput}
+                  keyboardType="number-pad"
+                />
+                <View style={styles.goalFormBtns}>
+                  <TouchableOpacity style={styles.goalSaveBtn} onPress={handleSaveGoal} activeOpacity={0.85}>
+                    <Text style={styles.goalSaveBtnText}>Save Goal ⭐</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShowGoalForm(false)}>
+                    <Text style={styles.goalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </KeyboardAvoidingView>
+            ) : (
+              /* No goal — invite to set one */
+              <TouchableOpacity style={styles.setGoalTap} onPress={() => setShowGoalForm(true)} activeOpacity={0.8}>
+                <Text style={styles.setGoalEmoji}>🎯</Text>
+                <Text style={styles.setGoalTitle}>Set a Goal!</Text>
+                <Text style={styles.setGoalSub}>Pick something to work toward</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* Empty state */}
           {kidTasks.length === 0 && (
             <View style={styles.emptyState}>
@@ -667,6 +771,126 @@ const styles = StyleSheet.create({
   },
   doneReward: { fontSize: 13, color: '#059669', fontWeight: '700' },
   doneTick: { fontSize: 24, marginLeft: 8 },
+
+  // ─── Goal card
+  goalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 24,
+    shadowColor: '#5C5FE4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: '#EEF2FF',
+  },
+  goalCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  goalCardTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0F172A',
+    flex: 1,
+  },
+  goalChangeBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#5C5FE4',
+  },
+  goalCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  goalCountText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  goalReachedText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#059669',
+  },
+  goalTrack: {
+    height: 14,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 100,
+    overflow: 'hidden',
+  },
+  goalFill: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    backgroundColor: '#5C5FE4',
+    borderRadius: 100,
+  },
+  // Goal form
+  goalFormTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  goalInput: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 13,
+    fontSize: 15,
+    color: '#0F172A',
+    backgroundColor: '#F8FAFC',
+  },
+  goalFormBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 14,
+  },
+  goalSaveBtn: {
+    backgroundColor: '#5C5FE4',
+    borderRadius: 100,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    shadowColor: '#5C5FE4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  goalSaveBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  goalCancelText: {
+    color: '#94A3B8',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // No goal state
+  setGoalTap: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  setGoalEmoji: { fontSize: 36, marginBottom: 6 },
+  setGoalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  setGoalSub: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
 
   // ─── States
   emptyState: {

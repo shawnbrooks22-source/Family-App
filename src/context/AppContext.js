@@ -1,18 +1,50 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+
+// Show notifications when app is in the foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowList: true,
+  }),
+});
 
 const AppContext = createContext(null);
 
 const FAMILY_KEY = '@chorequest_family';
-const TASKS_KEY = '@chorequest_tasks';
+const TASKS_KEY  = '@chorequest_tasks';
+
+async function requestNotifPermissions() {
+  try {
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+async function sendNotif(title, body) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: true },
+      trigger: null, // fire immediately
+    });
+  } catch (e) {
+    // Notifications not available in this environment — ignore
+  }
+}
 
 export function AppProvider({ children }) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [family, setFamily] = useState(null);
-  const [tasks, setTasks] = useState([]);
+  const [family,   setFamily]   = useState(null);
+  const [tasks,    setTasks]    = useState([]);
 
   useEffect(() => {
     loadData();
+    requestNotifPermissions();
   }, []);
 
   async function loadData() {
@@ -22,7 +54,7 @@ export function AppProvider({ children }) {
         AsyncStorage.getItem(TASKS_KEY),
       ]);
       if (familyRaw) setFamily(JSON.parse(familyRaw));
-      if (tasksRaw) setTasks(JSON.parse(tasksRaw));
+      if (tasksRaw)  setTasks(JSON.parse(tasksRaw));
     } catch (e) {
       console.error('Failed to load data:', e);
     } finally {
@@ -53,6 +85,7 @@ export function AppProvider({ children }) {
       createdAt: Date.now(),
       completedAt: null,
       approvedAt: null,
+      recurrence: task.recurrence || 'none',
     };
     await saveTasks([...tasks, newTask]);
     return newTask;
@@ -66,12 +99,38 @@ export function AppProvider({ children }) {
   }
 
   async function approveTask(taskId) {
-    const updated = tasks.map(t =>
+    const task = tasks.find(t => t.id === taskId);
+
+    let updated = tasks.map(t =>
       t.id === taskId
         ? { ...t, status: 'approved', celebrated: false, approvedAt: Date.now() }
         : t
     );
+
+    // Auto-respawn recurring tasks so the quest resets immediately
+    if (task?.recurrence && task.recurrence !== 'none') {
+      const respawned = {
+        ...task,
+        id: (Date.now() + 1).toString(),
+        status: 'pending',
+        celebrated: false,
+        createdAt: Date.now(),
+        completedAt: null,
+        approvedAt: null,
+      };
+      updated = [...updated, respawned];
+    }
+
     await saveTasks(updated);
+
+    // Notify the family that the reward was released
+    const kid = family?.kids?.find(k => k.id === task?.assignedTo);
+    if (kid) {
+      await sendNotif(
+        '⭐ Reward Released!',
+        `${kid.name} earned "${task?.reward}" for completing ${task?.emoji} ${task?.title}! 🎉`
+      );
+    }
   }
 
   async function markCelebrated(taskId) {
@@ -86,7 +145,7 @@ export function AppProvider({ children }) {
   }
 
   async function addKid(kid) {
-    const newKid = { ...kid, id: Date.now().toString() };
+    const newKid = { ...kid, id: Date.now().toString(), goal: null };
     const updated = { ...family, kids: [...family.kids, newKid] };
     await saveFamily(updated);
   }
@@ -94,8 +153,16 @@ export function AppProvider({ children }) {
   async function removeKid(kidId) {
     const updated = { ...family, kids: family.kids.filter(k => k.id !== kidId) };
     await saveFamily(updated);
-    // Also remove their tasks
     await saveTasks(tasks.filter(t => t.assignedTo !== kidId));
+  }
+
+  // goal: { name: string, stars: number } | null
+  async function setKidGoal(kidId, goal) {
+    const updated = {
+      ...family,
+      kids: family.kids.map(k => k.id === kidId ? { ...k, goal } : k),
+    };
+    await saveFamily(updated);
   }
 
   function verifyPin(pin) {
@@ -116,6 +183,7 @@ export function AppProvider({ children }) {
         deleteTask,
         addKid,
         removeKid,
+        setKidGoal,
         verifyPin,
       }}
     >

@@ -249,7 +249,14 @@ function TasksTab() {
                   <Text style={styles.taskRowEmoji}>{task.emoji}</Text>
                 </View>
                 <View style={styles.taskRowMiddle}>
-                  <Text style={styles.taskRowTitle} numberOfLines={1}>{task.title}</Text>
+                  <View style={styles.taskTitleRow}>
+                    <Text style={styles.taskRowTitle} numberOfLines={1}>{task.title}</Text>
+                    {task.recurrence && task.recurrence !== 'none' && (
+                      <View style={styles.recurringBadge}>
+                        <Text style={styles.recurringBadgeText}>🔁 {task.recurrence}</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.taskRowKid}>
                     {kid ? `${kid.emoji} ${kid.name}` : 'Unknown'}
                   </Text>
@@ -277,12 +284,19 @@ function TasksTab() {
 
 // ─── Add Task Tab ──────────────────────────────────────────────────────────────
 
+const RECURRENCE_OPTS = [
+  { key: 'none',   label: 'One-Time', icon: '1️⃣' },
+  { key: 'daily',  label: 'Daily',    icon: '📅' },
+  { key: 'weekly', label: 'Weekly',   icon: '📆' },
+];
+
 function AddTaskTab() {
   const { family, addTask } = useApp();
   const [title, setTitle] = useState('');
   const [reward, setReward] = useState('');
   const [selectedKid, setSelectedKid] = useState(null);
   const [selectedEmoji, setSelectedEmoji] = useState('🧹');
+  const [recurrence, setRecurrence] = useState('none');
   const [success, setSuccess] = useState(false);
 
   async function handleAdd() {
@@ -295,11 +309,13 @@ function AddTaskTab() {
       reward: reward.trim(),
       assignedTo: selectedKid,
       emoji: selectedEmoji,
+      recurrence,
     });
 
     setTitle('');
     setReward('');
     setSelectedKid(null);
+    setRecurrence('none');
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2500);
   }
@@ -360,6 +376,24 @@ function AddTaskTab() {
           placeholderTextColor={colors.text3}
           returnKeyType="done"
         />
+
+        {/* Recurrence */}
+        <FormLabel label="Repeats 🔁" />
+        <View style={styles.recurrenceRow}>
+          {RECURRENCE_OPTS.map(opt => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.recurrenceBtn, recurrence === opt.key && styles.recurrenceBtnActive]}
+              onPress={() => setRecurrence(opt.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.recurrenceIcon}>{opt.icon}</Text>
+              <Text style={[styles.recurrenceLabel, recurrence === opt.key && styles.recurrenceLabelActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Assign to */}
         <FormLabel label="Assign To" />
@@ -1071,6 +1105,53 @@ const styles = StyleSheet.create({
     color: colors.text3,
     fontSize: 15,
     fontWeight: '600',
+  },
+
+  // ─── Recurrence picker
+  recurrenceRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  recurrenceBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    gap: 4,
+  },
+  recurrenceBtnActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  recurrenceIcon: { fontSize: 22 },
+  recurrenceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text3,
+  },
+  recurrenceLabelActive: { color: colors.primary },
+
+  // ─── Recurring badge on task list
+  taskTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  recurringBadge: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 100,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  recurringBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'capitalize',
   },
 
   // ─── Home btn / avatar
