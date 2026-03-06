@@ -9,6 +9,7 @@ import {
   Alert,
   StatusBar,
   Pressable,
+  Modal,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,13 +24,9 @@ const TASK_EMOJIS = [
   '👕', '🎒', '🚿', '♻️', '💻', '🎨', '🧺', '🌿',
 ];
 const KID_EMOJIS = ['🦊', '🐱', '🐶', '🐸', '🐻', '🦁', '🐼', '🦄', '🐯', '🐰', '🦋', '🐬'];
+const PARENT_EMOJIS = ['👩', '👨', '🧑', '👩‍💼', '👨‍💼', '🧑‍💼', '👸', '🤴', '🦸', '🦹', '🧙', '🧚'];
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
-
-function useKid(kidId) {
-  const { family } = useApp();
-  return family.kids.find(k => k.id === kidId);
-}
 
 function ScreenHeader({ title, subtitle, rightContent }) {
   return (
@@ -66,9 +63,24 @@ function HomeTab({ navigation }) {
   const { tasks, family, approveTask } = useApp();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
 
-  const totalTasks = tasks.length;
-  const doneTasks = tasks.filter(t => t.status === 'approved').length;
+  const totalTasks   = tasks.length;
+  const doneTasks    = tasks.filter(t => t.status === 'approved').length;
   const waitingTasks = tasks.filter(t => t.status === 'completed').length;
+
+  // ── Weekly analytics ──────────────────────────────────────────────────────
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const completedThisWeek = tasks.filter(
+    t => t.status === 'approved' && t.approvedAt && t.approvedAt >= oneWeekAgo
+  );
+
+  // Per-kid star tally for leaderboard snippet
+  const kidStars = family.kids.map(kid => ({
+    kid,
+    stars: tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length,
+    weekStars: completedThisWeek.filter(t => t.assignedTo === kid.id).length,
+  })).sort((a, b) => b.stars - a.stars);
+
+  const topKid = kidStars[0];
 
   async function handleApprove(task) {
     await approveTask(task.id);
@@ -94,6 +106,42 @@ function HomeTab({ navigation }) {
           <StatCard label="Waiting" value={waitingTasks} color={colors.warning} icon="time" />
           <StatCard label="Approved" value={doneTasks} color={colors.success} icon="checkmark-circle" />
         </View>
+
+        {/* Weekly Analytics Card */}
+        {family.kids.length > 0 && (
+          <View style={styles.analyticsCard}>
+            <View style={styles.analyticsHeader}>
+              <Text style={styles.analyticsTitle}>📊 This Week</Text>
+              <Text style={styles.analyticsCount}>{completedThisWeek.length} quests done</Text>
+            </View>
+
+            {kidStars.length > 0 && (
+              <View style={styles.kidRankList}>
+                {kidStars.map((item, idx) => (
+                  <View key={item.kid.id} style={styles.kidRankRow}>
+                    <Text style={styles.kidRankNum}>
+                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                    </Text>
+                    <View style={[styles.kidRankAvatar, { backgroundColor: item.kid.color }]}>
+                      <Text style={{ fontSize: 14 }}>{item.kid.emoji}</Text>
+                    </View>
+                    <Text style={styles.kidRankName}>{item.kid.name}</Text>
+                    <View style={styles.kidRankStars}>
+                      <Text style={styles.kidRankStarText}>⭐ {item.stars} total</Text>
+                      {item.weekStars > 0 && (
+                        <Text style={styles.kidRankWeekText}>+{item.weekStars} this week</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {completedThisWeek.length === 0 && (
+              <Text style={styles.analyticsEmpty}>No quests completed this week yet — assign some!</Text>
+            )}
+          </View>
+        )}
 
         {/* Needs approval */}
         <SectionHeader
@@ -169,6 +217,9 @@ function ApprovalCard({ task, kid, onApprove }) {
       <Text style={styles.approvalTaskTitle}>
         {task.emoji}  {task.title}
       </Text>
+      {task.notes ? (
+        <Text style={styles.approvalNotes}>📝 {task.notes}</Text>
+      ) : null}
       <View style={styles.approvalRewardRow}>
         <Ionicons name="gift-outline" size={15} color={colors.text3} />
         <Text style={styles.approvalRewardText}>{task.reward}</Text>
@@ -185,21 +236,36 @@ function ApprovalCard({ task, kid, onApprove }) {
 
 // ─── Tasks Tab ─────────────────────────────────────────────────────────────────
 
+const RECURRENCE_OPTS = [
+  { key: 'none',   label: 'One-Time', icon: '1️⃣' },
+  { key: 'daily',  label: 'Daily',    icon: '📅' },
+  { key: 'weekly', label: 'Weekly',   icon: '📆' },
+];
+
 function TasksTab() {
-  const { tasks, family, deleteTask } = useApp();
+  const { tasks, family, deleteTask, editTask } = useApp();
   const [filter, setFilter] = useState('all');
+  const [editingTask, setEditingTask] = useState(null);
+
+  // Edit modal state
+  const [editTitle,      setEditTitle]      = useState('');
+  const [editReward,     setEditReward]     = useState('');
+  const [editEmoji,      setEditEmoji]      = useState('🧹');
+  const [editRecurrence, setEditRecurrence] = useState('none');
+  const [editKidId,      setEditKidId]      = useState(null);
+  const [editNotes,      setEditNotes]      = useState('');
 
   const FILTERS = [
-    { key: 'all', label: 'All' },
-    { key: 'pending', label: 'To Do' },
+    { key: 'all',       label: 'All' },
+    { key: 'pending',   label: 'To Do' },
     { key: 'completed', label: 'Waiting' },
-    { key: 'approved', label: 'Done' },
+    { key: 'approved',  label: 'Done' },
   ];
 
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
 
   function statusInfo(status) {
-    if (status === 'pending') return { label: 'To Do', color: colors.primary, bg: colors.primaryLight };
+    if (status === 'pending')   return { label: 'To Do',   color: colors.primary, bg: colors.primaryLight };
     if (status === 'completed') return { label: 'Waiting', color: colors.warning, bg: colors.warningLight };
     return { label: 'Done', color: colors.success, bg: colors.successLight };
   }
@@ -209,6 +275,30 @@ function TasksTab() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
     ]);
+  }
+
+  function openEdit(task) {
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditReward(task.reward);
+    setEditEmoji(task.emoji);
+    setEditRecurrence(task.recurrence || 'none');
+    setEditKidId(task.assignedTo);
+    setEditNotes(task.notes || '');
+  }
+
+  async function handleSaveEdit() {
+    if (!editTitle.trim()) { Alert.alert('Enter a quest name'); return; }
+    if (!editReward.trim()) { Alert.alert('Add a reward'); return; }
+    await editTask(editingTask.id, {
+      title: editTitle.trim(),
+      reward: editReward.trim(),
+      emoji: editEmoji,
+      recurrence: editRecurrence,
+      assignedTo: editKidId,
+      notes: editNotes.trim(),
+    });
+    setEditingTask(null);
   }
 
   return (
@@ -260,53 +350,182 @@ function TasksTab() {
                   <Text style={styles.taskRowKid}>
                     {kid ? `${kid.emoji} ${kid.name}` : 'Unknown'}
                   </Text>
+                  {task.notes ? (
+                    <Text style={styles.taskRowNotes} numberOfLines={1}>📝 {task.notes}</Text>
+                  ) : null}
                 </View>
                 <View style={styles.taskRowRight}>
                   <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
                     <Text style={[styles.statusPillText, { color: s.color }]}>{s.label}</Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => confirmDelete(task)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{ marginTop: 4 }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.text3} />
-                  </TouchableOpacity>
+                  <View style={styles.taskActions}>
+                    {/* Only allow editing pending tasks */}
+                    {task.status === 'pending' && (
+                      <TouchableOpacity
+                        onPress={() => openEdit(task)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => confirmDelete(task)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.text3} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             );
           })
         )}
       </ScrollView>
+
+      {/* ── Edit Task Modal ───────────────────────────────────────────────── */}
+      <Modal
+        visible={!!editingTask}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditingTask(null)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setEditingTask(null)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Quest</Text>
+            <TouchableOpacity onPress={handleSaveEdit}>
+              <Text style={styles.modalSaveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <FormLabel label="Quest Name" />
+            <TextInput
+              style={styles.formInput}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholderTextColor={colors.text3}
+              returnKeyType="next"
+            />
+
+            <FormLabel label="Quest Icon" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+            >
+              {TASK_EMOJIS.map(e => (
+                <TouchableOpacity
+                  key={e}
+                  style={[styles.taskEmojiBtn, editEmoji === e && styles.taskEmojiBtnActive]}
+                  onPress={() => setEditEmoji(e)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 28 }}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <FormLabel label="Reward 🎁" />
+            <TextInput
+              style={styles.formInput}
+              value={editReward}
+              onChangeText={setEditReward}
+              placeholderTextColor={colors.text3}
+              returnKeyType="next"
+            />
+
+            <FormLabel label="Notes (optional) 📝" />
+            <TextInput
+              style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top' }]}
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder="Any extra instructions for this quest…"
+              placeholderTextColor={colors.text3}
+              multiline
+            />
+
+            <FormLabel label="Repeats 🔁" />
+            <View style={styles.recurrenceRow}>
+              {RECURRENCE_OPTS.map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.recurrenceBtn, editRecurrence === opt.key && styles.recurrenceBtnActive]}
+                  onPress={() => setEditRecurrence(opt.key)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.recurrenceIcon}>{opt.icon}</Text>
+                  <Text style={[styles.recurrenceLabel, editRecurrence === opt.key && styles.recurrenceLabelActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <FormLabel label="Assign To" />
+            <View style={styles.kidPicker}>
+              {family.kids.map(kid => (
+                <TouchableOpacity
+                  key={kid.id}
+                  style={[
+                    styles.kidPickerBtn,
+                    { backgroundColor: kid.color + (editKidId === kid.id ? 'FF' : '30') },
+                    editKidId === kid.id && styles.kidPickerBtnActive,
+                  ]}
+                  onPress={() => setEditKidId(kid.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 26 }}>{kid.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.kidPickerName,
+                      { color: editKidId === kid.id ? '#fff' : colors.text1 },
+                    ]}
+                  >
+                    {kid.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32 }]} onPress={handleSaveEdit} activeOpacity={0.85}>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.assignBtnText}>Save Changes</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 // ─── Add Task Tab ──────────────────────────────────────────────────────────────
 
-const RECURRENCE_OPTS = [
-  { key: 'none',   label: 'One-Time', icon: '1️⃣' },
-  { key: 'daily',  label: 'Daily',    icon: '📅' },
-  { key: 'weekly', label: 'Weekly',   icon: '📆' },
-];
-
 function AddTaskTab() {
   const { family, addTask } = useApp();
   const [title, setTitle] = useState('');
   const [reward, setReward] = useState('');
+  const [notes, setNotes] = useState('');
   const [selectedKid, setSelectedKid] = useState(null);
   const [selectedEmoji, setSelectedEmoji] = useState('🧹');
   const [recurrence, setRecurrence] = useState('none');
   const [success, setSuccess] = useState(false);
 
   async function handleAdd() {
-    if (!title.trim()) { Alert.alert('Enter a quest name', 'What do you want your kid to do?'); return; }
+    if (!title.trim())  { Alert.alert('Enter a quest name', 'What do you want your kid to do?'); return; }
     if (!reward.trim()) { Alert.alert('Add a reward', "What will your kid earn for completing this?"); return; }
-    if (!selectedKid) { Alert.alert('Assign to a kid', 'Choose who should complete this quest.'); return; }
+    if (!selectedKid)   { Alert.alert('Assign to a kid', 'Choose who should complete this quest.'); return; }
 
     await addTask({
       title: title.trim(),
       reward: reward.trim(),
+      notes: notes.trim(),
       assignedTo: selectedKid,
       emoji: selectedEmoji,
       recurrence,
@@ -314,6 +533,7 @@ function AddTaskTab() {
 
     setTitle('');
     setReward('');
+    setNotes('');
     setSelectedKid(null);
     setRecurrence('none');
     setSuccess(true);
@@ -374,7 +594,18 @@ function AddTaskTab() {
           value={reward}
           onChangeText={setReward}
           placeholderTextColor={colors.text3}
-          returnKeyType="done"
+          returnKeyType="next"
+        />
+
+        {/* Notes */}
+        <FormLabel label="Notes (optional) 📝" />
+        <TextInput
+          style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top' }]}
+          placeholder="Extra instructions, tips, or details for your kid…"
+          value={notes}
+          onChangeText={setNotes}
+          placeholderTextColor={colors.text3}
+          multiline
         />
 
         {/* Recurrence */}
@@ -434,12 +665,19 @@ function AddTaskTab() {
 // ─── Family Tab ────────────────────────────────────────────────────────────────
 
 function FamilyTab({ navigation }) {
-  const { family, addKid, removeKid } = useApp();
+  const { family, addKid, removeKid, editKid } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [kidName, setKidName] = useState('');
   const [kidPhone, setKidPhone] = useState('');
   const [kidEmoji, setKidEmoji] = useState('🦊');
   const [kidColor, setKidColor] = useState(kidColors[0]);
+
+  // Edit kid state
+  const [editingKid,      setEditingKid]      = useState(null);
+  const [editKidName,     setEditKidName]     = useState('');
+  const [editKidPhone,    setEditKidPhone]    = useState('');
+  const [editKidEmoji,    setEditKidEmoji]    = useState('🦊');
+  const [editKidColor,    setEditKidColor]    = useState(kidColors[0]);
 
   async function handleAddKid() {
     if (!kidName.trim()) { Alert.alert('Enter a name'); return; }
@@ -454,6 +692,25 @@ function FamilyTab({ navigation }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => removeKid(kid.id) },
     ]);
+  }
+
+  function openEditKid(kid) {
+    setEditingKid(kid);
+    setEditKidName(kid.name);
+    setEditKidPhone(kid.phone || '');
+    setEditKidEmoji(kid.emoji);
+    setEditKidColor(kid.color);
+  }
+
+  async function handleSaveKid() {
+    if (!editKidName.trim()) { Alert.alert('Enter a name'); return; }
+    await editKid(editingKid.id, {
+      name: editKidName.trim(),
+      phone: editKidPhone.trim(),
+      emoji: editKidEmoji,
+      color: editKidColor,
+    });
+    setEditingKid(null);
   }
 
   return (
@@ -493,6 +750,13 @@ function FamilyTab({ navigation }) {
               <Text style={styles.memberName}>{kid.name}</Text>
               {kid.phone ? <Text style={styles.memberPhone}>{kid.phone}</Text> : null}
             </View>
+            <TouchableOpacity
+              onPress={() => openEditKid(kid)}
+              style={[styles.removeBtn, { marginRight: 4 }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => confirmRemove(kid)}
               style={styles.removeBtn}
@@ -585,6 +849,339 @@ function FamilyTab({ navigation }) {
           </View>
         )}
       </ScrollView>
+
+      {/* ── Edit Kid Modal ─────────────────────────────────────────────────── */}
+      <Modal
+        visible={!!editingKid}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditingKid(null)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setEditingKid(null)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Kid</Text>
+            <TouchableOpacity onPress={handleSaveKid}>
+              <Text style={styles.modalSaveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <FormLabel label="Name" />
+            <TextInput
+              style={styles.formInput}
+              value={editKidName}
+              onChangeText={setEditKidName}
+              placeholderTextColor={colors.text3}
+            />
+
+            <FormLabel label="Phone" />
+            <TextInput
+              style={styles.formInput}
+              value={editKidPhone}
+              onChangeText={setEditKidPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor={colors.text3}
+              placeholder="Optional"
+            />
+
+            <FormLabel label="Emoji" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {KID_EMOJIS.map(e => (
+                <TouchableOpacity
+                  key={e}
+                  style={[styles.taskEmojiBtn, editKidEmoji === e && styles.taskEmojiBtnActive]}
+                  onPress={() => setEditKidEmoji(e)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 26 }}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <FormLabel label="Color" />
+            <View style={[styles.colorRow, { marginBottom: 32 }]}>
+              {kidColors.map(c => (
+                <TouchableOpacity
+                  key={c}
+                  onPress={() => setEditKidColor(c)}
+                  style={[
+                    styles.colorDot,
+                    { backgroundColor: c },
+                    editKidColor === c && styles.colorDotActive,
+                  ]}
+                  activeOpacity={0.8}
+                />
+              ))}
+            </View>
+
+            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32 }]} onPress={handleSaveKid} activeOpacity={0.85}>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.assignBtnText}>Save Changes</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ─── Settings Tab ──────────────────────────────────────────────────────────────
+
+function SettingsTab({ navigation }) {
+  const { family, updateParentProfile, clearAllData, verifyPin, isCloudEnabled } = useApp();
+
+  // Parent profile edit
+  const [editName,  setEditName]  = useState(family.parentName);
+  const [editPhone, setEditPhone] = useState(family.parentPhone || '');
+  const [editEmoji, setEditEmoji] = useState(family.parentEmoji);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  // PIN change
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin,     setNewPin]     = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinMsg, setPinMsg] = useState(null); // { text, ok }
+
+  async function handleSaveProfile() {
+    if (!editName.trim()) { Alert.alert('Enter your name'); return; }
+    await updateParentProfile({
+      parentName:  editName.trim(),
+      parentPhone: editPhone.trim(),
+      parentEmoji: editEmoji,
+    });
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
+  }
+
+  async function handleChangePin() {
+    setPinMsg(null);
+    if (!verifyPin(currentPin)) {
+      setPinMsg({ text: 'Current PIN is incorrect.', ok: false });
+      return;
+    }
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setPinMsg({ text: 'New PIN must be exactly 4 digits.', ok: false });
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinMsg({ text: "New PINs don't match.", ok: false });
+      return;
+    }
+    await updateParentProfile({ parentPin: newPin });
+    setCurrentPin('');
+    setNewPin('');
+    setConfirmPin('');
+    setPinMsg({ text: 'PIN updated successfully! ✅', ok: true });
+    setTimeout(() => setPinMsg(null), 3000);
+  }
+
+  function confirmClearData() {
+    Alert.alert(
+      '⚠️ Reset All Data',
+      'This will permanently delete all family data, quests, and rewards. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset Everything',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllData();
+            navigation.navigate('Home');
+          },
+        },
+      ]
+    );
+  }
+
+  return (
+    <View style={styles.tabWrapper}>
+      <ScreenHeader title="Settings" subtitle="Manage your account" />
+
+      <ScrollView
+        contentContainerStyle={styles.tabScroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Parent Profile ──────────────────────────────────────────────── */}
+        <Text style={styles.settingsSectionLabel}>PARENT PROFILE</Text>
+        <View style={styles.settingsCard}>
+          {profileSaved && (
+            <View style={[styles.successBanner, { marginBottom: 14 }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={styles.successBannerText}>Profile saved!</Text>
+            </View>
+          )}
+
+          <FormLabel label="Display Name" />
+          <TextInput
+            style={styles.formInput}
+            value={editName}
+            onChangeText={setEditName}
+            placeholderTextColor={colors.text3}
+            returnKeyType="done"
+          />
+
+          <FormLabel label="Phone" />
+          <TextInput
+            style={styles.formInput}
+            value={editPhone}
+            onChangeText={setEditPhone}
+            keyboardType="phone-pad"
+            placeholder="Optional"
+            placeholderTextColor={colors.text3}
+          />
+
+          <FormLabel label="Avatar Emoji" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+          >
+            {PARENT_EMOJIS.map(e => (
+              <TouchableOpacity
+                key={e}
+                style={[styles.taskEmojiBtn, editEmoji === e && styles.taskEmojiBtnActive]}
+                onPress={() => setEditEmoji(e)}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 26 }}>{e}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity style={[styles.assignBtn, { marginTop: 18 }]} onPress={handleSaveProfile} activeOpacity={0.85}>
+            <Ionicons name="save-outline" size={20} color="#fff" />
+            <Text style={styles.assignBtnText}>Save Profile</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Change PIN ──────────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>CHANGE PIN</Text>
+        <View style={styles.settingsCard}>
+          {pinMsg && (
+            <View style={[
+              styles.successBanner,
+              { marginBottom: 14, backgroundColor: pinMsg.ok ? colors.successLight : colors.errorLight }
+            ]}>
+              <Ionicons
+                name={pinMsg.ok ? 'checkmark-circle' : 'alert-circle'}
+                size={18}
+                color={pinMsg.ok ? colors.success : colors.error}
+              />
+              <Text style={[styles.successBannerText, { color: pinMsg.ok ? colors.success : colors.error }]}>
+                {pinMsg.text}
+              </Text>
+            </View>
+          )}
+
+          <FormLabel label="Current PIN" />
+          <TextInput
+            style={styles.formInput}
+            value={currentPin}
+            onChangeText={t => setCurrentPin(t.replace(/\D/g, '').slice(0, 4))}
+            placeholder="Enter your current 4-digit PIN"
+            placeholderTextColor={colors.text3}
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={4}
+          />
+
+          <FormLabel label="New PIN" />
+          <TextInput
+            style={styles.formInput}
+            value={newPin}
+            onChangeText={t => setNewPin(t.replace(/\D/g, '').slice(0, 4))}
+            placeholder="4 digits"
+            placeholderTextColor={colors.text3}
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={4}
+          />
+
+          <FormLabel label="Confirm New PIN" />
+          <TextInput
+            style={styles.formInput}
+            value={confirmPin}
+            onChangeText={t => setConfirmPin(t.replace(/\D/g, '').slice(0, 4))}
+            placeholder="Repeat new PIN"
+            placeholderTextColor={colors.text3}
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={4}
+          />
+
+          <TouchableOpacity
+            style={[styles.assignBtn, { marginTop: 18, backgroundColor: colors.warning }]}
+            onPress={handleChangePin}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="lock-closed-outline" size={20} color="#fff" />
+            <Text style={styles.assignBtnText}>Update PIN</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── AI Quest Creator ──────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>AI FEATURES</Text>
+        <TouchableOpacity
+          style={[styles.settingsCard, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}
+          onPress={() => navigation.navigate('AI')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.aiIconBox}>
+            <Text style={{ fontSize: 26 }}>🤖</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.aiCardTitle}>AI Quest Creator</Text>
+            <Text style={styles.aiCardSub}>Let Claude suggest perfect chores for your kids</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.text3} />
+        </TouchableOpacity>
+
+        {/* ── Invite Code ───────────────────────────────────────────────── */}
+        {isCloudEnabled && family?.inviteCode && (
+          <>
+            <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>FAMILY INVITE CODE</Text>
+            <View style={styles.settingsCard}>
+              <Text style={styles.inviteCodeLabel}>Share this code to let family join on other devices:</Text>
+              <View style={styles.inviteCodeBox}>
+                <Text style={styles.inviteCodeText}>{family.inviteCode}</Text>
+              </View>
+              <Text style={styles.inviteCodeHint}>
+                Works on any phone. Open Kindo → Join with Invite Code.
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* ── Danger Zone ─────────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.error }]}>DANGER ZONE</Text>
+        <View style={[styles.settingsCard, { borderColor: colors.error + '30', borderWidth: 1.5 }]}>
+          <Text style={styles.dangerText}>
+            Resetting will permanently delete all family members, quests, and reward history. The app will return to the setup screen.
+          </Text>
+          <TouchableOpacity
+            style={[styles.assignBtn, { backgroundColor: colors.error, marginTop: 16 }]}
+            onPress={confirmClearData}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="trash-outline" size={20} color="#fff" />
+            <Text style={styles.assignBtnText}>Reset All Data</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
     </View>
   );
 }
@@ -635,10 +1232,11 @@ export default function ParentDashboard({ navigation }) {
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ focused, color }) => {
           const icons = {
-            Home: focused ? 'home' : 'home-outline',
-            Tasks: focused ? 'list' : 'list-outline',
-            AddTask: focused ? 'add-circle' : 'add-circle-outline',
-            Family: focused ? 'people' : 'people-outline',
+            Home:     focused ? 'home'         : 'home-outline',
+            Tasks:    focused ? 'list'         : 'list-outline',
+            AddTask:  focused ? 'add-circle'   : 'add-circle-outline',
+            Family:   focused ? 'people'       : 'people-outline',
+            Settings: focused ? 'settings'     : 'settings-outline',
           };
           return <Ionicons name={icons[route.name]} size={24} color={color} />;
         },
@@ -673,6 +1271,13 @@ export default function ParentDashboard({ navigation }) {
       >
         {props => <FamilyTab {...props} navigation={navigation} />}
       </Tab.Screen>
+
+      <Tab.Screen
+        name="Settings"
+        options={{ tabBarLabel: 'Settings' }}
+      >
+        {props => <SettingsTab {...props} navigation={navigation} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
@@ -706,7 +1311,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
@@ -728,6 +1333,79 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
+  },
+
+  // ─── Analytics card
+  analyticsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 24,
+    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  analyticsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  analyticsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.text1,
+  },
+  analyticsCount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  kidRankList: { gap: 10 },
+  kidRankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  kidRankNum: {
+    fontSize: 18,
+    width: 28,
+    textAlign: 'center',
+  },
+  kidRankAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kidRankName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text1,
+  },
+  kidRankStars: { alignItems: 'flex-end' },
+  kidRankStarText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text2,
+  },
+  kidRankWeekText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.success,
+  },
+  analyticsEmpty: {
+    fontSize: 14,
+    color: colors.text3,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingVertical: 8,
   },
 
   // ─── Section header
@@ -808,7 +1486,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: colors.text1,
+    marginBottom: 6,
+  },
+  approvalNotes: {
+    fontSize: 13,
+    color: colors.text2,
+    fontWeight: '500',
     marginBottom: 8,
+    fontStyle: 'italic',
   },
   approvalRewardRow: {
     flexDirection: 'row',
@@ -848,8 +1533,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     ...shadows.sm,
   },
-  taskRowLeft: { marginRight: 12 },
-  taskRowEmoji: { fontSize: 30 },
+  taskRowLeft:   { marginRight: 12 },
+  taskRowEmoji:  { fontSize: 30 },
   taskRowMiddle: { flex: 1 },
   taskRowTitle: {
     fontSize: 15,
@@ -862,7 +1547,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 3,
   },
+  taskRowNotes: {
+    fontSize: 11,
+    color: colors.text3,
+    fontWeight: '500',
+    marginTop: 2,
+  },
   taskRowRight: { alignItems: 'flex-end', gap: 6 },
+  taskActions: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
   statusPill: {
     borderRadius: 100,
     paddingHorizontal: 10,
@@ -904,6 +1600,43 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: colors.primary,
+  },
+
+  // ─── Edit Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text1,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text3,
+  },
+  modalSaveText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
 
   // ─── Form
@@ -1107,6 +1840,80 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // ─── Settings Tab
+  settingsSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.text3,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  settingsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 18,
+    ...shadows.sm,
+  },
+  dangerText: {
+    fontSize: 14,
+    color: colors.text2,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+
+  // ─── AI card
+  aiIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text1,
+    marginBottom: 3,
+  },
+  aiCardSub: {
+    fontSize: 13,
+    color: colors.text3,
+    fontWeight: '500',
+  },
+
+  // ─── Invite code
+  inviteCodeLabel: {
+    fontSize: 13,
+    color: colors.text2,
+    fontWeight: '500',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  inviteCodeBox: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderColor: colors.primary + '40',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  inviteCodeText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: 2,
+  },
+  inviteCodeHint: {
+    fontSize: 12,
+    color: colors.text3,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
   // ─── Recurrence picker
   recurrenceRow: {
     flexDirection: 'row',
@@ -1181,7 +1988,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
   },
-  emptyIcon: { fontSize: 56, marginBottom: 14 },
+  emptyIcon:  { fontSize: 56, marginBottom: 14 },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '800',

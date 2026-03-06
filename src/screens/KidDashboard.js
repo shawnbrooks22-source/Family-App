@@ -167,6 +167,12 @@ function WaitingCard({ task }) {
 }
 
 // ─── Done Card ─────────────────────────────────────────────────────────────────
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function DoneCard({ task }) {
   return (
     <View style={styles.doneCard}>
@@ -176,6 +182,9 @@ function DoneCard({ task }) {
       <View style={{ flex: 1 }}>
         <Text style={styles.doneTitle}>{task.title}</Text>
         <Text style={styles.doneReward}>⭐ {task.reward}</Text>
+        {task.approvedAt ? (
+          <Text style={styles.doneDate}>Earned {formatDate(task.approvedAt)}</Text>
+        ) : null}
       </View>
       <Text style={styles.doneTick}>✅</Text>
     </View>
@@ -198,6 +207,9 @@ export default function KidDashboard({ route, navigation }) {
   const completedCount = waitingTasks.length + approvedTasks.length;
   const totalCount = kidTasks.length;
   const todayProgress = totalCount > 0 ? completedCount / totalCount : 0;
+
+  // Streak
+  const streak = kid?.streak || 0;
 
   // Goal state
   const goal = kid?.goal || null; // { name, stars } | null
@@ -334,7 +346,7 @@ export default function KidDashboard({ route, navigation }) {
               <View style={styles.statDivider} />
               <StatChip emoji="✅" value={completedCount} label="Done" />
               <View style={styles.statDivider} />
-              <StatChip emoji="🎯" value={totalCount} label="Quests" />
+              <StatChip emoji="🔥" value={streak} label={streak === 1 ? 'Day' : 'Streak'} />
             </View>
 
             {/* Today's goal bar */}
@@ -436,6 +448,17 @@ export default function KidDashboard({ route, navigation }) {
             )}
           </View>
 
+          {/* Streak banner */}
+          {streak >= 2 && (
+            <View style={styles.streakBanner}>
+              <Text style={styles.streakFire}>🔥</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.streakTitle}>{streak}-Day Streak!</Text>
+                <Text style={styles.streakSub}>Keep it up — don't break the chain!</Text>
+              </View>
+            </View>
+          )}
+
           {/* Empty state */}
           {kidTasks.length === 0 && (
             <View style={styles.emptyState}>
@@ -501,7 +524,15 @@ export default function KidDashboard({ route, navigation }) {
                   <Text style={styles.sectionBadgeText}>{celebratedTasks.length}</Text>
                 </View>
               </View>
-              {celebratedTasks.map(task => (
+              {/* All-time stars summary */}
+              <View style={styles.allTimeCard}>
+                <Text style={styles.allTimeEmoji}>⭐</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.allTimeTitle}>{totalStars} Stars Earned All-Time</Text>
+                  <Text style={styles.allTimeSub}>{getStarTitle(totalStars)} — keep it up!</Text>
+                </View>
+              </View>
+              {celebratedTasks.slice().reverse().map(task => (
                 <DoneCard key={task.id} task={task} />
               ))}
             </View>
@@ -783,7 +814,58 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   doneReward: { fontSize: 13, color: '#059669', fontWeight: '700' },
+  doneDate: { fontSize: 11, color: '#94A3B8', fontWeight: '500', marginTop: 2 },
   doneTick: { fontSize: 24, marginLeft: 8 },
+
+  // ─── Streak banner
+  streakBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#FFB74D',
+    gap: 14,
+  },
+  streakFire: { fontSize: 36 },
+  streakTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#E65100',
+    marginBottom: 2,
+  },
+  streakSub: {
+    fontSize: 12,
+    color: '#BF360C',
+    fontWeight: '600',
+  },
+
+  // ─── All-time stars summary
+  allTimeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBF0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    gap: 12,
+  },
+  allTimeEmoji: { fontSize: 32 },
+  allTimeTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  allTimeSub: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
 
   // ─── Goal card
   goalCard: {

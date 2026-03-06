@@ -183,6 +183,38 @@ function ParentCard({ profile, onPress }) {
   );
 }
 
+// ─── Leaderboard Section ────────────────────────────────────────────────────────
+function LeaderboardBanner({ kidStars }) {
+  if (kidStars.length === 0) return null;
+
+  const medals = ['🥇', '🥈', '🥉'];
+  const sorted = [...kidStars].sort((a, b) => b.stars - a.stars);
+
+  return (
+    <View style={styles.leaderboard}>
+      <View style={styles.leaderboardHeader}>
+        <Text style={styles.leaderboardTitle}>🏆 Star Leaderboard</Text>
+      </View>
+      <View style={styles.leaderboardRows}>
+        {sorted.map((item, idx) => (
+          <View key={item.id} style={styles.leaderboardRow}>
+            <Text style={styles.leaderboardMedal}>
+              {idx < 3 ? medals[idx] : `${idx + 1}`}
+            </Text>
+            <View style={[styles.leaderboardAvatar, { backgroundColor: item.color }]}>
+              <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+            </View>
+            <Text style={styles.leaderboardName}>{item.name}</Text>
+            <View style={styles.leaderboardStarBadge}>
+              <Text style={styles.leaderboardStarText}>⭐ {item.stars}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const { family, tasks, verifyPin } = useApp();
@@ -198,11 +230,19 @@ export default function HomeScreen({ navigation }) {
   const sheetAnim   = useRef(new Animated.Value(600)).current;
 
   // Per-kid star counts
-  const kidStatsMap = {};
+  const kidStarsMap = {};
   family.kids.forEach(kid => {
     const approved = tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length;
-    kidStatsMap[kid.id] = { stars: approved };
+    kidStarsMap[kid.id] = { stars: approved };
   });
+
+  const kidStarsForLeaderboard = family.kids.map(kid => ({
+    id: kid.id,
+    name: kid.name,
+    emoji: kid.emoji,
+    color: kid.color,
+    stars: tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length,
+  }));
 
   const allProfiles = [
     { id: 'parent', name: family.parentName, emoji: family.parentEmoji, type: 'parent' },
@@ -295,7 +335,7 @@ export default function HomeScreen({ navigation }) {
 
       <SafeAreaView style={{ backgroundColor: colors.bg }}>
         <View style={styles.appBar}>
-          <Text style={styles.appBarTitle}>ChoreQuest ⭐</Text>
+          <Text style={styles.appBarTitle}>Kindo 🌟</Text>
         </View>
       </SafeAreaView>
 
@@ -307,8 +347,8 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.profileGrid}>
           {allProfiles.map((profile, i) => {
             const isParent = profile.type === 'parent';
-            const ea       = entryAnims[i];
-            const stats    = kidStatsMap[profile.id] || { stars: 0 };
+            const ea       = entryAnims[i] || { opacity: new Animated.Value(1), y: new Animated.Value(0) };
+            const stats    = kidStarsMap[profile.id] || { stars: 0 };
 
             return (
               <Animated.View
@@ -328,6 +368,11 @@ export default function HomeScreen({ navigation }) {
             );
           })}
         </View>
+
+        {/* ── Leaderboard ─────────────────────────────────────────────────── */}
+        {family.kids.length >= 2 && (
+          <LeaderboardBanner kidStars={kidStarsForLeaderboard} />
+        )}
       </ScrollView>
 
       {/* ─── PIN Bottom Sheet ─────────────────────────────────────────────────── */}
@@ -444,6 +489,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
     justifyContent: 'center',
+    marginBottom: 32,
   },
   profileItem: {
     width: CARD_SIZE,
@@ -493,6 +539,70 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   parentPillText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+
+  // ─── Leaderboard
+  leaderboard: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    overflow: 'hidden',
+    ...shadows.md,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  leaderboardHeader: {
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE082',
+  },
+  leaderboardTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#5D4037',
+    letterSpacing: -0.2,
+  },
+  leaderboardRows: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  leaderboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  leaderboardMedal: {
+    fontSize: 20,
+    width: 28,
+    textAlign: 'center',
+  },
+  leaderboardAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaderboardName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text1,
+  },
+  leaderboardStarBadge: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  leaderboardStarText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#F59E0B',
+  },
 
   // ─── PIN Modal
   modalRoot:    { flex: 1, justifyContent: 'flex-end' },

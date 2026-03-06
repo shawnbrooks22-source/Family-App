@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "ChoreQuest",
-    "slug": "chore-quest",
+    "name": "Kindo",
+    "slug": "kindo-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
-      "backgroundColor": "#6C63FF"
+      "backgroundColor": "#7C3AED"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chorequest.app"
+      "bundleIdentifier": "com.kindo.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#6C63FF"
+        "backgroundColor": "#7C3AED"
       },
-      "package": "com.chorequest.app"
+      "package": "com.kindo.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
