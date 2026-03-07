@@ -262,7 +262,7 @@ function WeeklySummaryModal({ visible, onClose, tasks, family }) {
   const todayLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
   const completedThisWeek = tasks.filter(
-    t => t.status === 'approved' && t.approvedAt && t.approvedAt >= weekStartMs
+    t => t.status === 'approved' && (t.approvedAt || t.approved_at) && (t.approvedAt || t.approved_at) >= weekStartMs
   );
 
   const kidStats = (family?.kids || []).map(kid => ({

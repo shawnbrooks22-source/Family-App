@@ -182,8 +182,8 @@ function DoneCard({ task }) {
       <View style={{ flex: 1 }}>
         <Text style={styles.doneTitle}>{task.title}</Text>
         <Text style={styles.doneReward}>⭐ {task.reward}</Text>
-        {task.approvedAt ? (
-          <Text style={styles.doneDate}>Earned {formatDate(task.approvedAt)}</Text>
+        {(task.approvedAt || task.approved_at) ? (
+          <Text style={styles.doneDate}>Earned {formatDate(task.approvedAt || task.approved_at)}</Text>
         ) : null}
       </View>
       <Text style={styles.doneTick}>✅</Text>

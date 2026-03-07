@@ -24,7 +24,7 @@ import {
   touchParentSession,
   isParentSessionValid,
   endParentSession,
-} from './security';
+} from '../lib/security';
 
 // ─── Supabase (optional — falls back to AsyncStorage if unconfigured) ──────────
 let supabase = null;

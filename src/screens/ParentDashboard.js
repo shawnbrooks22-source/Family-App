@@ -71,7 +71,7 @@ function HomeTab({ navigation }) {
   // ── Weekly analytics ──────────────────────────────────────────────────────
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const completedThisWeek = tasks.filter(
-    t => t.status === 'approved' && t.approvedAt && t.approvedAt >= oneWeekAgo
+    t => t.status === 'approved' && (t.approvedAt || t.approved_at) && (t.approvedAt || t.approved_at) >= oneWeekAgo
   );
 
   // Per-kid star tally for leaderboard snippet
