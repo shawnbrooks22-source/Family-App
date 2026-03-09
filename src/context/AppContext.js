@@ -56,8 +56,8 @@ const AppContext = createContext(null);
 
 const FAMILY_KEY     = '@kindo_family';
 const TASKS_KEY      = '@kindo_tasks';
-const FAMILY_ID_KEY  = '@kindo_family_id';   // stored in SecureStore
-const PARENT_PIN_KEY = '@kindo_parent_pin';  // stored in SecureStore (hashed)
+const FAMILY_ID_KEY  = 'kindo_family_id';    // stored in SecureStore
+const PARENT_PIN_KEY = 'kindo_parent_pin';   // stored in SecureStore (hashed)
 
 async function requestNotifPermissions() {
   try {

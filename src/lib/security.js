@@ -14,8 +14,8 @@ import * as SecureStore from 'expo-secure-store';
 
 // ─── Internal constants ────────────────────────────────────────────────────────
 const APP_PEPPER        = 'kindo_v1_2024_pepper'; // additional server-side secret
-const LOCKOUT_STORE_KEY = '@kindo_pin_lockout';
-const SESSION_STORE_KEY = '@kindo_parent_session';
+const LOCKOUT_STORE_KEY = 'kindo_pin_lockout';
+const SESSION_STORE_KEY = 'kindo_parent_session';
 
 export const PARENT_SESSION_MS    = 30 * 60 * 1000; // 30 minutes
 export const LOCKOUT_THRESHOLDS   = [
