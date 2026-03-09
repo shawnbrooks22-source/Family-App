@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   Alert,
   StatusBar,
   Pressable,
@@ -401,10 +403,12 @@ function TasksTab() {
             </TouchableOpacity>
           </View>
 
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView
             contentContainerStyle={styles.modalScroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets={true}
           >
             <FormLabel label="Quest Name" />
             <TextInput
@@ -500,6 +504,7 @@ function TasksTab() {
               <Text style={styles.assignBtnText}>Save Changes</Text>
             </TouchableOpacity>
           </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -545,12 +550,14 @@ function AddTaskTab() {
     <View style={styles.tabWrapper}>
       <ScreenHeader title="New Quest" subtitle="Assign a chore with a reward" />
 
-      <ScrollView
-        contentContainerStyle={styles.tabScroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {success && (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.tabScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={true}
+        >
+          {success && (
           <View style={styles.successBanner}>
             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
             <Text style={styles.successBannerText}>Quest assigned!</Text>
@@ -658,7 +665,8 @@ function AddTaskTab() {
           <Ionicons name="add-circle" size={22} color="#fff" />
           <Text style={styles.assignBtnText}>Assign Quest</Text>
         </TouchableOpacity>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -718,11 +726,13 @@ function FamilyTab({ navigation }) {
     <View style={styles.tabWrapper}>
       <ScreenHeader title="Family" subtitle={`${family.kids.length + 1} members`} />
 
-      <ScrollView
-        contentContainerStyle={styles.tabScroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.tabScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={true}
+        >
         {/* Parent */}
         <Text style={styles.sectionLabel}>PARENT</Text>
         <View style={styles.memberCard}>
@@ -849,7 +859,8 @@ function FamilyTab({ navigation }) {
             </View>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* ── Edit Kid Modal ─────────────────────────────────────────────────── */}
       <Modal
@@ -869,10 +880,12 @@ function FamilyTab({ navigation }) {
             </TouchableOpacity>
           </View>
 
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView
             contentContainerStyle={styles.modalScroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets={true}
           >
             <FormLabel label="Name" />
             <TextInput
@@ -931,6 +944,7 @@ function FamilyTab({ navigation }) {
               <Text style={styles.assignBtnText}>Save Changes</Text>
             </TouchableOpacity>
           </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -1009,12 +1023,14 @@ function SettingsTab({ navigation }) {
     <View style={styles.tabWrapper}>
       <ScreenHeader title="Settings" subtitle="Manage your account" />
 
-      <ScrollView
-        contentContainerStyle={styles.tabScroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Parent Profile ──────────────────────────────────────────────── */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.tabScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={true}
+        >
+          {/* ── Parent Profile ──────────────────────────────────────────────── */}
         <Text style={styles.settingsSectionLabel}>PARENT PROFILE</Text>
         <View style={styles.settingsCard}>
           {profileSaved && (
@@ -1181,8 +1197,9 @@ function SettingsTab({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <View style={{ height: 20 }} />
-      </ScrollView>
+          <View style={{ height: 20 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

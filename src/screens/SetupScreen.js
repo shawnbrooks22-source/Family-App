@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   Alert,
   StatusBar,
   Animated,
@@ -394,10 +396,12 @@ export default function SetupScreen() {
         </View>
       </SafeAreaView>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={true}
       >
         {step === 1 ? (
           <Step1
@@ -430,6 +434,7 @@ export default function SetupScreen() {
           />
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

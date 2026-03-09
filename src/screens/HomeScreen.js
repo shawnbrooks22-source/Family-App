@@ -466,7 +466,7 @@ const wStyles = StyleSheet.create({
 
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
-  const { family, tasks, verifyPin } = useApp();
+  const { family, tasks, verifyPin, unlockParentZone } = useApp();
   const [showPin,      setShowPin]      = useState(false);
   const [showWeekly,   setShowWeekly]   = useState(false);
   const [pin,          setPin]          = useState('');
@@ -603,6 +603,7 @@ export default function HomeScreen({ navigation }) {
       const ok = await verifyPin(newPin);
       if (ok) {
         await clearPinFailures();
+        await unlockParentZone();   // start the 30-min session timer
         setPinAttempts(0);
         setLockoutSecs(0);
         closePin();
