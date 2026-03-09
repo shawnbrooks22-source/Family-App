@@ -11,6 +11,8 @@ import {
   StatusBar,
   Platform,
   Pressable,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +22,7 @@ import {
   recordPinFailure,
   clearPinFailures,
   getPinLockoutStatus,
+  hashPin,
 } from '../lib/security';
 
 const { width } = Dimensions.get('window');
@@ -231,10 +234,11 @@ function LeaderboardBanner({ kidStars }) {
   );
 }
 
-// ─── Weekly Summary Modal ───────────────────────────────────────────────────────
+// ─── Analytics Summary Modal ────────────────────────────────────────────────────
 function WeeklySummaryModal({ visible, onClose, tasks, family }) {
   const slideAnim   = useRef(new Animated.Value(700)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
+  const [view, setView] = useState('week'); // 'week' | 'month' | 'alltime'
 
   useEffect(() => {
     if (visible) {
@@ -258,24 +262,50 @@ function WeeklySummaryModal({ visible, onClose, tasks, family }) {
   weekStart.setHours(0, 0, 0, 0);
   const weekStartMs = weekStart.getTime();
 
-  const weekLabel = weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const todayLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  // Month start
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStartMs = monthStart.getTime();
 
-  const completedThisWeek = tasks.filter(
-    t => t.status === 'approved' && (t.approvedAt || t.approved_at) && (t.approvedAt || t.approved_at) >= weekStartMs
+  const weekLabel  = weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const todayLabel = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const monthLabel = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const approvedTasks = tasks.filter(t => t.status === 'approved');
+
+  const completedThisWeek = approvedTasks.filter(
+    t => (t.approvedAt || t.approved_at) && (t.approvedAt || t.approved_at) >= weekStartMs
   );
+  const completedThisMonth = approvedTasks.filter(
+    t => (t.approvedAt || t.approved_at) && (t.approvedAt || t.approved_at) >= monthStartMs
+  );
+
+  function getSlicedTasks() {
+    if (view === 'week')    return completedThisWeek;
+    if (view === 'month')   return completedThisMonth;
+    return approvedTasks;
+  }
+
+  const slicedTasks = getSlicedTasks();
 
   const kidStats = (family?.kids || []).map(kid => ({
     kid,
-    weekStars: completedThisWeek.filter(t => (t.assignedTo || t.assigned_to) === kid.id).length,
-    totalStars: tasks.filter(t => (t.assignedTo || t.assigned_to) === kid.id && t.status === 'approved').length,
+    slicedStars: slicedTasks.filter(t => (t.assignedTo || t.assigned_to) === kid.id).length,
+    weekStars:   completedThisWeek.filter(t => (t.assignedTo || t.assigned_to) === kid.id).length,
+    totalStars:  approvedTasks.filter(t => (t.assignedTo || t.assigned_to) === kid.id).length,
     streak: kid.streak || 0,
-  })).sort((a, b) => b.weekStars - a.weekStars);
+  })).sort((a, b) => b.slicedStars - a.slicedStars);
 
   const totalThisWeek = completedThisWeek.length;
-  const topKid = kidStats[0];
+  const totalSliced   = slicedTasks.length;
 
   function getEncouragement() {
+    if (view === 'alltime') {
+      const grand = approvedTasks.length;
+      if (grand === 0) return "No quests completed yet — start your adventure! 🚀";
+      if (grand < 10)  return "Just getting started! Every quest counts 🌱";
+      if (grand < 30)  return "Making great progress! Keep the momentum 💪";
+      return "Amazing family! You're quest legends 🏆🔥";
+    }
     if (totalThisWeek === 0) return "No quests finished yet this week — time to get questing! 🚀";
     if (totalThisWeek < 3)   return "Good start! Keep building that momentum 💪";
     if (totalThisWeek < 7)   return "Nice work this week! The family is crushing it 🔥";
@@ -299,14 +329,38 @@ function WeeklySummaryModal({ visible, onClose, tasks, family }) {
             style={wStyles.headerGrad}
           >
             <View>
-              <Text style={wStyles.headerTitle}>📊 Weekly Report</Text>
-              <Text style={wStyles.headerSub}>{weekLabel} – {todayLabel}</Text>
+              <Text style={wStyles.headerTitle}>📊 Family Stats</Text>
+              <Text style={wStyles.headerSub}>
+                {view === 'week'    ? `${weekLabel} – ${todayLabel}`  :
+                 view === 'month'   ? monthLabel :
+                 'All Time'}
+              </Text>
             </View>
             <View style={wStyles.totalBubble}>
-              <Text style={wStyles.totalNum}>{totalThisWeek}</Text>
+              <Text style={wStyles.totalNum}>{totalSliced}</Text>
               <Text style={wStyles.totalLabel}>quests{'\n'}done</Text>
             </View>
           </LinearGradient>
+
+          {/* ─── Tab switcher */}
+          <View style={wStyles.tabRow}>
+            {[
+              { key: 'week',    label: 'This Week' },
+              { key: 'month',   label: 'This Month' },
+              { key: 'alltime', label: 'All Time' },
+            ].map(t => (
+              <TouchableOpacity
+                key={t.key}
+                style={[wStyles.tabBtn, view === t.key && wStyles.tabBtnActive]}
+                onPress={() => setView(t.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[wStyles.tabBtnText, view === t.key && wStyles.tabBtnTextActive]}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <ScrollView
             contentContainerStyle={wStyles.body}
@@ -322,7 +376,7 @@ function WeeklySummaryModal({ visible, onClose, tasks, family }) {
               <View key={item.kid.id} style={wStyles.kidRow}>
                 {/* Rank + avatar */}
                 <Text style={wStyles.kidRank}>
-                  {idx === 0 && item.weekStars > 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                  {idx === 0 && item.slicedStars > 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
                 </Text>
                 <View style={[wStyles.kidAvatar, { backgroundColor: item.kid.color }]}>
                   <Text style={{ fontSize: 20 }}>{item.kid.emoji}</Text>
@@ -336,15 +390,15 @@ function WeeklySummaryModal({ visible, onClose, tasks, family }) {
                       <Text style={wStyles.streakPill}>🔥 {item.streak}d</Text>
                     )}
                   </View>
-                  {/* Progress bar proportional to week leader */}
+                  {/* Progress bar proportional to leader */}
                   <View style={wStyles.barTrack}>
                     <View
                       style={[
                         wStyles.barFill,
                         {
                           backgroundColor: item.kid.color,
-                          width: kidStats[0]?.weekStars > 0
-                            ? `${Math.round((item.weekStars / kidStats[0].weekStars) * 100)}%`
+                          width: kidStats[0]?.slicedStars > 0
+                            ? `${Math.round((item.slicedStars / kidStats[0].slicedStars) * 100)}%`
                             : '0%',
                         },
                       ]}
@@ -354,14 +408,14 @@ function WeeklySummaryModal({ visible, onClose, tasks, family }) {
 
                 {/* Star counts */}
                 <View style={wStyles.kidStarCol}>
-                  <Text style={wStyles.kidWeekStars}>+{item.weekStars} ⭐</Text>
+                  <Text style={wStyles.kidWeekStars}>+{item.slicedStars} ⭐</Text>
                   <Text style={wStyles.kidTotalStars}>{item.totalStars} total</Text>
                 </View>
               </View>
             ))}
 
             {kidStats.length === 0 && (
-              <Text style={wStyles.noKids}>Add kids to see their weekly progress!</Text>
+              <Text style={wStyles.noKids}>Add kids to see their progress!</Text>
             )}
 
             <TouchableOpacity style={wStyles.closeBtn} onPress={onClose} activeOpacity={0.85}>
@@ -418,6 +472,33 @@ const wStyles = StyleSheet.create({
   totalNum:   { fontSize: 32, fontWeight: '900', color: '#FFE000', lineHeight: 34 },
   totalLabel: { fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: '700', textAlign: 'center', marginTop: 2 },
 
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 100,
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  tabBtnActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  tabBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text3,
+  },
+  tabBtnTextActive: {
+    color: colors.primary,
+  },
+
   body: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10, gap: 14 },
 
   encourageCard: {
@@ -466,7 +547,7 @@ const wStyles = StyleSheet.create({
 
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
-  const { family, tasks, verifyPin, unlockParentZone } = useApp();
+  const { family, tasks, verifyPin, unlockParentZone, updateParentProfile, isCloudEnabled } = useApp();
   const [showPin,      setShowPin]      = useState(false);
   const [showWeekly,   setShowWeekly]   = useState(false);
   const [pin,          setPin]          = useState('');
@@ -477,6 +558,14 @@ export default function HomeScreen({ navigation }) {
   const [revealIdx,    setRevealIdx]    = useState(-1);
   const revealTimer   = useRef(null);
   const lockoutTimer  = useRef(null);
+
+  // PIN Recovery
+  const [showRecovery,   setShowRecovery]   = useState(false);
+  const [recoveryStep,   setRecoveryStep]   = useState('verify'); // 'verify' | 'newpin' | 'confirm'
+  const [recoveryCode,   setRecoveryCode]   = useState('');
+  const [recoveryNewPin, setRecoveryNewPin] = useState('');
+  const [recoveryConfirm,setRecoveryConfirm]= useState('');
+  const [recoveryError,  setRecoveryError]  = useState('');
 
   const shakeAnim   = useRef(new Animated.Value(0)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -502,10 +591,15 @@ export default function HomeScreen({ navigation }) {
     return () => clearInterval(lockoutTimer.current);
   }, [lockoutSecs > 0]);
 
-  // Per-kid star counts
+  // Per-kid star counts — normalize both field naming conventions
+  // (Supabase returns assigned_to; local mode uses assignedTo)
+  function taskBelongsToKid(task, kidId) {
+    return (task.assignedTo === kidId || task.assigned_to === kidId);
+  }
+
   const kidStarsMap = {};
   family.kids.forEach(kid => {
-    const approved = tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length;
+    const approved = tasks.filter(t => taskBelongsToKid(t, kid.id) && t.status === 'approved').length;
     kidStarsMap[kid.id] = { stars: approved };
   });
 
@@ -514,7 +608,7 @@ export default function HomeScreen({ navigation }) {
     name: kid.name,
     emoji: kid.emoji,
     color: kid.color,
-    stars: tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length,
+    stars: tasks.filter(t => taskBelongsToKid(t, kid.id) && t.status === 'approved').length,
   }));
 
   const allProfiles = [
@@ -537,6 +631,49 @@ export default function HomeScreen({ navigation }) {
       )
     ).start();
   }, []);
+
+  // ─── PIN Recovery ─────────────────────────────────────────────────────────────
+  function openRecovery() {
+    setRecoveryStep('verify');
+    setRecoveryCode('');
+    setRecoveryNewPin('');
+    setRecoveryConfirm('');
+    setRecoveryError('');
+    setShowRecovery(true);
+  }
+
+  async function handleRecoveryVerify() {
+    const code = recoveryCode.trim().toUpperCase();
+    if (!code) { setRecoveryError('Enter your invite code.'); return; }
+    // Verify invite code matches the family's stored code
+    if (family?.inviteCode && code !== family.inviteCode) {
+      setRecoveryError('Invite code does not match. Check your original setup code.');
+      return;
+    }
+    if (!family?.inviteCode && !isCloudEnabled) {
+      // Local-only mode has no invite code — allow any non-empty entry as verification
+      // (best we can do without a server)
+    }
+    setRecoveryError('');
+    setRecoveryStep('newpin');
+  }
+
+  async function handleRecoverySetPin() {
+    if (!/^\d{4}$/.test(recoveryNewPin)) {
+      setRecoveryError('PIN must be exactly 4 digits.');
+      return;
+    }
+    if (recoveryNewPin !== recoveryConfirm) {
+      setRecoveryError("PINs don't match.");
+      return;
+    }
+    await updateParentProfile({ parentPin: recoveryNewPin });
+    await clearPinFailures();
+    setShowRecovery(false);
+    setLockoutSecs(0);
+    setPinAttempts(0);
+    Alert.alert('PIN Reset!', 'Your PIN has been updated. You can now log in.');
+  }
 
   // ─── PIN sheet ───────────────────────────────────────────────────────────────
   async function openPin() {
@@ -722,9 +859,12 @@ export default function HomeScreen({ navigation }) {
             {lockoutActive && (
               <View style={styles.lockoutBanner}>
                 <Text style={styles.lockoutEmoji}>⏳</Text>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.lockoutTitle}>Try again in</Text>
                   <Text style={styles.lockoutTimer}>{formatLockoutTime(lockoutSecs)}</Text>
+                  <TouchableOpacity onPress={openRecovery} style={{ marginTop: 8 }}>
+                    <Text style={styles.forgotPinText}>Forgot PIN? Reset with invite code →</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -778,6 +918,78 @@ export default function HomeScreen({ navigation }) {
 
             <View style={{ height: Platform.OS === 'ios' ? 16 : 8 }} />
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* ─── PIN Recovery Modal ───────────────────────────────────────────────── */}
+      <Modal visible={showRecovery} transparent animationType="slide" onRequestClose={() => setShowRecovery(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowRecovery(false)} />
+          <View style={styles.recoverySheet}>
+            <View style={styles.sheetHandle} />
+
+            <Text style={styles.recoveryTitle}>🔑 Reset PIN</Text>
+            <Text style={styles.recoverySub}>
+              {recoveryStep === 'verify'
+                ? 'Enter your family invite code to verify your identity.'
+                : 'Set a new 4-digit PIN for the Parent Zone.'}
+            </Text>
+
+            {!!recoveryError && (
+              <View style={styles.recoveryError}>
+                <Text style={styles.recoveryErrorText}>{recoveryError}</Text>
+              </View>
+            )}
+
+            {recoveryStep === 'verify' ? (
+              <>
+                <TextInput
+                  style={styles.recoveryInput}
+                  value={recoveryCode}
+                  onChangeText={t => setRecoveryCode(t.toUpperCase())}
+                  placeholder="KINDO-LION-3847"
+                  placeholderTextColor={colors.text3}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity style={styles.recoveryBtn} onPress={handleRecoveryVerify} activeOpacity={0.85}>
+                  <Text style={styles.recoveryBtnText}>Verify Code</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.recoveryInput}
+                  value={recoveryNewPin}
+                  onChangeText={t => setRecoveryNewPin(t.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="New 4-digit PIN"
+                  placeholderTextColor={colors.text3}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  maxLength={4}
+                />
+                <TextInput
+                  style={[styles.recoveryInput, { marginTop: 10 }]}
+                  value={recoveryConfirm}
+                  onChangeText={t => setRecoveryConfirm(t.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="Confirm new PIN"
+                  placeholderTextColor={colors.text3}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  maxLength={4}
+                />
+                <TouchableOpacity style={styles.recoveryBtn} onPress={handleRecoverySetPin} activeOpacity={0.85}>
+                  <Text style={styles.recoveryBtnText}>Set New PIN</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowRecovery(false)}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: Platform.OS === 'ios' ? 20 : 12 }} />
+          </View>
         </View>
       </Modal>
     </View>
@@ -1127,5 +1339,84 @@ const styles = StyleSheet.create({
     color: colors.text3,
     fontSize: 16,
     fontWeight: '600',
+  },
+
+  forgotPinText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E65100',
+    textDecorationLine: 'underline',
+  },
+
+  // ─── Recovery modal
+  recoverySheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 28,
+    paddingTop: 14,
+    paddingBottom: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  recoveryTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text1,
+    marginBottom: 8,
+    letterSpacing: -0.3,
+  },
+  recoverySub: {
+    fontSize: 14,
+    color: colors.text3,
+    fontWeight: '500',
+    marginBottom: 20,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  recoveryError: {
+    backgroundColor: colors.errorLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+  },
+  recoveryErrorText: {
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  recoveryInput: {
+    width: '100%',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
+    color: colors.text1,
+    backgroundColor: '#F8FAFC',
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+  recoveryBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 100,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    marginTop: 18,
+    width: '100%',
+    alignItems: 'center',
+  },
+  recoveryBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

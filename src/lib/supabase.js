@@ -15,9 +15,10 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-// ⬇️  Replace these with your actual Supabase project credentials
-export const SUPABASE_URL  = 'https://YOUR_PROJECT_ID.supabase.co';
-export const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';
+// ⬇️  Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON in your .env file
+// Copy .env.example to .env and fill in your Supabase project credentials.
+export const SUPABASE_URL  = process.env.EXPO_PUBLIC_SUPABASE_URL  || 'https://YOUR_PROJECT_ID.supabase.co';
+export const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON || 'YOUR_SUPABASE_ANON_KEY';
 
 // Secure token storage adapter for React Native
 const SecureStoreAdapter = {

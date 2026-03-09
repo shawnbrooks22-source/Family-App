@@ -34,6 +34,7 @@ create table if not exists public.profiles (
   goal            jsonb,                   -- { name, stars } | null
   streak          integer default 0,       -- current daily streak (days)
   last_completed_date text,               -- ISO date string of last task completion
+  notify_prefs    jsonb default '{"taskCompleted": true, "taskApproved": true}'::jsonb,
   created_at      timestamptz default now()
 );
 
@@ -51,6 +52,7 @@ create table if not exists public.tasks (
   status         text    default 'pending',  -- 'pending' | 'completed' | 'approved'
   recurrence     text    default 'none',     -- 'none' | 'daily' | 'weekly'
   celebrated     boolean default false,
+  due_date       text,     -- ISO date string 'YYYY-MM-DD', optional deadline
   created_at     bigint,   -- epoch ms from client
   completed_at   bigint,
   approved_at    bigint
@@ -76,3 +78,11 @@ create policy "tasks_open"     on public.tasks     for all using (true) with che
 -- ─────────────────────────────────────────────────────────────────────────────
 alter publication supabase_realtime add table public.tasks;
 alter publication supabase_realtime add table public.profiles;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRATIONS (run only if upgrading an existing installation)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- v1.1: Add due_date to tasks and notification preferences to profiles
+-- alter table public.tasks    add column if not exists due_date    text;
+-- alter table public.profiles add column if not exists notify_prefs jsonb default '{"taskCompleted": true, "taskApproved": true}'::jsonb;

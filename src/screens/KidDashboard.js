@@ -40,6 +40,23 @@ function getGradient(color) {
   return GRADIENT_MAP[color] || ['#5C5FE4', '#3D40C4'];
 }
 
+// ─── Due date helpers ──────────────────────────────────────────────────────────
+function formatQuestDueDate(dateStr) {
+  if (!dateStr) return '';
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  if (dateStr === today)    return 'TODAY!';
+  if (dateStr === tomorrow) return 'Tomorrow';
+  try {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function isDueToday(dateStr) {
+  if (!dateStr) return false;
+  return dateStr <= new Date().toISOString().split('T')[0];
+}
+
 // ─── Star rank ─────────────────────────────────────────────────────────────────
 function getStarTitle(stars) {
   if (stars >= 30) return '✨ STAR LEGEND';
@@ -117,6 +134,11 @@ function QuestCard({ task, index, onDone, kidColor }) {
                 {task.reward}
               </Text>
             </View>
+            {task.due_date ? (
+              <Text style={[styles.questDueDate, isDueToday(task.due_date) && styles.questDueDateUrgent]}>
+                📅 Due {formatQuestDueDate(task.due_date)}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -736,6 +758,16 @@ const styles = StyleSheet.create({
   questRewardRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   questRewardStar: { fontSize: 15 },
   questRewardText: { fontSize: 14, color: '#64748B', fontWeight: '600', flex: 1 },
+  questDueDate: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  questDueDateUrgent: {
+    color: '#DC2626',
+    fontWeight: '800',
+  },
 
   // DO IT button
   doItWrap: {

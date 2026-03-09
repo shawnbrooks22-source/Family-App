@@ -177,6 +177,7 @@ export function AppProvider({ children }) {
         parentPhone:  parent?.phone  || '',
         parentPin:    parent?.parent_pin || '',
         parentId:     parent?.id     || '',
+        notifyPrefs:  parent?.notify_prefs || { taskCompleted: true, taskApproved: true },
         kids: kids.map(k => ({
           id:    k.id,
           name:  k.name,
@@ -317,6 +318,7 @@ export function AppProvider({ children }) {
       approved_at:  null,
       recurrence:  task.recurrence || 'none',
       notes:       task.notes || '',
+      due_date:    task.due_date || null,
       ...task,
     };
 
@@ -354,10 +356,12 @@ export function AppProvider({ children }) {
 
     // Notify the parent so they can approve quickly
     const kid = family?.kids?.find(k => k.id === kidId);
-    await sendNotif(
-      '⚡ Quest Complete — Review Needed!',
-      `${kid?.name || 'Your kid'} finished "${task?.emoji || ''} ${task?.title || 'a quest'}" and is waiting for your approval! 🎉`
-    );
+    if (family?.notifyPrefs?.taskCompleted !== false) {
+      await sendNotif(
+        '⚡ Quest Complete — Review Needed!',
+        `${kid?.name || 'Your kid'} finished "${task?.emoji || ''} ${task?.title || 'a quest'}" and is waiting for your approval! 🎉`
+      );
+    }
   }
 
   async function approveTask(taskId) {
@@ -398,7 +402,7 @@ export function AppProvider({ children }) {
 
     // Notify
     const kid = family?.kids?.find(k => k.id === (task?.assignedTo || task?.assigned_to));
-    if (kid) {
+    if (kid && family?.notifyPrefs?.taskApproved !== false) {
       await sendNotif(
         '⭐ Reward Released!',
         `${kid.name} earned "${task?.reward}" for completing ${task?.emoji} ${task?.title}! 🎉`
@@ -545,6 +549,17 @@ export function AppProvider({ children }) {
     }
   }
 
+  // ── Notification preferences ───────────────────────────────────────────────
+  async function updateNotifyPrefs(prefs) {
+    const merged = { ...(family?.notifyPrefs || { taskCompleted: true, taskApproved: true }), ...prefs };
+    if (SUPABASE_READY && familyId && family?.parentId) {
+      await supabase.from('profiles').update({ notify_prefs: merged }).eq('id', family.parentId);
+    } else {
+      const updated = { ...family, notifyPrefs: merged };
+      await saveFamily(updated);
+    }
+  }
+
   // ── Clear all data ─────────────────────────────────────────────────────────
   async function clearAllData() {
     try {
@@ -629,6 +644,7 @@ export function AppProvider({ children }) {
         setKidGoal,
         // Profile
         updateParentProfile,
+        updateNotifyPrefs,
         clearAllData,
         // Auth / session
         verifyPin,

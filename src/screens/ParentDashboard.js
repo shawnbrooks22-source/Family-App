@@ -29,6 +29,37 @@ const TASK_EMOJIS = [
 const KID_EMOJIS = ['🦊', '🐱', '🐶', '🐸', '🐻', '🦁', '🐼', '🦄', '🐯', '🐰', '🦋', '🐬'];
 const PARENT_EMOJIS = ['👩', '👨', '🧑', '👩‍💼', '👨‍💼', '🧑‍💼', '👸', '🤴', '🦸', '🦹', '🧙', '🧚'];
 
+// ─── Due date helpers ──────────────────────────────────────────────────────────
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return '';
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  if (dateStr === today)    return 'Today';
+  if (dateStr === tomorrow) return 'Tomorrow';
+  try {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function isDueSoon(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return dateStr <= today;
+}
+
+function getDueDateSuggestions() {
+  const today    = new Date();
+  const tomorrow = new Date(today.getTime() + 86400000);
+  const nextWeek = new Date(today.getTime() + 7 * 86400000);
+  const fmt = d => d.toISOString().split('T')[0];
+  return [
+    { label: 'Today',     value: fmt(today) },
+    { label: 'Tomorrow',  value: fmt(tomorrow) },
+    { label: 'This Week', value: fmt(nextWeek) },
+  ];
+}
+
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
 function ScreenHeader({ title, subtitle, rightContent }) {
@@ -257,6 +288,7 @@ function TasksTab() {
   const [editRecurrence, setEditRecurrence] = useState('none');
   const [editKidId,      setEditKidId]      = useState(null);
   const [editNotes,      setEditNotes]      = useState('');
+  const [editDueDate,    setEditDueDate]    = useState('');
 
   const FILTERS = [
     { key: 'all',       label: 'All' },
@@ -286,20 +318,27 @@ function TasksTab() {
     setEditReward(task.reward);
     setEditEmoji(task.emoji);
     setEditRecurrence(task.recurrence || 'none');
-    setEditKidId(task.assignedTo);
+    setEditKidId(task.assignedTo || task.assigned_to);
     setEditNotes(task.notes || '');
+    setEditDueDate(task.due_date || '');
   }
 
   async function handleSaveEdit() {
     if (!editTitle.trim()) { Alert.alert('Enter a quest name'); return; }
     if (!editReward.trim()) { Alert.alert('Add a reward'); return; }
+    if (editDueDate && !/^\d{4}-\d{2}-\d{2}$/.test(editDueDate)) {
+      Alert.alert('Invalid date', 'Use format YYYY-MM-DD (e.g. 2025-06-15)');
+      return;
+    }
     await editTask(editingTask.id, {
       title: editTitle.trim(),
       reward: editReward.trim(),
       emoji: editEmoji,
       recurrence: editRecurrence,
       assignedTo: editKidId,
+      assigned_to: editKidId,
       notes: editNotes.trim(),
+      due_date: editDueDate.trim() || null,
     });
     setEditingTask(null);
   }
@@ -353,6 +392,11 @@ function TasksTab() {
                   <Text style={styles.taskRowKid}>
                     {kid ? `${kid.emoji} ${kid.name}` : 'Unknown'}
                   </Text>
+                  {task.due_date ? (
+                    <Text style={[styles.taskRowNotes, isDueSoon(task.due_date) && { color: colors.error }]}>
+                      📅 Due {formatDueDate(task.due_date)}
+                    </Text>
+                  ) : null}
                   {task.notes ? (
                     <Text style={styles.taskRowNotes} numberOfLines={1}>📝 {task.notes}</Text>
                   ) : null}
@@ -456,6 +500,31 @@ function TasksTab() {
               multiline
             />
 
+            <FormLabel label="Due Date (optional) 📅" />
+            <View style={styles.dueDateRow}>
+              {getDueDateSuggestions().map(s => (
+                <TouchableOpacity
+                  key={s.value}
+                  style={[styles.dueDateChip, editDueDate === s.value && styles.dueDateChipActive]}
+                  onPress={() => setEditDueDate(editDueDate === s.value ? '' : s.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.dueDateChipText, editDueDate === s.value && styles.dueDateChipTextActive]}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={[styles.formInput, { marginTop: 8 }]}
+              value={editDueDate}
+              onChangeText={setEditDueDate}
+              placeholder="Or type YYYY-MM-DD"
+              placeholderTextColor={colors.text3}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+
             <FormLabel label="Repeats 🔁" />
             <View style={styles.recurrenceRow}>
               {RECURRENCE_OPTS.map(opt => (
@@ -521,20 +590,27 @@ function AddTaskTab() {
   const [selectedKid, setSelectedKid] = useState(null);
   const [selectedEmoji, setSelectedEmoji] = useState('🧹');
   const [recurrence, setRecurrence] = useState('none');
+  const [dueDate, setDueDate] = useState('');
   const [success, setSuccess] = useState(false);
 
   async function handleAdd() {
     if (!title.trim())  { Alert.alert('Enter a quest name', 'What do you want your kid to do?'); return; }
     if (!reward.trim()) { Alert.alert('Add a reward', "What will your kid earn for completing this?"); return; }
     if (!selectedKid)   { Alert.alert('Assign to a kid', 'Choose who should complete this quest.'); return; }
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      Alert.alert('Invalid date', 'Use format YYYY-MM-DD (e.g. 2025-06-15)');
+      return;
+    }
 
     await addTask({
       title: title.trim(),
       reward: reward.trim(),
       notes: notes.trim(),
       assignedTo: selectedKid,
+      assigned_to: selectedKid,
       emoji: selectedEmoji,
       recurrence,
+      due_date: dueDate.trim() || null,
     });
 
     setTitle('');
@@ -542,6 +618,7 @@ function AddTaskTab() {
     setNotes('');
     setSelectedKid(null);
     setRecurrence('none');
+    setDueDate('');
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2500);
   }
@@ -614,6 +691,32 @@ function AddTaskTab() {
           onChangeText={setNotes}
           placeholderTextColor={colors.text3}
           multiline
+        />
+
+        {/* Due Date */}
+        <FormLabel label="Due Date (optional) 📅" />
+        <View style={styles.dueDateRow}>
+          {getDueDateSuggestions().map(s => (
+            <TouchableOpacity
+              key={s.value}
+              style={[styles.dueDateChip, dueDate === s.value && styles.dueDateChipActive]}
+              onPress={() => setDueDate(dueDate === s.value ? '' : s.value)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.dueDateChipText, dueDate === s.value && styles.dueDateChipTextActive]}>
+                {s.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput
+          style={[styles.formInput, { marginTop: 8 }]}
+          placeholder="Or type YYYY-MM-DD"
+          value={dueDate}
+          onChangeText={setDueDate}
+          placeholderTextColor={colors.text3}
+          keyboardType="numbers-and-punctuation"
+          maxLength={10}
         />
 
         {/* Recurrence */}
@@ -954,7 +1057,7 @@ function FamilyTab({ navigation }) {
 // ─── Settings Tab ──────────────────────────────────────────────────────────────
 
 function SettingsTab({ navigation }) {
-  const { family, updateParentProfile, clearAllData, verifyPin, isCloudEnabled } = useApp();
+  const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled } = useApp();
 
   // Parent profile edit
   const [editName,  setEditName]  = useState(family.parentName);
@@ -967,6 +1070,12 @@ function SettingsTab({ navigation }) {
   const [newPin,     setNewPin]     = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinMsg, setPinMsg] = useState(null); // { text, ok }
+
+  // Notification preferences
+  const defaultPrefs = { taskCompleted: true, taskApproved: true };
+  const notifyPrefs = family?.notifyPrefs || defaultPrefs;
+  const [notifTaskCompleted, setNotifTaskCompleted] = useState(notifyPrefs.taskCompleted !== false);
+  const [notifTaskApproved,  setNotifTaskApproved]  = useState(notifyPrefs.taskApproved  !== false);
 
   async function handleSaveProfile() {
     if (!editName.trim()) { Alert.alert('Enter your name'); return; }
@@ -981,7 +1090,9 @@ function SettingsTab({ navigation }) {
 
   async function handleChangePin() {
     setPinMsg(null);
-    if (!verifyPin(currentPin)) {
+    // ✅ FIXED: verifyPin is async — must await it
+    const pinOk = await verifyPin(currentPin);
+    if (!pinOk) {
       setPinMsg({ text: 'Current PIN is incorrect.', ok: false });
       return;
     }
@@ -999,6 +1110,16 @@ function SettingsTab({ navigation }) {
     setConfirmPin('');
     setPinMsg({ text: 'PIN updated successfully! ✅', ok: true });
     setTimeout(() => setPinMsg(null), 3000);
+  }
+
+  async function toggleNotif(type, value) {
+    if (type === 'taskCompleted') {
+      setNotifTaskCompleted(value);
+      await updateNotifyPrefs({ taskCompleted: value });
+    } else {
+      setNotifTaskApproved(value);
+      await updateNotifyPrefs({ taskApproved: value });
+    }
   }
 
   function confirmClearData() {
@@ -1146,6 +1267,37 @@ function SettingsTab({ navigation }) {
             <Ionicons name="lock-closed-outline" size={20} color="#fff" />
             <Text style={styles.assignBtnText}>Update PIN</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* ── Notification Preferences ──────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>NOTIFICATIONS</Text>
+        <View style={styles.settingsCard}>
+          <View style={styles.notifRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.notifTitle}>Quest Completed</Text>
+              <Text style={styles.notifSub}>Notify when a kid marks a quest done</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleBtn, notifTaskCompleted && styles.toggleBtnOn]}
+              onPress={() => toggleNotif('taskCompleted', !notifTaskCompleted)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.toggleThumb, notifTaskCompleted && styles.toggleThumbOn]} />
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.notifRow, { marginTop: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.notifTitle}>Reward Released</Text>
+              <Text style={styles.notifSub}>Notify the kid when you approve a quest</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleBtn, notifTaskApproved && styles.toggleBtnOn]}
+              onPress={() => toggleNotif('taskApproved', !notifTaskApproved)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.toggleThumb, notifTaskApproved && styles.toggleThumbOn]} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── AI Quest Creator ──────────────────────────────────────────── */}
@@ -2067,5 +2219,76 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: 240,
+  },
+
+  // ─── Due date picker
+  dueDateRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  dueDateChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  dueDateChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  dueDateChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text3,
+  },
+  dueDateChipTextActive: {
+    color: colors.primary,
+  },
+
+  // ─── Notification toggle
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notifTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text1,
+    marginBottom: 2,
+  },
+  notifSub: {
+    fontSize: 12,
+    color: colors.text3,
+    fontWeight: '500',
+  },
+  toggleBtn: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#CBD5E1',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  toggleBtnOn: {
+    backgroundColor: colors.primary,
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    alignSelf: 'flex-start',
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
   },
 });

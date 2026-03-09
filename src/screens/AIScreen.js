@@ -30,8 +30,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { colors, shadows } from '../theme/index';
 
-// ⬇️  Replace with your Anthropic API key (or call via your backend)
-const CLAUDE_API_KEY = 'YOUR_ANTHROPIC_API_KEY';
+// ⬇️  Set EXPO_PUBLIC_CLAUDE_API_KEY in your .env file
+// For production, proxy this through a Supabase Edge Function instead.
+const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
 const CLAUDE_READY   = !CLAUDE_API_KEY.includes('YOUR_');
 
 const TASK_EMOJIS = [
