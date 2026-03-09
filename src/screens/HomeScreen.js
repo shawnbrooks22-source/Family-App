@@ -22,7 +22,6 @@ import {
   recordPinFailure,
   clearPinFailures,
   getPinLockoutStatus,
-  hashPin,
 } from '../lib/security';
 
 const { width } = Dimensions.get('window');

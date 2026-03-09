@@ -219,7 +219,8 @@ export default function KidDashboard({ route, navigation }) {
   const { family, tasks, completeTask, setKidGoal } = useApp();
   const kid = family.kids.find(k => k.id === kidId);
 
-  const kidTasks = tasks.filter(t => t.assignedTo === kidId);
+  // Normalize both field naming conventions (local = assignedTo, Supabase = assigned_to)
+  const kidTasks = tasks.filter(t => t.assignedTo === kidId || t.assigned_to === kidId);
   const pendingTasks = kidTasks.filter(t => t.status === 'pending');
   const waitingTasks = kidTasks.filter(t => t.status === 'completed');
   const approvedTasks = kidTasks.filter(t => t.status === 'approved');
