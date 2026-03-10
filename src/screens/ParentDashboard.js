@@ -18,7 +18,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
-import { colors, kidColors, shadows } from '../theme/index';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { kidColors, shadows } from '../theme/index';
 
 const Tab = createBottomTabNavigator();
 
@@ -63,12 +65,13 @@ function getDueDateSuggestions() {
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
 function ScreenHeader({ title, subtitle, rightContent }) {
+  const { colors } = useTheme();
   return (
-    <SafeAreaView style={headerStyles.safe}>
-      <View style={headerStyles.row}>
+    <SafeAreaView style={{ backgroundColor: colors.surface }}>
+      <View style={[headerStyles.row, { borderBottomColor: colors.divider }]}>
         <View style={{ flex: 1 }}>
-          <Text style={headerStyles.title}>{title}</Text>
-          {subtitle ? <Text style={headerStyles.sub}>{subtitle}</Text> : null}
+          <Text style={[headerStyles.title, { color: colors.text1 }]}>{title}</Text>
+          {subtitle ? <Text style={[headerStyles.sub, { color: colors.text3 }]}>{subtitle}</Text> : null}
         </View>
         {rightContent}
       </View>
@@ -77,7 +80,6 @@ function ScreenHeader({ title, subtitle, rightContent }) {
 }
 
 const headerStyles = StyleSheet.create({
-  safe: { backgroundColor: colors.surface },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -85,15 +87,16 @@ const headerStyles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
   },
-  title: { fontSize: 26, fontWeight: '800', color: colors.text1, letterSpacing: -0.4 },
-  sub: { fontSize: 13, color: colors.text3, fontWeight: '500', marginTop: 2 },
+  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  sub: { fontSize: 13, fontWeight: '500', marginTop: 2 },
 });
 
 // ─── Home / Approvals Tab ──────────────────────────────────────────────────────
 
 function HomeTab({ navigation }) {
+  const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
   const { tasks, family, approveTask } = useApp();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
 
@@ -121,11 +124,11 @@ function HomeTab({ navigation }) {
   }
 
   return (
-    <View style={styles.tabWrapper}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+    <View style={[styles.tabWrapper, { backgroundColor: colors.bg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
       <ScreenHeader
-        title="Parent Hub"
-        subtitle={`Welcome back, ${family.parentName}!`}
+        title={t('parentDashboard.parentHub')}
+        subtitle={t('parentDashboard.welcomeBack', { name: family.parentName })}
         rightContent={
           <View style={[styles.avatarSm, { backgroundColor: colors.primary }]}>
             <Text style={{ fontSize: 20 }}>{family.parentEmoji}</Text>
@@ -136,17 +139,17 @@ function HomeTab({ navigation }) {
       <ScrollView contentContainerStyle={styles.tabScroll} showsVerticalScrollIndicator={false}>
         {/* Stats row */}
         <View style={styles.statsRow}>
-          <StatCard label="Total" value={totalTasks} color={colors.primary} icon="list" />
-          <StatCard label="Waiting" value={waitingTasks} color={colors.warning} icon="time" />
-          <StatCard label="Approved" value={doneTasks} color={colors.success} icon="checkmark-circle" />
+          <StatCard label={t('parentDashboard.total')} value={totalTasks} color={colors.primary} icon="list" />
+          <StatCard label={t('parentDashboard.waiting')} value={waitingTasks} color={colors.warning} icon="time" />
+          <StatCard label={t('parentDashboard.approved')} value={doneTasks} color={colors.success} icon="checkmark-circle" />
         </View>
 
         {/* Weekly Analytics Card */}
         {family.kids.length > 0 && (
-          <View style={styles.analyticsCard}>
+          <View style={[styles.analyticsCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
             <View style={styles.analyticsHeader}>
-              <Text style={styles.analyticsTitle}>📊 This Week</Text>
-              <Text style={styles.analyticsCount}>{completedThisWeek.length} quests done</Text>
+              <Text style={[styles.analyticsTitle, { color: colors.text1 }]}>{t('parentDashboard.thisWeek')}</Text>
+              <Text style={[styles.analyticsCount, { color: colors.primary, backgroundColor: colors.primaryLight }]}>{completedThisWeek.length} {t('parentDashboard.questsDone')}</Text>
             </View>
 
             {kidStars.length > 0 && (
@@ -159,11 +162,11 @@ function HomeTab({ navigation }) {
                     <View style={[styles.kidRankAvatar, { backgroundColor: item.kid.color }]}>
                       <Text style={{ fontSize: 14 }}>{item.kid.emoji}</Text>
                     </View>
-                    <Text style={styles.kidRankName}>{item.kid.name}</Text>
+                    <Text style={[styles.kidRankName, { color: colors.text1 }]}>{item.kid.name}</Text>
                     <View style={styles.kidRankStars}>
-                      <Text style={styles.kidRankStarText}>⭐ {item.stars} total</Text>
+                      <Text style={[styles.kidRankStarText, { color: colors.text2 }]}>⭐ {item.stars} total</Text>
                       {item.weekStars > 0 && (
-                        <Text style={styles.kidRankWeekText}>+{item.weekStars} this week</Text>
+                        <Text style={[styles.kidRankWeekText, { color: colors.success }]}>+{item.weekStars} this week</Text>
                       )}
                     </View>
                   </View>
@@ -172,14 +175,14 @@ function HomeTab({ navigation }) {
             )}
 
             {completedThisWeek.length === 0 && (
-              <Text style={styles.analyticsEmpty}>No quests completed this week yet — assign some!</Text>
+              <Text style={[styles.analyticsEmpty, { color: colors.text3 }]}>No quests completed this week yet — assign some!</Text>
             )}
           </View>
         )}
 
         {/* Needs approval */}
         <SectionHeader
-          title="Needs Approval"
+          title={t('parentDashboard.needsApproval')}
           count={pendingApproval.length}
           countColor={colors.warning}
         />
@@ -187,8 +190,8 @@ function HomeTab({ navigation }) {
         {pendingApproval.length === 0 ? (
           <EmptyState
             icon="✨"
-            title="All caught up!"
-            sub="No tasks waiting for your approval right now."
+            title={t('parentDashboard.allCaughtUp')}
+            sub={t('parentDashboard.noTasksWaiting')}
           />
         ) : (
           pendingApproval.map(task => {
@@ -206,11 +209,11 @@ function HomeTab({ navigation }) {
 
         {/* Back to home */}
         <TouchableOpacity
-          style={styles.homeBtn}
+          style={[styles.homeBtn, { borderColor: colors.border }]}
           onPress={() => navigation.navigate('Home')}
           activeOpacity={0.85}
         >
-          <Text style={styles.homeBtnText}>← Back to Home</Text>
+          <Text style={[styles.homeBtnText, { color: colors.text2 }]}>{t('parentDashboard.backToHome')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -218,51 +221,54 @@ function HomeTab({ navigation }) {
 }
 
 function StatCard({ label, value, color, icon }) {
+  const { colors } = useTheme();
   return (
-    <View style={[styles.statCard, { borderTopColor: color, borderTopWidth: 3 }]}>
+    <View style={[styles.statCard, { borderTopColor: color, borderTopWidth: 3, backgroundColor: colors.surface }]}>
       <Ionicons name={icon} size={20} color={color} style={{ marginBottom: 6 }} />
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statLabel, { color: colors.text3 }]}>{label}</Text>
     </View>
   );
 }
 
 function ApprovalCard({ task, kid, onApprove }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   return (
-    <View style={styles.approvalCard}>
+    <View style={[styles.approvalCard, { backgroundColor: colors.surface }]}>
       {/* Kid info */}
       <View style={styles.approvalKidRow}>
         <View style={[styles.kidAvatar, { backgroundColor: kid?.color || colors.primary }]}>
           <Text style={{ fontSize: 22 }}>{kid?.emoji || '🎉'}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.approvalKidName}>{kid?.name || 'Unknown'}</Text>
-          <Text style={styles.approvalKidLabel}>completed a quest!</Text>
+          <Text style={[styles.approvalKidName, { color: colors.text1 }]}>{kid?.name || 'Unknown'}</Text>
+          <Text style={[styles.approvalKidLabel, { color: colors.text3 }]}>{t('parentDashboard.completedQuest')}</Text>
         </View>
-        <View style={styles.waitBadge}>
-          <Text style={styles.waitBadgeText}>Waiting</Text>
+        <View style={[styles.waitBadge, { backgroundColor: colors.warningLight }]}>
+          <Text style={[styles.waitBadgeText, { color: colors.warning }]}>{t('parentDashboard.waiting')}</Text>
         </View>
       </View>
 
       {/* Divider */}
-      <View style={styles.approvalDivider} />
+      <View style={[styles.approvalDivider, { backgroundColor: colors.divider }]} />
 
       {/* Task info */}
-      <Text style={styles.approvalTaskTitle}>
+      <Text style={[styles.approvalTaskTitle, { color: colors.text1 }]}>
         {task.emoji}  {task.title}
       </Text>
       {task.notes ? (
-        <Text style={styles.approvalNotes}>📝 {task.notes}</Text>
+        <Text style={[styles.approvalNotes, { color: colors.text2 }]}>📝 {task.notes}</Text>
       ) : null}
       <View style={styles.approvalRewardRow}>
         <Ionicons name="gift-outline" size={15} color={colors.text3} />
-        <Text style={styles.approvalRewardText}>{task.reward}</Text>
+        <Text style={[styles.approvalRewardText, { color: colors.text2 }]}>{task.reward}</Text>
       </View>
 
       {/* Approve button */}
-      <TouchableOpacity style={styles.approveBtn} onPress={onApprove} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.approveBtn, { backgroundColor: colors.success }]} onPress={onApprove} activeOpacity={0.85}>
         <Ionicons name="checkmark-circle" size={20} color="#fff" />
-        <Text style={styles.approveBtnText}>Release Reward</Text>
+        <Text style={styles.approveBtnText}>{t('parentDashboard.releaseReward')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -271,12 +277,14 @@ function ApprovalCard({ task, kid, onApprove }) {
 // ─── Tasks Tab ─────────────────────────────────────────────────────────────────
 
 const RECURRENCE_OPTS = [
-  { key: 'none',   label: 'One-Time', icon: '1️⃣' },
-  { key: 'daily',  label: 'Daily',    icon: '📅' },
-  { key: 'weekly', label: 'Weekly',   icon: '📆' },
+  { key: 'none',   labelKey: 'parentDashboard.oneTime', icon: '1️⃣' },
+  { key: 'daily',  labelKey: 'parentDashboard.daily',   icon: '📅' },
+  { key: 'weekly', labelKey: 'parentDashboard.weekly',  icon: '📆' },
 ];
 
 function TasksTab() {
+  const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
   const { tasks, family, deleteTask, editTask } = useApp();
   const [filter, setFilter] = useState('all');
   const [editingTask, setEditingTask] = useState(null);
@@ -291,10 +299,10 @@ function TasksTab() {
   const [editDueDate,    setEditDueDate]    = useState('');
 
   const FILTERS = [
-    { key: 'all',       label: 'All' },
-    { key: 'pending',   label: 'To Do' },
-    { key: 'completed', label: 'Waiting' },
-    { key: 'approved',  label: 'Done' },
+    { key: 'all',       label: t('parentDashboard.all') },
+    { key: 'pending',   label: t('parentDashboard.toDo') },
+    { key: 'completed', label: t('parentDashboard.waiting') },
+    { key: 'approved',  label: t('parentDashboard.done') },
   ];
 
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
@@ -306,9 +314,9 @@ function TasksTab() {
   }
 
   function confirmDelete(task) {
-    Alert.alert('Delete Quest?', `Remove "${task.title}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
+    Alert.alert(t('parentDashboard.deleteQuest'), t('parentDashboard.removeQuest', { title: task.title }), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('parentDashboard.delete'), style: 'destructive', onPress: () => deleteTask(task.id) },
     ]);
   }
 
@@ -344,24 +352,32 @@ function TasksTab() {
   }
 
   return (
-    <View style={styles.tabWrapper}>
-      <ScreenHeader title="All Quests" subtitle={`${tasks.length} total`} />
+    <View style={[styles.tabWrapper, { backgroundColor: colors.bg }]}>
+      <ScreenHeader title={t('parentDashboard.allQuests')} subtitle={t('parentDashboard.total_quests', { count: tasks.length })} />
 
       {/* Filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
+        style={[styles.filterScroll, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}
         contentContainerStyle={styles.filterRow}
       >
         {FILTERS.map(f => (
           <TouchableOpacity
             key={f.key}
-            style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
+            style={[
+              styles.filterChip,
+              { backgroundColor: colors.border },
+              filter === f.key && { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+            ]}
             onPress={() => setFilter(f.key)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.filterChipText, filter === f.key && styles.filterChipTextActive]}>
+            <Text style={[
+              styles.filterChipText,
+              { color: colors.text3 },
+              filter === f.key && { color: colors.primary },
+            ]}>
               {f.label}
             </Text>
           </TouchableOpacity>
@@ -370,35 +386,35 @@ function TasksTab() {
 
       <ScrollView contentContainerStyle={styles.tabScroll} showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
-          <EmptyState icon="📝" title="No quests here" sub="Try a different filter or add new quests." />
+          <EmptyState icon="📝" title={t('parentDashboard.noQuestsHere')} sub={t('parentDashboard.tryDifferentFilter')} />
         ) : (
           filtered.map(task => {
             const kid = family.kids.find(k => k.id === task.assignedTo);
             const s = statusInfo(task.status);
             return (
-              <View key={task.id} style={styles.taskRow}>
+              <View key={task.id} style={[styles.taskRow, { backgroundColor: colors.surface }]}>
                 <View style={styles.taskRowLeft}>
                   <Text style={styles.taskRowEmoji}>{task.emoji}</Text>
                 </View>
                 <View style={styles.taskRowMiddle}>
                   <View style={styles.taskTitleRow}>
-                    <Text style={styles.taskRowTitle} numberOfLines={1}>{task.title}</Text>
+                    <Text style={[styles.taskRowTitle, { color: colors.text1 }]} numberOfLines={1}>{task.title}</Text>
                     {task.recurrence && task.recurrence !== 'none' && (
-                      <View style={styles.recurringBadge}>
-                        <Text style={styles.recurringBadgeText}>🔁 {task.recurrence}</Text>
+                      <View style={[styles.recurringBadge, { backgroundColor: colors.primaryLight }]}>
+                        <Text style={[styles.recurringBadgeText, { color: colors.primary }]}>🔁 {task.recurrence}</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={styles.taskRowKid}>
+                  <Text style={[styles.taskRowKid, { color: colors.text3 }]}>
                     {kid ? `${kid.emoji} ${kid.name}` : 'Unknown'}
                   </Text>
                   {task.due_date ? (
-                    <Text style={[styles.taskRowNotes, isDueSoon(task.due_date) && { color: colors.error }]}>
+                    <Text style={[styles.taskRowNotes, { color: colors.text3 }, isDueSoon(task.due_date) && { color: colors.error }]}>
                       📅 Due {formatDueDate(task.due_date)}
                     </Text>
                   ) : null}
                   {task.notes ? (
-                    <Text style={styles.taskRowNotes} numberOfLines={1}>📝 {task.notes}</Text>
+                    <Text style={[styles.taskRowNotes, { color: colors.text3 }]} numberOfLines={1}>📝 {task.notes}</Text>
                   ) : null}
                 </View>
                 <View style={styles.taskRowRight}>
@@ -436,14 +452,14 @@ function TasksTab() {
         presentationStyle="pageSheet"
         onRequestClose={() => setEditingTask(null)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.bg }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
             <TouchableOpacity onPress={() => setEditingTask(null)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+              <Text style={[styles.modalCancelText, { color: colors.text3 }]}>{t('cancel')}</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Edit Quest</Text>
+            <Text style={[styles.modalTitle, { color: colors.text1 }]}>{t('parentDashboard.editQuest')}</Text>
             <TouchableOpacity onPress={handleSaveEdit}>
-              <Text style={styles.modalSaveText}>Save</Text>
+              <Text style={[styles.modalSaveText, { color: colors.primary }]}>{t('save')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -454,16 +470,16 @@ function TasksTab() {
             showsVerticalScrollIndicator={false}
             automaticallyAdjustKeyboardInsets={true}
           >
-            <FormLabel label="Quest Name" />
+            <FormLabel label={t('parentDashboard.questName')} />
             <TextInput
-              style={styles.formInput}
+              style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
               value={editTitle}
               onChangeText={setEditTitle}
               placeholderTextColor={colors.text3}
               returnKeyType="next"
             />
 
-            <FormLabel label="Quest Icon" />
+            <FormLabel label={t('parentDashboard.questIcon')} />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -472,7 +488,11 @@ function TasksTab() {
               {TASK_EMOJIS.map(e => (
                 <TouchableOpacity
                   key={e}
-                  style={[styles.taskEmojiBtn, editEmoji === e && styles.taskEmojiBtnActive]}
+                  style={[
+                    styles.taskEmojiBtn,
+                    { backgroundColor: colors.surface },
+                    editEmoji === e && { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+                  ]}
                   onPress={() => setEditEmoji(e)}
                   activeOpacity={0.7}
                 >
@@ -481,68 +501,84 @@ function TasksTab() {
               ))}
             </ScrollView>
 
-            <FormLabel label="Reward 🎁" />
+            <FormLabel label={t('parentDashboard.reward')} />
             <TextInput
-              style={styles.formInput}
+              style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
               value={editReward}
               onChangeText={setEditReward}
               placeholderTextColor={colors.text3}
               returnKeyType="next"
             />
 
-            <FormLabel label="Notes (optional) 📝" />
+            <FormLabel label={t('parentDashboard.notes')} />
             <TextInput
-              style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top' }]}
+              style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top', borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
               value={editNotes}
               onChangeText={setEditNotes}
-              placeholder="Any extra instructions for this quest…"
+              placeholder={t('parentDashboard.notesPlaceholder')}
               placeholderTextColor={colors.text3}
               multiline
             />
 
-            <FormLabel label="Due Date (optional) 📅" />
+            <FormLabel label={t('parentDashboard.dueDate')} />
             <View style={styles.dueDateRow}>
               {getDueDateSuggestions().map(s => (
                 <TouchableOpacity
                   key={s.value}
-                  style={[styles.dueDateChip, editDueDate === s.value && styles.dueDateChipActive]}
+                  style={[
+                    styles.dueDateChip,
+                    { backgroundColor: colors.border },
+                    editDueDate === s.value && { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+                  ]}
                   onPress={() => setEditDueDate(editDueDate === s.value ? '' : s.value)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.dueDateChipText, editDueDate === s.value && styles.dueDateChipTextActive]}>
+                  <Text style={[
+                    styles.dueDateChipText,
+                    { color: colors.text3 },
+                    editDueDate === s.value && { color: colors.primary },
+                  ]}>
                     {s.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TextInput
-              style={[styles.formInput, { marginTop: 8 }]}
+              style={[styles.formInput, { marginTop: 8, borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
               value={editDueDate}
               onChangeText={setEditDueDate}
-              placeholder="Or type YYYY-MM-DD"
+              placeholder={t('parentDashboard.dueDatePlaceholder')}
               placeholderTextColor={colors.text3}
               keyboardType="numbers-and-punctuation"
               maxLength={10}
             />
 
-            <FormLabel label="Repeats 🔁" />
+            <FormLabel label={t('parentDashboard.repeats')} />
             <View style={styles.recurrenceRow}>
               {RECURRENCE_OPTS.map(opt => (
                 <TouchableOpacity
                   key={opt.key}
-                  style={[styles.recurrenceBtn, editRecurrence === opt.key && styles.recurrenceBtnActive]}
+                  style={[
+                    styles.recurrenceBtn,
+                    { backgroundColor: colors.border },
+                    editRecurrence === opt.key && { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+                  ]}
                   onPress={() => setEditRecurrence(opt.key)}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.recurrenceIcon}>{opt.icon}</Text>
-                  <Text style={[styles.recurrenceLabel, editRecurrence === opt.key && styles.recurrenceLabelActive]}>
-                    {opt.label}
+                  <Text style={[
+                    styles.recurrenceLabel,
+                    { color: colors.text3 },
+                    editRecurrence === opt.key && { color: colors.primary },
+                  ]}>
+                    {t(opt.labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <FormLabel label="Assign To" />
+            <FormLabel label={t('parentDashboard.assignTo')} />
             <View style={styles.kidPicker}>
               {family.kids.map(kid => (
                 <TouchableOpacity
@@ -568,9 +604,9 @@ function TasksTab() {
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32 }]} onPress={handleSaveEdit} activeOpacity={0.85}>
+            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32, backgroundColor: colors.primary }]} onPress={handleSaveEdit} activeOpacity={0.85}>
               <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={styles.assignBtnText}>Save Changes</Text>
+              <Text style={styles.assignBtnText}>{t('parentDashboard.saveChanges')}</Text>
             </TouchableOpacity>
           </ScrollView>
           </KeyboardAvoidingView>
@@ -583,6 +619,8 @@ function TasksTab() {
 // ─── Add Task Tab ──────────────────────────────────────────────────────────────
 
 function AddTaskTab() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const { family, addTask } = useApp();
   const [title, setTitle] = useState('');
   const [reward, setReward] = useState('');
@@ -594,9 +632,9 @@ function AddTaskTab() {
   const [success, setSuccess] = useState(false);
 
   async function handleAdd() {
-    if (!title.trim())  { Alert.alert('Enter a quest name', 'What do you want your kid to do?'); return; }
-    if (!reward.trim()) { Alert.alert('Add a reward', "What will your kid earn for completing this?"); return; }
-    if (!selectedKid)   { Alert.alert('Assign to a kid', 'Choose who should complete this quest.'); return; }
+    if (!title.trim())  { Alert.alert(t('parentDashboard.questName'), 'What do you want your kid to do?'); return; }
+    if (!reward.trim()) { Alert.alert(t('parentDashboard.reward'), "What will your kid earn for completing this?"); return; }
+    if (!selectedKid)   { Alert.alert(t('parentDashboard.assignTo'), 'Choose who should complete this quest.'); return; }
     if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
       Alert.alert('Invalid date', 'Use format YYYY-MM-DD (e.g. 2025-06-15)');
       return;
@@ -624,8 +662,8 @@ function AddTaskTab() {
   }
 
   return (
-    <View style={styles.tabWrapper}>
-      <ScreenHeader title="New Quest" subtitle="Assign a chore with a reward" />
+    <View style={[styles.tabWrapper, { backgroundColor: colors.bg }]}>
+      <ScreenHeader title={t('parentDashboard.newQuest')} subtitle={t('parentDashboard.assignChoreReward')} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -635,17 +673,17 @@ function AddTaskTab() {
           automaticallyAdjustKeyboardInsets={true}
         >
           {success && (
-          <View style={styles.successBanner}>
+          <View style={[styles.successBanner, { backgroundColor: colors.successLight, borderColor: colors.success + '40' }]}>
             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-            <Text style={styles.successBannerText}>Quest assigned!</Text>
+            <Text style={[styles.successBannerText, { color: colors.success }]}>{t('parentDashboard.questAssigned')}</Text>
           </View>
         )}
 
         {/* Task name */}
-        <FormLabel label="Quest Name" />
+        <FormLabel label={t('parentDashboard.questName')} />
         <TextInput
-          style={styles.formInput}
-          placeholder="e.g. Clean your room, Do homework…"
+          style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
+          placeholder={t('parentDashboard.questNamePlaceholder')}
           value={title}
           onChangeText={setTitle}
           placeholderTextColor={colors.text3}
@@ -653,7 +691,7 @@ function AddTaskTab() {
         />
 
         {/* Emoji */}
-        <FormLabel label="Quest Icon" />
+        <FormLabel label={t('parentDashboard.questIcon')} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -662,7 +700,11 @@ function AddTaskTab() {
           {TASK_EMOJIS.map(e => (
             <TouchableOpacity
               key={e}
-              style={[styles.taskEmojiBtn, selectedEmoji === e && styles.taskEmojiBtnActive]}
+              style={[
+                styles.taskEmojiBtn,
+                { backgroundColor: colors.surface },
+                selectedEmoji === e && { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+              ]}
               onPress={() => setSelectedEmoji(e)}
               activeOpacity={0.7}
             >
@@ -672,10 +714,10 @@ function AddTaskTab() {
         </ScrollView>
 
         {/* Reward */}
-        <FormLabel label="Reward 🎁" />
+        <FormLabel label={t('parentDashboard.reward')} />
         <TextInput
-          style={styles.formInput}
-          placeholder="e.g. 30 min screen time, Ice cream!"
+          style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
+          placeholder={t('parentDashboard.rewardPlaceholder')}
           value={reward}
           onChangeText={setReward}
           placeholderTextColor={colors.text3}
@@ -683,10 +725,10 @@ function AddTaskTab() {
         />
 
         {/* Notes */}
-        <FormLabel label="Notes (optional) 📝" />
+        <FormLabel label={t('parentDashboard.notes')} />
         <TextInput
-          style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top' }]}
-          placeholder="Extra instructions, tips, or details for your kid…"
+          style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top', borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
+          placeholder={t('parentDashboard.notesPlaceholder')}
           value={notes}
           onChangeText={setNotes}
           placeholderTextColor={colors.text3}
@@ -694,24 +736,32 @@ function AddTaskTab() {
         />
 
         {/* Due Date */}
-        <FormLabel label="Due Date (optional) 📅" />
+        <FormLabel label={t('parentDashboard.dueDate')} />
         <View style={styles.dueDateRow}>
           {getDueDateSuggestions().map(s => (
             <TouchableOpacity
               key={s.value}
-              style={[styles.dueDateChip, dueDate === s.value && styles.dueDateChipActive]}
+              style={[
+                styles.dueDateChip,
+                { backgroundColor: colors.border },
+                dueDate === s.value && { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+              ]}
               onPress={() => setDueDate(dueDate === s.value ? '' : s.value)}
               activeOpacity={0.8}
             >
-              <Text style={[styles.dueDateChipText, dueDate === s.value && styles.dueDateChipTextActive]}>
+              <Text style={[
+                styles.dueDateChipText,
+                { color: colors.text3 },
+                dueDate === s.value && { color: colors.primary },
+              ]}>
                 {s.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
         <TextInput
-          style={[styles.formInput, { marginTop: 8 }]}
-          placeholder="Or type YYYY-MM-DD"
+          style={[styles.formInput, { marginTop: 8, borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
+          placeholder={t('parentDashboard.dueDatePlaceholder')}
           value={dueDate}
           onChangeText={setDueDate}
           placeholderTextColor={colors.text3}
@@ -720,25 +770,33 @@ function AddTaskTab() {
         />
 
         {/* Recurrence */}
-        <FormLabel label="Repeats 🔁" />
+        <FormLabel label={t('parentDashboard.repeats')} />
         <View style={styles.recurrenceRow}>
           {RECURRENCE_OPTS.map(opt => (
             <TouchableOpacity
               key={opt.key}
-              style={[styles.recurrenceBtn, recurrence === opt.key && styles.recurrenceBtnActive]}
+              style={[
+                styles.recurrenceBtn,
+                { backgroundColor: colors.border },
+                recurrence === opt.key && { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+              ]}
               onPress={() => setRecurrence(opt.key)}
               activeOpacity={0.8}
             >
               <Text style={styles.recurrenceIcon}>{opt.icon}</Text>
-              <Text style={[styles.recurrenceLabel, recurrence === opt.key && styles.recurrenceLabelActive]}>
-                {opt.label}
+              <Text style={[
+                styles.recurrenceLabel,
+                { color: colors.text3 },
+                recurrence === opt.key && { color: colors.primary },
+              ]}>
+                {t(opt.labelKey)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Assign to */}
-        <FormLabel label="Assign To" />
+        <FormLabel label={t('parentDashboard.assignTo')} />
         <View style={styles.kidPicker}>
           {family.kids.map(kid => (
             <TouchableOpacity
@@ -764,9 +822,9 @@ function AddTaskTab() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.assignBtn} onPress={handleAdd} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.assignBtn, { backgroundColor: colors.primary }]} onPress={handleAdd} activeOpacity={0.85}>
           <Ionicons name="add-circle" size={22} color="#fff" />
-          <Text style={styles.assignBtnText}>Assign Quest</Text>
+          <Text style={styles.assignBtnText}>{t('parentDashboard.assignQuest')}</Text>
         </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -777,6 +835,8 @@ function AddTaskTab() {
 // ─── Family Tab ────────────────────────────────────────────────────────────────
 
 function FamilyTab({ navigation }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const { family, addKid, removeKid, editKid } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [kidName, setKidName] = useState('');
@@ -792,7 +852,7 @@ function FamilyTab({ navigation }) {
   const [editKidColor,    setEditKidColor]    = useState(kidColors[0]);
 
   async function handleAddKid() {
-    if (!kidName.trim()) { Alert.alert('Enter a name'); return; }
+    if (!kidName.trim()) { Alert.alert(t('parentDashboard.name')); return; }
     await addKid({ name: kidName.trim(), emoji: kidEmoji, color: kidColor, phone: kidPhone.trim() });
     setKidName('');
     setKidPhone('');
@@ -800,9 +860,9 @@ function FamilyTab({ navigation }) {
   }
 
   function confirmRemove(kid) {
-    Alert.alert(`Remove ${kid.name}?`, 'This will also remove all their quests.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeKid(kid.id) },
+    Alert.alert(t('parentDashboard.removeKid', { name: kid.name }), t('parentDashboard.removeKidConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('parentDashboard.remove'), style: 'destructive', onPress: () => removeKid(kid.id) },
     ]);
   }
 
@@ -815,7 +875,7 @@ function FamilyTab({ navigation }) {
   }
 
   async function handleSaveKid() {
-    if (!editKidName.trim()) { Alert.alert('Enter a name'); return; }
+    if (!editKidName.trim()) { Alert.alert(t('parentDashboard.name')); return; }
     await editKid(editingKid.id, {
       name: editKidName.trim(),
       phone: editKidPhone.trim(),
@@ -826,8 +886,8 @@ function FamilyTab({ navigation }) {
   }
 
   return (
-    <View style={styles.tabWrapper}>
-      <ScreenHeader title="Family" subtitle={`${family.kids.length + 1} members`} />
+    <View style={[styles.tabWrapper, { backgroundColor: colors.bg }]}>
+      <ScreenHeader title={t('parentDashboard.family')} subtitle={t('parentDashboard.familyMembers', { count: family.kids.length + 1 })} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -837,32 +897,32 @@ function FamilyTab({ navigation }) {
           automaticallyAdjustKeyboardInsets={true}
         >
         {/* Parent */}
-        <Text style={styles.sectionLabel}>PARENT</Text>
-        <View style={styles.memberCard}>
+        <Text style={[styles.sectionLabel, { color: colors.text3 }]}>{t('parentDashboard.parent_label')}</Text>
+        <View style={[styles.memberCard, { backgroundColor: colors.surface }]}>
           <View style={[styles.memberAvatar, { backgroundColor: colors.primary }]}>
             <Text style={{ fontSize: 26 }}>{family.parentEmoji}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.memberName}>{family.parentName}</Text>
+            <Text style={[styles.memberName, { color: colors.text1 }]}>{family.parentName}</Text>
             {family.parentPhone ? (
-              <Text style={styles.memberPhone}>{family.parentPhone}</Text>
+              <Text style={[styles.memberPhone, { color: colors.text3 }]}>{family.parentPhone}</Text>
             ) : null}
           </View>
-          <View style={styles.parentRolePill}>
-            <Text style={styles.parentRolePillText}>Parent</Text>
+          <View style={[styles.parentRolePill, { backgroundColor: colors.primaryLight }]}>
+            <Text style={[styles.parentRolePillText, { color: colors.primary }]}>{t('parentDashboard.parent_label')}</Text>
           </View>
         </View>
 
         {/* Kids */}
-        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>KIDS ({family.kids.length})</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 24, color: colors.text3 }]}>{t('parentDashboard.kids_label', { count: family.kids.length })}</Text>
         {family.kids.map(kid => (
-          <View key={kid.id} style={styles.memberCard}>
+          <View key={kid.id} style={[styles.memberCard, { backgroundColor: colors.surface }]}>
             <View style={[styles.memberAvatar, { backgroundColor: kid.color }]}>
               <Text style={{ fontSize: 26 }}>{kid.emoji}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.memberName}>{kid.name}</Text>
-              {kid.phone ? <Text style={styles.memberPhone}>{kid.phone}</Text> : null}
+              <Text style={[styles.memberName, { color: colors.text1 }]}>{kid.name}</Text>
+              {kid.phone ? <Text style={[styles.memberPhone, { color: colors.text3 }]}>{kid.phone}</Text> : null}
             </View>
             <TouchableOpacity
               onPress={() => openEditKid(kid)}
@@ -883,27 +943,27 @@ function FamilyTab({ navigation }) {
 
         {/* Add kid */}
         {!showAdd ? (
-          <TouchableOpacity style={styles.addKidDashedBtn} onPress={() => setShowAdd(true)}>
+          <TouchableOpacity style={[styles.addKidDashedBtn, { borderColor: colors.border }]} onPress={() => setShowAdd(true)}>
             <Ionicons name="add" size={20} color={colors.primary} />
-            <Text style={styles.addKidDashedText}>Add Another Kid</Text>
+            <Text style={[styles.addKidDashedText, { color: colors.primary }]}>{t('parentDashboard.addAnotherKid')}</Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.addKidForm}>
-            <Text style={styles.addKidFormTitle}>New Kid</Text>
+          <View style={[styles.addKidForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.addKidFormTitle, { color: colors.text1 }]}>{t('parentDashboard.newKid')}</Text>
 
-            <FormLabel label="Name" />
+            <FormLabel label={t('parentDashboard.name')} />
             <TextInput
-              style={styles.formInput}
-              placeholder="Kid's name…"
+              style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+              placeholder={t('parentDashboard.kidNameDots')}
               value={kidName}
               onChangeText={setKidName}
               placeholderTextColor={colors.text3}
             />
 
-            <FormLabel label="Phone" />
+            <FormLabel label={t('parentDashboard.phone')} />
             <TextInput
-              style={styles.formInput}
-              placeholder="Optional"
+              style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+              placeholder={t('optional')}
               value={kidPhone}
               onChangeText={setKidPhone}
               keyboardType="phone-pad"
@@ -919,7 +979,11 @@ function FamilyTab({ navigation }) {
               {KID_EMOJIS.map(e => (
                 <TouchableOpacity
                   key={e}
-                  style={[styles.taskEmojiBtn, kidEmoji === e && styles.taskEmojiBtnActive]}
+                  style={[
+                    styles.taskEmojiBtn,
+                    { backgroundColor: colors.surface },
+                    kidEmoji === e && { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+                  ]}
                   onPress={() => setKidEmoji(e)}
                   activeOpacity={0.7}
                 >
@@ -937,7 +1001,7 @@ function FamilyTab({ navigation }) {
                   style={[
                     styles.colorDot,
                     { backgroundColor: c },
-                    kidColor === c && styles.colorDotActive,
+                    kidColor === c && [styles.colorDotActive, { borderColor: colors.text1 }],
                   ]}
                   activeOpacity={0.8}
                 />
@@ -946,18 +1010,18 @@ function FamilyTab({ navigation }) {
 
             <View style={styles.addKidFormBtns}>
               <TouchableOpacity
-                style={[styles.assignBtn, { flex: 1 }]}
+                style={[styles.assignBtn, { flex: 1, backgroundColor: colors.primary }]}
                 onPress={handleAddKid}
                 activeOpacity={0.85}
               >
-                <Text style={styles.assignBtnText}>Add</Text>
+                <Text style={styles.assignBtnText}>{t('add')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cancelFormBtn}
                 onPress={() => setShowAdd(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelFormBtnText}>Cancel</Text>
+                <Text style={[styles.cancelFormBtnText, { color: colors.text3 }]}>{t('cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -972,14 +1036,14 @@ function FamilyTab({ navigation }) {
         presentationStyle="pageSheet"
         onRequestClose={() => setEditingKid(null)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.bg }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
             <TouchableOpacity onPress={() => setEditingKid(null)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+              <Text style={[styles.modalCancelText, { color: colors.text3 }]}>{t('cancel')}</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Edit Kid</Text>
+            <Text style={[styles.modalTitle, { color: colors.text1 }]}>{t('parentDashboard.editKid')}</Text>
             <TouchableOpacity onPress={handleSaveKid}>
-              <Text style={styles.modalSaveText}>Save</Text>
+              <Text style={[styles.modalSaveText, { color: colors.primary }]}>{t('save')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -990,22 +1054,22 @@ function FamilyTab({ navigation }) {
             showsVerticalScrollIndicator={false}
             automaticallyAdjustKeyboardInsets={true}
           >
-            <FormLabel label="Name" />
+            <FormLabel label={t('parentDashboard.name')} />
             <TextInput
-              style={styles.formInput}
+              style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
               value={editKidName}
               onChangeText={setEditKidName}
               placeholderTextColor={colors.text3}
             />
 
-            <FormLabel label="Phone" />
+            <FormLabel label={t('parentDashboard.phone')} />
             <TextInput
-              style={styles.formInput}
+              style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
               value={editKidPhone}
               onChangeText={setEditKidPhone}
               keyboardType="phone-pad"
               placeholderTextColor={colors.text3}
-              placeholder="Optional"
+              placeholder={t('optional')}
             />
 
             <FormLabel label="Emoji" />
@@ -1017,7 +1081,11 @@ function FamilyTab({ navigation }) {
               {KID_EMOJIS.map(e => (
                 <TouchableOpacity
                   key={e}
-                  style={[styles.taskEmojiBtn, editKidEmoji === e && styles.taskEmojiBtnActive]}
+                  style={[
+                    styles.taskEmojiBtn,
+                    { backgroundColor: colors.surface },
+                    editKidEmoji === e && { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+                  ]}
                   onPress={() => setEditKidEmoji(e)}
                   activeOpacity={0.7}
                 >
@@ -1035,16 +1103,16 @@ function FamilyTab({ navigation }) {
                   style={[
                     styles.colorDot,
                     { backgroundColor: c },
-                    editKidColor === c && styles.colorDotActive,
+                    editKidColor === c && [styles.colorDotActive, { borderColor: colors.text1 }],
                   ]}
                   activeOpacity={0.8}
                 />
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32 }]} onPress={handleSaveKid} activeOpacity={0.85}>
+            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32, backgroundColor: colors.primary }]} onPress={handleSaveKid} activeOpacity={0.85}>
               <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={styles.assignBtnText}>Save Changes</Text>
+              <Text style={styles.assignBtnText}>{t('parentDashboard.saveChanges')}</Text>
             </TouchableOpacity>
           </ScrollView>
           </KeyboardAvoidingView>
@@ -1057,6 +1125,8 @@ function FamilyTab({ navigation }) {
 // ─── Settings Tab ──────────────────────────────────────────────────────────────
 
 function SettingsTab({ navigation }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled } = useApp();
 
   // Parent profile edit
@@ -1078,7 +1148,7 @@ function SettingsTab({ navigation }) {
   const [notifTaskApproved,  setNotifTaskApproved]  = useState(notifyPrefs.taskApproved  !== false);
 
   async function handleSaveProfile() {
-    if (!editName.trim()) { Alert.alert('Enter your name'); return; }
+    if (!editName.trim()) { Alert.alert(t('settings.enterName')); return; }
     await updateParentProfile({
       parentName:  editName.trim(),
       parentPhone: editPhone.trim(),
@@ -1093,22 +1163,22 @@ function SettingsTab({ navigation }) {
     // ✅ FIXED: verifyPin is async — must await it
     const pinOk = await verifyPin(currentPin);
     if (!pinOk) {
-      setPinMsg({ text: 'Current PIN is incorrect.', ok: false });
+      setPinMsg({ text: t('settings.pinIncorrect'), ok: false });
       return;
     }
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-      setPinMsg({ text: 'New PIN must be exactly 4 digits.', ok: false });
+      setPinMsg({ text: t('settings.pinMustBe4'), ok: false });
       return;
     }
     if (newPin !== confirmPin) {
-      setPinMsg({ text: "New PINs don't match.", ok: false });
+      setPinMsg({ text: t('settings.pinsDontMatch'), ok: false });
       return;
     }
     await updateParentProfile({ parentPin: newPin });
     setCurrentPin('');
     setNewPin('');
     setConfirmPin('');
-    setPinMsg({ text: 'PIN updated successfully! ✅', ok: true });
+    setPinMsg({ text: t('settings.pinUpdated'), ok: true });
     setTimeout(() => setPinMsg(null), 3000);
   }
 
@@ -1124,12 +1194,12 @@ function SettingsTab({ navigation }) {
 
   function confirmClearData() {
     Alert.alert(
-      '⚠️ Reset All Data',
-      'This will permanently delete all family data, quests, and rewards. This cannot be undone.',
+      t('settings.resetTitle'),
+      t('settings.resetMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Reset Everything',
+          text: t('settings.resetEverything'),
           style: 'destructive',
           onPress: async () => {
             await clearAllData();
@@ -1141,8 +1211,8 @@ function SettingsTab({ navigation }) {
   }
 
   return (
-    <View style={styles.tabWrapper}>
-      <ScreenHeader title="Settings" subtitle="Manage your account" />
+    <View style={[styles.tabWrapper, { backgroundColor: colors.bg }]}>
+      <ScreenHeader title={t('parentDashboard.settings')} subtitle={t('settings.manageAccount')} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -1152,35 +1222,35 @@ function SettingsTab({ navigation }) {
           automaticallyAdjustKeyboardInsets={true}
         >
           {/* ── Parent Profile ──────────────────────────────────────────────── */}
-        <Text style={styles.settingsSectionLabel}>PARENT PROFILE</Text>
-        <View style={styles.settingsCard}>
+        <Text style={[styles.settingsSectionLabel, { color: colors.text3 }]}>{t('settings.parentProfile')}</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
           {profileSaved && (
-            <View style={[styles.successBanner, { marginBottom: 14 }]}>
+            <View style={[styles.successBanner, { marginBottom: 14, backgroundColor: colors.successLight, borderColor: colors.success + '40' }]}>
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={styles.successBannerText}>Profile saved!</Text>
+              <Text style={[styles.successBannerText, { color: colors.success }]}>{t('settings.profileSaved')}</Text>
             </View>
           )}
 
-          <FormLabel label="Display Name" />
+          <FormLabel label={t('settings.displayName')} />
           <TextInput
-            style={styles.formInput}
+            style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
             value={editName}
             onChangeText={setEditName}
             placeholderTextColor={colors.text3}
             returnKeyType="done"
           />
 
-          <FormLabel label="Phone" />
+          <FormLabel label={t('settings.phone')} />
           <TextInput
-            style={styles.formInput}
+            style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
             value={editPhone}
             onChangeText={setEditPhone}
             keyboardType="phone-pad"
-            placeholder="Optional"
+            placeholder={t('optional')}
             placeholderTextColor={colors.text3}
           />
 
-          <FormLabel label="Avatar Emoji" />
+          <FormLabel label={t('settings.avatarEmoji')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1189,7 +1259,11 @@ function SettingsTab({ navigation }) {
             {PARENT_EMOJIS.map(e => (
               <TouchableOpacity
                 key={e}
-                style={[styles.taskEmojiBtn, editEmoji === e && styles.taskEmojiBtnActive]}
+                style={[
+                  styles.taskEmojiBtn,
+                  { backgroundColor: colors.surface },
+                  editEmoji === e && { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+                ]}
                 onPress={() => setEditEmoji(e)}
                 activeOpacity={0.7}
               >
@@ -1198,19 +1272,19 @@ function SettingsTab({ navigation }) {
             ))}
           </ScrollView>
 
-          <TouchableOpacity style={[styles.assignBtn, { marginTop: 18 }]} onPress={handleSaveProfile} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.assignBtn, { marginTop: 18, backgroundColor: colors.primary }]} onPress={handleSaveProfile} activeOpacity={0.85}>
             <Ionicons name="save-outline" size={20} color="#fff" />
-            <Text style={styles.assignBtnText}>Save Profile</Text>
+            <Text style={styles.assignBtnText}>{t('settings.saveProfile')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── Change PIN ──────────────────────────────────────────────────── */}
-        <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>CHANGE PIN</Text>
-        <View style={styles.settingsCard}>
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.changePin')}</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
           {pinMsg && (
             <View style={[
               styles.successBanner,
-              { marginBottom: 14, backgroundColor: pinMsg.ok ? colors.successLight : colors.errorLight }
+              { marginBottom: 14, backgroundColor: pinMsg.ok ? colors.successLight : colors.errorLight, borderColor: (pinMsg.ok ? colors.success : colors.error) + '40' }
             ]}>
               <Ionicons
                 name={pinMsg.ok ? 'checkmark-circle' : 'alert-circle'}
@@ -1223,36 +1297,36 @@ function SettingsTab({ navigation }) {
             </View>
           )}
 
-          <FormLabel label="Current PIN" />
+          <FormLabel label={t('settings.currentPin')} />
           <TextInput
-            style={styles.formInput}
+            style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
             value={currentPin}
-            onChangeText={t => setCurrentPin(t.replace(/\D/g, '').slice(0, 4))}
-            placeholder="Enter your current 4-digit PIN"
+            onChangeText={v => setCurrentPin(v.replace(/\D/g, '').slice(0, 4))}
+            placeholder={t('settings.currentPinPlaceholder')}
             placeholderTextColor={colors.text3}
             keyboardType="number-pad"
             secureTextEntry
             maxLength={4}
           />
 
-          <FormLabel label="New PIN" />
+          <FormLabel label={t('settings.newPin')} />
           <TextInput
-            style={styles.formInput}
+            style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
             value={newPin}
-            onChangeText={t => setNewPin(t.replace(/\D/g, '').slice(0, 4))}
-            placeholder="4 digits"
+            onChangeText={v => setNewPin(v.replace(/\D/g, '').slice(0, 4))}
+            placeholder={t('settings.newPinPlaceholder')}
             placeholderTextColor={colors.text3}
             keyboardType="number-pad"
             secureTextEntry
             maxLength={4}
           />
 
-          <FormLabel label="Confirm New PIN" />
+          <FormLabel label={t('settings.confirmNewPin')} />
           <TextInput
-            style={styles.formInput}
+            style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
             value={confirmPin}
-            onChangeText={t => setConfirmPin(t.replace(/\D/g, '').slice(0, 4))}
-            placeholder="Repeat new PIN"
+            onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, 4))}
+            placeholder={t('settings.confirmPinPlaceholder')}
             placeholderTextColor={colors.text3}
             keyboardType="number-pad"
             secureTextEntry
@@ -1265,20 +1339,20 @@ function SettingsTab({ navigation }) {
             activeOpacity={0.85}
           >
             <Ionicons name="lock-closed-outline" size={20} color="#fff" />
-            <Text style={styles.assignBtnText}>Update PIN</Text>
+            <Text style={styles.assignBtnText}>{t('settings.updatePin')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── Notification Preferences ──────────────────────────────────── */}
-        <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>NOTIFICATIONS</Text>
-        <View style={styles.settingsCard}>
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.notifications')}</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
           <View style={styles.notifRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.notifTitle}>Quest Completed</Text>
-              <Text style={styles.notifSub}>Notify when a kid marks a quest done</Text>
+              <Text style={[styles.notifTitle, { color: colors.text1 }]}>{t('settings.questCompleted')}</Text>
+              <Text style={[styles.notifSub, { color: colors.text3 }]}>{t('settings.questCompletedSub')}</Text>
             </View>
             <TouchableOpacity
-              style={[styles.toggleBtn, notifTaskCompleted && styles.toggleBtnOn]}
+              style={[styles.toggleBtn, notifTaskCompleted && { backgroundColor: colors.primary }]}
               onPress={() => toggleNotif('taskCompleted', !notifTaskCompleted)}
               activeOpacity={0.85}
             >
@@ -1287,11 +1361,11 @@ function SettingsTab({ navigation }) {
           </View>
           <View style={[styles.notifRow, { marginTop: 16 }]}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.notifTitle}>Reward Released</Text>
-              <Text style={styles.notifSub}>Notify the kid when you approve a quest</Text>
+              <Text style={[styles.notifTitle, { color: colors.text1 }]}>{t('settings.rewardReleased')}</Text>
+              <Text style={[styles.notifSub, { color: colors.text3 }]}>{t('settings.rewardReleasedSub')}</Text>
             </View>
             <TouchableOpacity
-              style={[styles.toggleBtn, notifTaskApproved && styles.toggleBtnOn]}
+              style={[styles.toggleBtn, notifTaskApproved && { backgroundColor: colors.primary }]}
               onPress={() => toggleNotif('taskApproved', !notifTaskApproved)}
               activeOpacity={0.85}
             >
@@ -1301,18 +1375,18 @@ function SettingsTab({ navigation }) {
         </View>
 
         {/* ── AI Quest Creator ──────────────────────────────────────────── */}
-        <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>AI FEATURES</Text>
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.aiFeatures')}</Text>
         <TouchableOpacity
-          style={[styles.settingsCard, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}
+          style={[styles.settingsCard, { backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 14 }]}
           onPress={() => navigation.navigate('AI')}
           activeOpacity={0.85}
         >
-          <View style={styles.aiIconBox}>
+          <View style={[styles.aiIconBox, { backgroundColor: colors.primaryLight }]}>
             <Text style={{ fontSize: 26 }}>🤖</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.aiCardTitle}>AI Quest Creator</Text>
-            <Text style={styles.aiCardSub}>Let Claude suggest perfect chores for your kids</Text>
+            <Text style={[styles.aiCardTitle, { color: colors.text1 }]}>{t('settings.aiQuestCreator')}</Text>
+            <Text style={[styles.aiCardSub, { color: colors.text3 }]}>{t('settings.aiQuestSub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.text3} />
         </TouchableOpacity>
@@ -1320,24 +1394,24 @@ function SettingsTab({ navigation }) {
         {/* ── Invite Code ───────────────────────────────────────────────── */}
         {isCloudEnabled && family?.inviteCode && (
           <>
-            <Text style={[styles.settingsSectionLabel, { marginTop: 28 }]}>FAMILY INVITE CODE</Text>
-            <View style={styles.settingsCard}>
-              <Text style={styles.inviteCodeLabel}>Share this code to let family join on other devices:</Text>
-              <View style={styles.inviteCodeBox}>
-                <Text style={styles.inviteCodeText}>{family.inviteCode}</Text>
+            <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.familyInviteCode')}</Text>
+            <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.inviteCodeLabel, { color: colors.text2 }]}>{t('settings.inviteCodeLabel')}</Text>
+              <View style={[styles.inviteCodeBox, { backgroundColor: colors.primaryLight, borderColor: colors.primary + '40' }]}>
+                <Text style={[styles.inviteCodeText, { color: colors.primary }]}>{family.inviteCode}</Text>
               </View>
-              <Text style={styles.inviteCodeHint}>
-                Works on any phone. Open Kindo → Join with Invite Code.
+              <Text style={[styles.inviteCodeHint, { color: colors.text3 }]}>
+                {t('settings.inviteCodeHint')}
               </Text>
             </View>
           </>
         )}
 
         {/* ── Danger Zone ─────────────────────────────────────────────────── */}
-        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.error }]}>DANGER ZONE</Text>
-        <View style={[styles.settingsCard, { borderColor: colors.error + '30', borderWidth: 1.5 }]}>
-          <Text style={styles.dangerText}>
-            Resetting will permanently delete all family members, quests, and reward history. The app will return to the setup screen.
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.error }]}>{t('settings.dangerZone')}</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.error + '30', borderWidth: 1.5 }]}>
+          <Text style={[styles.dangerText, { color: colors.text2 }]}>
+            {t('settings.dangerText')}
           </Text>
           <TouchableOpacity
             style={[styles.assignBtn, { backgroundColor: colors.error, marginTop: 16 }]}
@@ -1345,7 +1419,7 @@ function SettingsTab({ navigation }) {
             activeOpacity={0.85}
           >
             <Ionicons name="trash-outline" size={20} color="#fff" />
-            <Text style={styles.assignBtnText}>Reset All Data</Text>
+            <Text style={styles.assignBtnText}>{t('settings.resetAllData')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -1359,9 +1433,10 @@ function SettingsTab({ navigation }) {
 // ─── Shared mini-components ────────────────────────────────────────────────────
 
 function SectionHeader({ title, count, countColor }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionHeaderTitle}>{title}</Text>
+      <Text style={[styles.sectionHeaderTitle, { color: colors.text1 }]}>{title}</Text>
       {count > 0 && (
         <View style={[styles.countBadge, { backgroundColor: countColor }]}>
           <Text style={styles.countBadgeText}>{count}</Text>
@@ -1372,22 +1447,26 @@ function SectionHeader({ title, count, countColor }) {
 }
 
 function EmptyState({ icon, title, sub }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.emptyState}>
       <Text style={styles.emptyIcon}>{icon}</Text>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptySub}>{sub}</Text>
+      <Text style={[styles.emptyTitle, { color: colors.text1 }]}>{title}</Text>
+      <Text style={[styles.emptySub, { color: colors.text3 }]}>{sub}</Text>
     </View>
   );
 }
 
 function FormLabel({ label }) {
-  return <Text style={styles.formLabel}>{label}</Text>;
+  const { colors } = useTheme();
+  return <Text style={[styles.formLabel, { color: colors.text2 }]}>{label}</Text>;
 }
 
 // ─── ParentDashboard root ──────────────────────────────────────────────────────
 
 export default function ParentDashboard({ navigation }) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const { tasks, checkParentSession, refreshParentSession } = useApp();
   const pendingCount = tasks.filter(t => t.status === 'completed').length;
   const sessionCheckRef = useRef(null);
@@ -1408,7 +1487,7 @@ export default function ParentDashboard({ navigation }) {
       Alert.alert(
         '🔒 Parent Zone Locked',
         'Your session expired after 30 minutes of inactivity. Please enter your PIN again.',
-        [{ text: 'OK' }]
+        [{ text: t('done') }]
       );
     }
   }
@@ -1443,7 +1522,7 @@ export default function ParentDashboard({ navigation }) {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }],
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text3,
         tabBarShowLabel: true,
@@ -1463,7 +1542,7 @@ export default function ParentDashboard({ navigation }) {
       <Tab.Screen
         name="Home"
         options={{
-          tabBarLabel: 'Home',
+          tabBarLabel: t('parentDashboard.home'),
           tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.warning, fontSize: 10 },
         }}
@@ -1474,25 +1553,25 @@ export default function ParentDashboard({ navigation }) {
       <Tab.Screen
         name="Tasks"
         component={TasksTab}
-        options={{ tabBarLabel: 'Quests' }}
+        options={{ tabBarLabel: t('parentDashboard.quests') }}
       />
 
       <Tab.Screen
         name="AddTask"
         component={AddTaskTab}
-        options={{ tabBarLabel: 'Add' }}
+        options={{ tabBarLabel: t('parentDashboard.add') }}
       />
 
       <Tab.Screen
         name="Family"
-        options={{ tabBarLabel: 'Family' }}
+        options={{ tabBarLabel: t('parentDashboard.family') }}
       >
         {props => <FamilyTab {...props} navigation={navigation} />}
       </Tab.Screen>
 
       <Tab.Screen
         name="Settings"
-        options={{ tabBarLabel: 'Settings' }}
+        options={{ tabBarLabel: t('parentDashboard.settings') }}
       >
         {props => <SettingsTab {...props} navigation={navigation} />}
       </Tab.Screen>
@@ -1504,7 +1583,6 @@ export default function ParentDashboard({ navigation }) {
 const styles = StyleSheet.create({
   tabWrapper: {
     flex: 1,
-    backgroundColor: colors.bg,
   },
   tabScroll: {
     paddingHorizontal: 20,
@@ -1512,9 +1590,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   tabBar: {
-    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.divider,
     height: 72,
     paddingBottom: 12,
     paddingTop: 8,
@@ -1533,7 +1609,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,
     alignItems: 'center',
@@ -1546,7 +1621,6 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: colors.text3,
     fontWeight: '600',
     marginTop: 2,
     textTransform: 'uppercase',
@@ -1555,13 +1629,11 @@ const styles = StyleSheet.create({
 
   // ─── Analytics card
   analyticsCard: {
-    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 18,
     marginBottom: 24,
     ...shadows.sm,
     borderWidth: 1,
-    borderColor: colors.divider,
   },
   analyticsHeader: {
     flexDirection: 'row',
@@ -1572,13 +1644,10 @@ const styles = StyleSheet.create({
   analyticsTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: colors.text1,
   },
   analyticsCount: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.primary,
-    backgroundColor: colors.primaryLight,
     borderRadius: 100,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -1605,22 +1674,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '700',
-    color: colors.text1,
   },
   kidRankStars: { alignItems: 'flex-end' },
   kidRankStarText: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.text2,
   },
   kidRankWeekText: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.success,
   },
   analyticsEmpty: {
     fontSize: 14,
-    color: colors.text3,
     fontWeight: '500',
     textAlign: 'center',
     paddingVertical: 8,
@@ -1636,7 +1701,6 @@ const styles = StyleSheet.create({
   sectionHeaderTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.text1,
     letterSpacing: -0.2,
   },
   countBadge: {
@@ -1655,7 +1719,6 @@ const styles = StyleSheet.create({
 
   // ─── Approval card
   approvalCard: {
-    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 18,
     marginBottom: 14,
@@ -1677,38 +1740,31 @@ const styles = StyleSheet.create({
   approvalKidName: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text1,
   },
   approvalKidLabel: {
     fontSize: 12,
-    color: colors.text3,
     fontWeight: '500',
   },
   waitBadge: {
-    backgroundColor: colors.warningLight,
     borderRadius: 100,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   waitBadgeText: {
-    color: colors.warning,
     fontSize: 11,
     fontWeight: '700',
   },
   approvalDivider: {
     height: 1,
-    backgroundColor: colors.divider,
     marginBottom: 12,
   },
   approvalTaskTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.text1,
     marginBottom: 6,
   },
   approvalNotes: {
     fontSize: 13,
-    color: colors.text2,
     fontWeight: '500',
     marginBottom: 8,
     fontStyle: 'italic',
@@ -1721,12 +1777,10 @@ const styles = StyleSheet.create({
   },
   approvalRewardText: {
     fontSize: 14,
-    color: colors.text2,
     fontWeight: '600',
     flex: 1,
   },
   approveBtn: {
-    backgroundColor: colors.success,
     borderRadius: 100,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -1745,7 +1799,6 @@ const styles = StyleSheet.create({
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
@@ -1757,17 +1810,14 @@ const styles = StyleSheet.create({
   taskRowTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.text1,
   },
   taskRowKid: {
     fontSize: 12,
-    color: colors.text3,
     fontWeight: '500',
     marginTop: 3,
   },
   taskRowNotes: {
     fontSize: 11,
-    color: colors.text3,
     fontWeight: '500',
     marginTop: 2,
   },
@@ -1789,9 +1839,7 @@ const styles = StyleSheet.create({
 
   // ─── Filter chips
   filterScroll: {
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
   },
   filterRow: {
     paddingHorizontal: 20,
@@ -1803,27 +1851,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 100,
-    backgroundColor: '#F1F5F9',
     borderWidth: 1.5,
     borderColor: 'transparent',
-  },
-  filterChipActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.text3,
-  },
-  filterChipTextActive: {
-    color: colors.primary,
   },
 
   // ─── Edit Modal
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.bg,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1832,24 +1870,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 14,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.text1,
   },
   modalCancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text3,
   },
   modalSaveText: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.primary,
   },
   modalScroll: {
     paddingHorizontal: 20,
@@ -1861,7 +1894,6 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.text2,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginTop: 18,
@@ -1869,23 +1901,15 @@ const styles = StyleSheet.create({
   },
   formInput: {
     borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
     fontSize: 16,
-    color: colors.text1,
-    backgroundColor: '#F8FAFC',
   },
   taskEmojiBtn: {
     padding: 8,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'transparent',
-    backgroundColor: '#F8FAFC',
-  },
-  taskEmojiBtnActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
   },
   kidPicker: {
     flexDirection: 'row',
@@ -1909,7 +1933,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   assignBtn: {
-    backgroundColor: colors.primary,
     borderRadius: 100,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -1927,7 +1950,6 @@ const styles = StyleSheet.create({
 
   // ─── Success banner
   successBanner: {
-    backgroundColor: colors.successLight,
     borderRadius: 14,
     padding: 14,
     flexDirection: 'row',
@@ -1935,10 +1957,8 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.success + '40',
   },
   successBannerText: {
-    color: colors.success,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -1947,7 +1967,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.text3,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 10,
@@ -1955,7 +1974,6 @@ const styles = StyleSheet.create({
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
@@ -1972,22 +1990,18 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text1,
   },
   memberPhone: {
     fontSize: 12,
-    color: colors.text3,
     fontWeight: '500',
     marginTop: 3,
   },
   parentRolePill: {
-    backgroundColor: colors.primaryLight,
     borderRadius: 100,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
   parentRolePillText: {
-    color: colors.primary,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1996,7 +2010,6 @@ const styles = StyleSheet.create({
   },
   addKidDashedBtn: {
     borderWidth: 2,
-    borderColor: colors.border,
     borderStyle: 'dashed',
     borderRadius: 16,
     paddingVertical: 16,
@@ -2007,22 +2020,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addKidDashedText: {
-    color: colors.primary,
     fontSize: 15,
     fontWeight: '700',
   },
   addKidForm: {
-    backgroundColor: '#F8FAFC',
     borderRadius: 20,
     padding: 18,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   addKidFormTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.text1,
     marginBottom: 4,
   },
   colorRow: {
@@ -2039,7 +2048,6 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   colorDotActive: {
-    borderColor: colors.text1,
     transform: [{ scale: 1.2 }],
   },
   addKidFormBtns: {
@@ -2053,7 +2061,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   cancelFormBtnText: {
-    color: colors.text3,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -2062,20 +2069,17 @@ const styles = StyleSheet.create({
   settingsSectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.text3,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 10,
   },
   settingsCard: {
-    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 18,
     ...shadows.sm,
   },
   dangerText: {
     fontSize: 14,
-    color: colors.text2,
     fontWeight: '500',
     lineHeight: 20,
   },
@@ -2085,49 +2089,41 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   aiCardTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: colors.text1,
     marginBottom: 3,
   },
   aiCardSub: {
     fontSize: 13,
-    color: colors.text3,
     fontWeight: '500',
   },
 
   // ─── Invite code
   inviteCodeLabel: {
     fontSize: 13,
-    color: colors.text2,
     fontWeight: '500',
     marginBottom: 12,
     lineHeight: 18,
   },
   inviteCodeBox: {
-    backgroundColor: colors.primaryLight,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderWidth: 1.5,
-    borderColor: colors.primary + '40',
     alignItems: 'center',
     marginBottom: 10,
   },
   inviteCodeText: {
     fontSize: 20,
     fontWeight: '900',
-    color: colors.primary,
     letterSpacing: 2,
   },
   inviteCodeHint: {
     fontSize: 12,
-    color: colors.text3,
     fontWeight: '500',
     textAlign: 'center',
   },
@@ -2142,22 +2138,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
     borderWidth: 1.5,
     borderColor: 'transparent',
     gap: 4,
-  },
-  recurrenceBtnActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
   },
   recurrenceIcon: { fontSize: 22 },
   recurrenceLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.text3,
   },
-  recurrenceLabelActive: { color: colors.primary },
 
   // ─── Recurring badge on task list
   taskTitleRow: {
@@ -2167,7 +2156,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   recurringBadge: {
-    backgroundColor: colors.primaryLight,
     borderRadius: 100,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -2175,7 +2163,6 @@ const styles = StyleSheet.create({
   recurringBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.primary,
     textTransform: 'capitalize',
   },
 
@@ -2192,11 +2179,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 100,
     borderWidth: 1.5,
-    borderColor: colors.border,
     alignItems: 'center',
   },
   homeBtnText: {
-    color: colors.text2,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -2210,12 +2195,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.text1,
     marginBottom: 6,
   },
   emptySub: {
     fontSize: 14,
-    color: colors.text3,
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: 240,
@@ -2231,21 +2214,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 100,
-    backgroundColor: '#F1F5F9',
     borderWidth: 1.5,
     borderColor: 'transparent',
-  },
-  dueDateChipActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
   },
   dueDateChipText: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.text3,
-  },
-  dueDateChipTextActive: {
-    color: colors.primary,
   },
 
   // ─── Notification toggle
@@ -2257,12 +2231,10 @@ const styles = StyleSheet.create({
   notifTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.text1,
     marginBottom: 2,
   },
   notifSub: {
     fontSize: 12,
-    color: colors.text3,
     fontWeight: '500',
   },
   toggleBtn: {
@@ -2272,9 +2244,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
     justifyContent: 'center',
     paddingHorizontal: 3,
-  },
-  toggleBtnOn: {
-    backgroundColor: colors.primary,
   },
   toggleThumb: {
     width: 22,
