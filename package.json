@@ -46,8 +46,7 @@
     "@babel/core": "^7.20.0",
     "babel-preset-expo": "~13.0.0",
     "jest": "^29.7.0",
-    "jest-expo": "~54.0.0",
-    "@testing-library/react-native": "^12.4.0"
+    "jest-expo": "~54.0.0"
   },
   "private": true
 }
