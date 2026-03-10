@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -153,6 +155,7 @@ function QuestCard({ task, index, onDone, kidColor }) {
             >
               <Text style={styles.doItText}>⚡  DO IT!</Text>
             </LinearGradient>
+            {/* Note: DO IT text is intentionally kept universal/iconic */}
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -217,6 +220,8 @@ function DoneCard({ task }) {
 export default function KidDashboard({ route, navigation }) {
   const { kidId } = route.params;
   const { family, tasks, completeTask, setKidGoal } = useApp();
+  const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
   const kid = family.kids.find(k => k.id === kidId);
 
   // Normalize both field naming conventions (local = assignedTo, Supabase = assigned_to)
@@ -321,7 +326,7 @@ export default function KidDashboard({ route, navigation }) {
   const gradient = getGradient(kid.color);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#0F0A1E' : '#F8F9FF' }]}>
       <StatusBar barStyle="light-content" />
 
       <ScrollView
@@ -336,7 +341,7 @@ export default function KidDashboard({ route, navigation }) {
             style={styles.backBtn}
             activeOpacity={0.8}
           >
-            <Text style={styles.backBtnText}>← Home</Text>
+            <Text style={styles.backBtnText}>{t('kidDashboard.backHome')}</Text>
           </TouchableOpacity>
 
           <Animated.View style={[styles.headerMain, { opacity: headerOpacity }]}>
@@ -365,19 +370,19 @@ export default function KidDashboard({ route, navigation }) {
 
             {/* Stats row */}
             <View style={styles.statsRow}>
-              <StatChip emoji="⭐" value={totalStars} label="Stars" />
+              <StatChip emoji="⭐" value={totalStars} label={t('kidDashboard.stars')} />
               <View style={styles.statDivider} />
-              <StatChip emoji="✅" value={completedCount} label="Done" />
+              <StatChip emoji="✅" value={completedCount} label={t('kidDashboard.done')} />
               <View style={styles.statDivider} />
-              <StatChip emoji="🔥" value={streak} label={streak === 1 ? 'Day' : 'Streak'} />
+              <StatChip emoji="🔥" value={streak} label={streak === 1 ? t('kidDashboard.day') : t('kidDashboard.streak')} />
             </View>
 
             {/* Today's goal bar */}
             {totalCount > 0 && (
               <View style={styles.xpSection}>
                 <View style={styles.xpLabelRow}>
-                  <Text style={styles.xpLabel}>Today's Goal</Text>
-                  <Text style={styles.xpCount}>{completedCount} / {totalCount} done</Text>
+                  <Text style={styles.xpLabel}>{t('kidDashboard.todaysGoal')}</Text>
+                  <Text style={styles.xpCount}>{t('kidDashboard.doneFraction', { completed: completedCount, total: totalCount })}</Text>
                 </View>
                 <View style={styles.xpTrack}>
                   <Animated.View
@@ -408,7 +413,7 @@ export default function KidDashboard({ route, navigation }) {
                 <View style={styles.goalCardHeader}>
                   <Text style={styles.goalCardTitle}>🎯 {goal.name}</Text>
                   <TouchableOpacity onPress={handleClearGoal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={styles.goalChangeBtn}>Change</Text>
+                    <Text style={styles.goalChangeBtn}>{t('kidDashboard.change')}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.goalCountRow}>
@@ -416,7 +421,7 @@ export default function KidDashboard({ route, navigation }) {
                     {Math.min(totalStars, goal.stars)} / {goal.stars} ⭐
                   </Text>
                   {totalStars >= goal.stars && (
-                    <Text style={styles.goalReachedText}>🏆 Goal Reached!</Text>
+                    <Text style={styles.goalReachedText}>{t('kidDashboard.goalReached')}</Text>
                   )}
                 </View>
                 <View style={styles.goalTrack}>
@@ -436,17 +441,17 @@ export default function KidDashboard({ route, navigation }) {
             ) : showGoalForm ? (
               /* Goal form */
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                <Text style={styles.goalFormTitle}>Set a Goal 🎯</Text>
+                <Text style={styles.goalFormTitle}>{t('kidDashboard.setGoalTitle')}</Text>
                 <TextInput
                   style={styles.goalInput}
-                  placeholder="What do you want? (e.g. New toy 🧸)"
+                  placeholder={t('kidDashboard.goalWhatWant')}
                   placeholderTextColor="#94A3B8"
                   value={goalNameInput}
                   onChangeText={setGoalNameInput}
                 />
                 <TextInput
                   style={[styles.goalInput, { marginTop: 8 }]}
-                  placeholder="How many stars to earn it?"
+                  placeholder={t('kidDashboard.goalHowManyStars')}
                   placeholderTextColor="#94A3B8"
                   value={goalStarsInput}
                   onChangeText={setGoalStarsInput}
@@ -454,10 +459,10 @@ export default function KidDashboard({ route, navigation }) {
                 />
                 <View style={styles.goalFormBtns}>
                   <TouchableOpacity style={styles.goalSaveBtn} onPress={handleSaveGoal} activeOpacity={0.85}>
-                    <Text style={styles.goalSaveBtnText}>Save Goal ⭐</Text>
+                    <Text style={styles.goalSaveBtnText}>{t('kidDashboard.saveGoal')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setShowGoalForm(false)}>
-                    <Text style={styles.goalCancelText}>Cancel</Text>
+                    <Text style={styles.goalCancelText}>{t('cancel')}</Text>
                   </TouchableOpacity>
                 </View>
               </KeyboardAvoidingView>
@@ -465,8 +470,8 @@ export default function KidDashboard({ route, navigation }) {
               /* No goal — invite to set one */
               <TouchableOpacity style={styles.setGoalTap} onPress={() => setShowGoalForm(true)} activeOpacity={0.8}>
                 <Text style={styles.setGoalEmoji}>🎯</Text>
-                <Text style={styles.setGoalTitle}>Set a Goal!</Text>
-                <Text style={styles.setGoalSub}>Pick something to work toward</Text>
+                <Text style={styles.setGoalTitle}>{t('kidDashboard.setAGoal')}</Text>
+                <Text style={styles.setGoalSub}>{t('kidDashboard.setGoalSub')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -476,8 +481,8 @@ export default function KidDashboard({ route, navigation }) {
             <View style={styles.streakBanner}>
               <Text style={styles.streakFire}>🔥</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.streakTitle}>{streak}-Day Streak!</Text>
-                <Text style={styles.streakSub}>Keep it up — don't break the chain!</Text>
+                <Text style={styles.streakTitle}>{t('kidDashboard.streakTitle', { streak })}</Text>
+                <Text style={styles.streakSub}>{t('kidDashboard.streakSub')}</Text>
               </View>
             </View>
           )}
@@ -486,9 +491,9 @@ export default function KidDashboard({ route, navigation }) {
           {kidTasks.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>🎯</Text>
-              <Text style={styles.emptyTitle}>No Quests Yet!</Text>
+              <Text style={styles.emptyTitle}>{t('kidDashboard.noQuestsYet')}</Text>
               <Text style={styles.emptySub}>
-                Ask Mom or Dad to add some awesome quests for you!
+                {t('kidDashboard.askForQuests')}
               </Text>
             </View>
           )}
@@ -497,8 +502,8 @@ export default function KidDashboard({ route, navigation }) {
           {kidTasks.length > 0 && pendingTasks.length === 0 && waitingTasks.length === 0 && (
             <View style={styles.allDoneCard}>
               <Text style={styles.allDoneEmoji}>🎊</Text>
-              <Text style={styles.allDoneTitle}>YOU'RE A STAR!</Text>
-              <Text style={styles.allDoneSub}>All quests complete! Ask for more adventures!</Text>
+              <Text style={styles.allDoneTitle}>{t('kidDashboard.youreAStar')}</Text>
+              <Text style={styles.allDoneSub}>{t('kidDashboard.allComplete')}</Text>
             </View>
           )}
 
@@ -506,7 +511,7 @@ export default function KidDashboard({ route, navigation }) {
           {pendingTasks.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={styles.sectionTitle}>⚡ ACTIVE QUESTS</Text>
+                <Text style={styles.sectionTitle}>{t('kidDashboard.activeQuests')}</Text>
                 <View style={[styles.sectionBadge, { backgroundColor: '#FF8C00' }]}>
                   <Text style={styles.sectionBadgeText}>{pendingTasks.length}</Text>
                 </View>
@@ -527,7 +532,7 @@ export default function KidDashboard({ route, navigation }) {
           {waitingTasks.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={[styles.sectionTitle, { color: '#B45309' }]}>⏳ BEING CHECKED</Text>
+                <Text style={[styles.sectionTitle, { color: '#B45309' }]}>{t('kidDashboard.beingChecked')}</Text>
                 <View style={[styles.sectionBadge, { backgroundColor: '#F59E0B' }]}>
                   <Text style={styles.sectionBadgeText}>{waitingTasks.length}</Text>
                 </View>
@@ -542,7 +547,7 @@ export default function KidDashboard({ route, navigation }) {
           {celebratedTasks.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={[styles.sectionTitle, { color: '#065F46' }]}>🏆 REWARDS WON</Text>
+                <Text style={[styles.sectionTitle, { color: '#065F46' }]}>{t('kidDashboard.rewardsWon')}</Text>
                 <View style={[styles.sectionBadge, { backgroundColor: '#10B981' }]}>
                   <Text style={styles.sectionBadgeText}>{celebratedTasks.length}</Text>
                 </View>
@@ -551,7 +556,7 @@ export default function KidDashboard({ route, navigation }) {
               <View style={styles.allTimeCard}>
                 <Text style={styles.allTimeEmoji}>⭐</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.allTimeTitle}>{totalStars} Stars Earned All-Time</Text>
+                  <Text style={styles.allTimeTitle}>{t('kidDashboard.starsEarnedAllTime', { count: totalStars })}</Text>
                   <Text style={styles.allTimeSub}>{getStarTitle(totalStars)} — keep it up!</Text>
                 </View>
               </View>
@@ -568,7 +573,7 @@ export default function KidDashboard({ route, navigation }) {
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FF' },
+  container: { flex: 1, backgroundColor: '#F8F9FF' }, // overridden inline with dynamic color
 
   // ─── Header
   header: {

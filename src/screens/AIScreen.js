@@ -28,46 +28,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
-import { colors, shadows } from '../theme/index';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
-// ─── AI Configuration ──────────────────────────────────────────────────────────
-//
-// OPTION A (Recommended — Production): Supabase Edge Function proxy
-//   1. Deploy supabase/functions/claude-proxy with your ANTHROPIC_API_KEY secret
-//   2. Set EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY in .env:
-//      EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY=https://<ref>.supabase.co/functions/v1/claude-proxy
-//
-// OPTION B (Development only): Direct API key in .env
-//   Set EXPO_PUBLIC_CLAUDE_API_KEY=sk-ant-your-key-here
-//
-const PROXY_URL    = process.env.EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY || '';
+// ⬇️  Set EXPO_PUBLIC_CLAUDE_API_KEY in your .env file
+// For production, proxy this through a Supabase Edge Function instead.
 const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
-const USE_PROXY    = !!PROXY_URL;
-const CLAUDE_READY = USE_PROXY || !CLAUDE_API_KEY.includes('YOUR_');
+const CLAUDE_READY   = !CLAUDE_API_KEY.includes('YOUR_');
 
 const TASK_EMOJIS = [
   '🧹', '🧽', '🛁', '📚', '🍽️', '🌱', '🐕', '🛏️',
   '👕', '🎒', '🚿', '♻️', '💻', '🎨', '🧺', '🌿',
 ];
 
-// Call Claude — via Supabase proxy (production) or direct API (dev)
+// Call Claude API via fetch
 async function callClaude(prompt) {
-  if (USE_PROXY) {
-    // Secure: key lives on the server, never in the app binary
-    const res = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, max_tokens: 800 }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Proxy error ${res.status}`);
-    }
-    const data = await res.json();
-    return data.text || '';
-  }
-
-  // Direct API call (dev / fallback)
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -102,6 +77,8 @@ function parseSuggestions(text) {
 
 export default function AIScreen({ navigation }) {
   const { family, addTask } = useApp();
+  const { colors, shadows, isDark } = useTheme();
+  const { t } = useTranslation();
 
   const [age,          setAge]          = useState('');
   const [interests,    setInterests]    = useState('');
@@ -112,13 +89,13 @@ export default function AIScreen({ navigation }) {
 
   async function handleGenerate() {
     if (!age.trim()) {
-      Alert.alert("Enter your child's age", "This helps Claude suggest age-appropriate chores.");
+      Alert.alert(t('ai.enterAge'), t('ai.ageHelps'));
       return;
     }
     if (!CLAUDE_READY) {
       Alert.alert(
-        'Claude API not configured',
-        'Add your Anthropic API key to src/screens/AIScreen.js to enable AI suggestions.'
+        t('ai.notConfiguredAlert'),
+        t('ai.notConfiguredAlertMsg')
       );
       return;
     }
@@ -151,7 +128,7 @@ Example format:
       if (parsed.length === 0) throw new Error('Could not parse suggestions');
       setSuggestions(parsed);
     } catch (e) {
-      Alert.alert('Oops!', e.message || 'Something went wrong. Please try again.');
+      Alert.alert(t('ai.oops'), e.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -159,7 +136,7 @@ Example format:
 
   async function handleAddSuggestion(s) {
     if (!selectedKid) {
-      Alert.alert('Select a kid', 'Choose who to assign this quest to.');
+      Alert.alert(t('ai.selectKid'), t('ai.chooseKid'));
       return;
     }
     await addTask({
@@ -173,6 +150,202 @@ Example format:
     setAddedIds(prev => new Set(prev).add(s.title));
   }
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+
+    header: {
+      paddingBottom: 32,
+      paddingHorizontal: 24,
+    },
+    backBtn: {
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 100,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 20,
+    },
+    backBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    headerEmoji: { fontSize: 40, marginBottom: 8 },
+    headerTitle: {
+      fontSize: 30,
+      fontWeight: '900',
+      color: '#fff',
+      letterSpacing: -0.5,
+      marginBottom: 6,
+    },
+    headerSub: {
+      fontSize: 15,
+      color: 'rgba(255,255,255,0.8)',
+      fontWeight: '500',
+    },
+
+    body: {
+      padding: 20,
+      gap: 16,
+    },
+
+    configCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 20,
+      ...shadows.md,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.text3,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 10,
+    },
+    kidPicker: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    kidBtn: {
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      alignItems: 'center',
+      minWidth: 70,
+    },
+    kidBtnActive: {
+      borderWidth: 2,
+      borderColor: 'rgba(0,0,0,0.15)',
+    },
+    kidBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 14,
+      padding: 14,
+      fontSize: 16,
+      color: colors.text1,
+      backgroundColor: colors.bg,
+    },
+    generateBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 100,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 20,
+      ...shadows.md,
+    },
+    generateBtnEmoji: { fontSize: 20 },
+    generateBtnText: {
+      color: '#fff',
+      fontSize: 17,
+      fontWeight: '800',
+    },
+
+    loadingCard: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 20,
+      padding: 20,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.primary + '30',
+    },
+    loadingText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+
+    suggestionsTitle: {
+      fontSize: 20,
+      fontWeight: '900',
+      color: colors.text1,
+      letterSpacing: -0.3,
+    },
+
+    suggestionCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 16,
+      ...shadows.sm,
+    },
+    suggestionTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 10,
+    },
+    suggestionEmojiBox: {
+      width: 54,
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    suggestionTitle: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.text1,
+      marginBottom: 4,
+    },
+    suggestionReward: {
+      fontSize: 13,
+      color: colors.text2,
+      fontWeight: '600',
+    },
+    suggestionWhy: {
+      fontSize: 13,
+      color: colors.text3,
+      fontWeight: '500',
+      marginBottom: 12,
+      lineHeight: 18,
+    },
+    addBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 100,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    addBtnAdded: {
+      backgroundColor: colors.success,
+    },
+    addBtnText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '700',
+    },
+
+    notConfiguredCard: {
+      backgroundColor: '#FFF8E1',
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: 1.5,
+      borderColor: '#FFE082',
+    },
+    notConfiguredTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: '#5D4037',
+      marginBottom: 8,
+    },
+    notConfiguredText: {
+      fontSize: 14,
+      color: '#795548',
+      fontWeight: '500',
+      lineHeight: 22,
+    },
+  });
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -181,11 +354,11 @@ Example format:
       <LinearGradient colors={['#7C3AED', '#4F46E5']} style={styles.header}>
         <SafeAreaView>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={styles.backBtnText}>← {t('back')}</Text>
           </TouchableOpacity>
           <Text style={styles.headerEmoji}>🤖</Text>
-          <Text style={styles.headerTitle}>AI Quest Creator</Text>
-          <Text style={styles.headerSub}>Let Claude suggest perfect chores for your kid</Text>
+          <Text style={styles.headerTitle}>{t('ai.title')}</Text>
+          <Text style={styles.headerSub}>{t('ai.subtitle')}</Text>
         </SafeAreaView>
       </LinearGradient>
 
@@ -200,7 +373,7 @@ Example format:
         >
           {/* Config card */}
           <View style={styles.configCard}>
-            <Text style={styles.sectionLabel}>ASSIGN TO</Text>
+            <Text style={styles.sectionLabel}>{t('ai.assignTo')}</Text>
             <View style={styles.kidPicker}>
               {family?.kids?.map(kid => (
                 <TouchableOpacity
@@ -224,23 +397,23 @@ Example format:
               ))}
             </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 18 }]}>CHILD'S AGE</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 18 }]}>{t('ai.childAge')}</Text>
             <TextInput
               style={styles.input}
               value={age}
               onChangeText={setAge}
-              placeholder="e.g. 7, or 8–10"
+              placeholder={t('ai.agePlaceholder')}
               placeholderTextColor={colors.text3}
               keyboardType="default"
               returnKeyType="next"
             />
 
-            <Text style={[styles.sectionLabel, { marginTop: 14 }]}>INTERESTS (OPTIONAL)</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 14 }]}>{t('ai.interests')}</Text>
             <TextInput
               style={styles.input}
               value={interests}
               onChangeText={setInterests}
-              placeholder="e.g. dinosaurs, art, outdoor play"
+              placeholder={t('ai.interestsPlaceholder')}
               placeholderTextColor={colors.text3}
               returnKeyType="done"
             />
@@ -256,7 +429,7 @@ Example format:
               ) : (
                 <>
                   <Text style={styles.generateBtnEmoji}>✨</Text>
-                  <Text style={styles.generateBtnText}>Generate Quests</Text>
+                  <Text style={styles.generateBtnText}>{t('ai.generate')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -265,7 +438,7 @@ Example format:
           {/* Loading shimmer */}
           {loading && (
             <View style={styles.loadingCard}>
-              <Text style={styles.loadingText}>🤖 Claude is thinking up perfect quests...</Text>
+              <Text style={styles.loadingText}>{t('ai.generating')}</Text>
             </View>
           )}
 
@@ -273,7 +446,7 @@ Example format:
           {suggestions.length > 0 && (
             <View style={{ gap: 12 }}>
               <Text style={styles.suggestionsTitle}>
-                ✨ {suggestions.length} Quest Ideas
+                {t('ai.questIdeas', { count: suggestions.length })}
               </Text>
               {suggestions.map((s, idx) => {
                 const added = addedIds.has(s.title);
@@ -302,7 +475,7 @@ Example format:
                         color="#fff"
                       />
                       <Text style={styles.addBtnText}>
-                        {added ? 'Added!' : 'Add This Quest'}
+                        {added ? t('ai.added') : t('ai.addThisQuest')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -314,15 +487,9 @@ Example format:
           {/* Not configured notice */}
           {!CLAUDE_READY && (
             <View style={styles.notConfiguredCard}>
-              <Text style={styles.notConfiguredTitle}>🔑 AI Not Yet Configured</Text>
+              <Text style={styles.notConfiguredTitle}>{t('ai.notConfiguredTitle')}</Text>
               <Text style={styles.notConfiguredText}>
-                <Text style={{ fontWeight: '700' }}>Production (recommended):{'\n'}</Text>
-                Deploy the Supabase Edge Function in{'\n'}
-                <Text style={{ fontWeight: '700' }}>supabase/functions/claude-proxy</Text>
-                {'\n'}and set EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY in .env{'\n\n'}
-                <Text style={{ fontWeight: '700' }}>Development:{'\n'}</Text>
-                Set EXPO_PUBLIC_CLAUDE_API_KEY in .env{'\n'}
-                Get your key at console.anthropic.com
+                {t('ai.notConfiguredText')}
               </Text>
             </View>
           )}
@@ -333,199 +500,3 @@ Example format:
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-
-  header: {
-    paddingBottom: 32,
-    paddingHorizontal: 24,
-  },
-  backBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 100,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 20,
-  },
-  backBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  headerEmoji: { fontSize: 40, marginBottom: 8 },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  headerSub: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '500',
-  },
-
-  body: {
-    padding: 20,
-    gap: 16,
-  },
-
-  configCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    ...shadows.md,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text3,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-  kidPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  kidBtn: {
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-    minWidth: 70,
-  },
-  kidBtnActive: {
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.15)',
-  },
-  kidBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    padding: 14,
-    fontSize: 16,
-    color: colors.text1,
-    backgroundColor: '#F8FAFC',
-  },
-  generateBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 100,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 20,
-    ...shadows.md,
-  },
-  generateBtnEmoji: { fontSize: 20 },
-  generateBtnText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-
-  loadingCard: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary + '30',
-  },
-  loadingText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-
-  suggestionsTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: colors.text1,
-    letterSpacing: -0.3,
-  },
-
-  suggestionCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 16,
-    ...shadows.sm,
-  },
-  suggestionTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 10,
-  },
-  suggestionEmojiBox: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  suggestionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.text1,
-    marginBottom: 4,
-  },
-  suggestionReward: {
-    fontSize: 13,
-    color: colors.text2,
-    fontWeight: '600',
-  },
-  suggestionWhy: {
-    fontSize: 13,
-    color: colors.text3,
-    fontWeight: '500',
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 100,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  addBtnAdded: {
-    backgroundColor: colors.success,
-  },
-  addBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-
-  notConfiguredCard: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: '#FFE082',
-  },
-  notConfiguredTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#5D4037',
-    marginBottom: 8,
-  },
-  notConfiguredText: {
-    fontSize: 14,
-    color: '#795548',
-    fontWeight: '500',
-    lineHeight: 22,
-  },
-});

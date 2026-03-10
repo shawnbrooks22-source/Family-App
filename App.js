@@ -1,11 +1,13 @@
 // Polyfill URL for Supabase (must be first import)
 import 'react-native-url-polyfill/auto';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/context/AppContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { initI18n } from './src/i18n/index';
 import WelcomeScreen      from './src/screens/WelcomeScreen';
 import HomeScreen         from './src/screens/HomeScreen';
 import SetupScreen        from './src/screens/SetupScreen';
@@ -19,13 +21,14 @@ const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
   const { isLoaded, family } = useApp();
+  const { colors } = useTheme();
 
   if (!isLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FDF8FF' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
         <Text style={{ fontSize: 52, marginBottom: 16 }}>🌟</Text>
-        <ActivityIndicator size="large" color="#7C3AED" />
-        <Text style={{ fontSize: 16, color: '#9E88C2', fontWeight: '600', marginTop: 14 }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ fontSize: 16, color: colors.text3, fontWeight: '600', marginTop: 14 }}>
           Loading Kindo…
         </Text>
       </View>
@@ -58,12 +61,29 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const [i18nReady, setI18nReady] = useState(false);
+
+  useEffect(() => {
+    initI18n().then(() => setI18nReady(true)).catch(() => setI18nReady(true));
+  }, []);
+
+  if (!i18nReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FDF8FF' }}>
+        <Text style={{ fontSize: 52, marginBottom: 16 }}>🌟</Text>
+        <ActivityIndicator size="large" color="#7C3AED" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
+        <ThemeProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

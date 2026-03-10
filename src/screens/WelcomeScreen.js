@@ -11,7 +11,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
-import { colors, shadows } from '../theme/index';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,6 +50,8 @@ function Bubble({ size, color, x, y, delay }) {
 
 export default function WelcomeScreen({ navigation }) {
   const { isCloudEnabled } = useApp();
+  const { colors, shadows } = useTheme();
+  const { t } = useTranslation();
 
   const logoAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -92,13 +95,13 @@ export default function WelcomeScreen({ navigation }) {
           <View style={styles.logoCircle}>
             <Text style={styles.logoEmoji}>🌟</Text>
           </View>
-          <Text style={styles.appName}>Kindo</Text>
-          <Text style={styles.tagline}>Make chores an adventure!</Text>
+          <Text style={styles.appName}>{t('appName')}</Text>
+          <Text style={styles.tagline}>{t('welcome.tagline')}</Text>
         </Animated.View>
 
         {/* Feature pills */}
         <Animated.View style={[styles.pills, { opacity: fadeAnim }]}>
-          {['⭐ Earn Stars', '🏆 Win Rewards', '🎯 Complete Quests'].map(pill => (
+          {[t('welcome.earnStars'), t('welcome.winRewards'), t('welcome.completeQuests')].map(pill => (
             <View key={pill} style={styles.pill}>
               <Text style={styles.pillText}>{pill}</Text>
             </View>
@@ -113,11 +116,11 @@ export default function WelcomeScreen({ navigation }) {
           ]}
         >
           <TouchableOpacity
-            style={styles.primaryBtn}
+            style={[styles.primaryBtn, shadows.lg]}
             onPress={() => navigation.navigate('Setup')}
             activeOpacity={0.88}
           >
-            <Text style={styles.primaryBtnText}>✨ Create My Family</Text>
+            <Text style={[styles.primaryBtnText, { color: colors.primary }]}>{t('welcome.createFamily')}</Text>
           </TouchableOpacity>
 
           {isCloudEnabled && (
@@ -126,12 +129,12 @@ export default function WelcomeScreen({ navigation }) {
               onPress={() => navigation.navigate('Join')}
               activeOpacity={0.88}
             >
-              <Text style={styles.secondaryBtnText}>🔑 Join with Invite Code</Text>
+              <Text style={styles.secondaryBtnText}>{t('welcome.joinCode')}</Text>
             </TouchableOpacity>
           )}
 
           <Text style={styles.disclaimer}>
-            Free · Works on all devices · No ads
+            {t('welcome.disclaimer')}
           </Text>
         </Animated.View>
       </SafeAreaView>
@@ -212,10 +215,8 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 18,
     alignItems: 'center',
-    ...shadows.lg,
   },
   primaryBtnText: {
-    color: colors.primary,
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.2,

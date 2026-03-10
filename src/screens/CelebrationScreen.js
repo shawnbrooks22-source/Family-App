@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
 
 const { width, height } = Dimensions.get('window');
 
@@ -34,6 +35,7 @@ const TWINKLE_POSITIONS = [
 export default function CelebrationScreen({ route, navigation }) {
   const { taskId, reward, kidName } = route.params || {};
   const { markCelebrated } = useApp();
+  const { t } = useTranslation();
   const [phase, setPhase] = useState('suspense');
 
   // Mark celebrated right away so KidDashboard won't re-trigger navigation
@@ -254,11 +256,11 @@ export default function CelebrationScreen({ route, navigation }) {
         <View style={styles.suspenseCenter}>
           {/* QUEST COMPLETE badge */}
           <View style={styles.questBadge}>
-            <Text style={styles.questBadgeText}>🌟  KINDO  ·  QUEST COMPLETE  ⚡</Text>
+            <Text style={styles.questBadgeText}>{t('celebration.questComplete')}</Text>
           </View>
 
           {kidName ? (
-            <Text style={styles.suspenseKidName}>Nice work,{'\n'}{kidName}!</Text>
+            <Text style={styles.suspenseKidName}>{t('celebration.niceWork', { name: kidName })}</Text>
           ) : null}
 
           {/* Pulsing / shaking gift */}
@@ -277,7 +279,7 @@ export default function CelebrationScreen({ route, navigation }) {
           </Animated.Text>
 
           <Text style={styles.suspenseMystery}>
-            {phase === 'suspense' ? 'Your reward is locked inside…' : '🔓 OPENING…'}
+            {phase === 'suspense' ? t('celebration.rewardLocked') : t('celebration.opening')}
           </Text>
 
           {phase === 'suspense' && (
@@ -289,7 +291,7 @@ export default function CelebrationScreen({ route, navigation }) {
                   end={{ x: 1, y: 0 }}
                   style={styles.tapBtnGradient}
                 >
-                  <Text style={styles.tapBtnText}>⚡  TAP TO REVEAL!</Text>
+                  <Text style={styles.tapBtnText}>{t('celebration.tapToReveal')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
@@ -336,9 +338,9 @@ export default function CelebrationScreen({ route, navigation }) {
 
         {/* AMAZING! title */}
         <Animated.View style={{ transform: [{ scale: titleScale }], opacity: titleOpacity }}>
-          <Text style={styles.revealedTitle}>AMAZING!</Text>
+          <Text style={styles.revealedTitle}>{t('celebration.amazing')}</Text>
           {kidName ? (
-            <Text style={styles.revealedKidName}>Way to go, {kidName}! 🌟</Text>
+            <Text style={styles.revealedKidName}>{t('celebration.wayToGo', { name: kidName })}</Text>
           ) : null}
         </Animated.View>
 
@@ -349,7 +351,7 @@ export default function CelebrationScreen({ route, navigation }) {
             { opacity: starEarnedOpacity, transform: [{ translateY: starEarnedSlide }] },
           ]}
         >
-          <Text style={styles.starEarnedText}>⭐  +1 STAR EARNED!</Text>
+          <Text style={styles.starEarnedText}>{t('celebration.starEarned')}</Text>
         </Animated.View>
 
         {/* Reward card */}
@@ -359,8 +361,8 @@ export default function CelebrationScreen({ route, navigation }) {
             { opacity: rewardOpacity, transform: [{ translateY: rewardSlide }] },
           ]}
         >
-          <Text style={styles.rewardLabel}>🎁  YOUR REWARD</Text>
-          <Text style={styles.rewardValue}>{reward || 'Awesome job!'}</Text>
+          <Text style={styles.rewardLabel}>{t('celebration.yourReward')}</Text>
+          <Text style={styles.rewardValue}>{reward || t('celebration.awesomeJob')}</Text>
         </Animated.View>
 
         {/* Back button */}
@@ -370,7 +372,7 @@ export default function CelebrationScreen({ route, navigation }) {
             onPress={() => navigation.goBack()}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Back to My Quests 🚀</Text>
+            <Text style={styles.backBtnText}>{t('celebration.backToQuests')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
