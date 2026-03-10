@@ -71,3 +71,29 @@ export const radius = {
   xl: 30,
   full: 999,
 };
+
+export const darkColors = {
+  primary: '#9D6FFF',
+  primaryDark: '#7C3AED',
+  primaryLight: '#2D1B69',
+  accent: '#F472B6',
+  accentLight: '#4A1942',
+  bg: '#0F0A1E',
+  surface: '#1A1033',
+  border: '#2D1F5E',
+  divider: '#231848',
+  text1: '#F0EAFF',
+  text2: '#C4B5F5',
+  text3: '#7B6BAA',
+  textInverse: '#0F0A1E',
+  success: '#34D399',
+  successLight: '#064E3B',
+  warning: '#FBBF24',
+  warningLight: '#451A03',
+  error: '#F87171',
+  errorLight: '#450A0A',
+};
+
+export function getColors(isDark) {
+  return isDark ? darkColors : colors;
+}

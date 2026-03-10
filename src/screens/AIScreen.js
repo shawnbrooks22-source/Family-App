@@ -30,18 +30,44 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { colors, shadows } from '../theme/index';
 
-// ⬇️  Set EXPO_PUBLIC_CLAUDE_API_KEY in your .env file
-// For production, proxy this through a Supabase Edge Function instead.
+// ─── AI Configuration ──────────────────────────────────────────────────────────
+//
+// OPTION A (Recommended — Production): Supabase Edge Function proxy
+//   1. Deploy supabase/functions/claude-proxy with your ANTHROPIC_API_KEY secret
+//   2. Set EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY in .env:
+//      EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY=https://<ref>.supabase.co/functions/v1/claude-proxy
+//
+// OPTION B (Development only): Direct API key in .env
+//   Set EXPO_PUBLIC_CLAUDE_API_KEY=sk-ant-your-key-here
+//
+const PROXY_URL    = process.env.EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY || '';
 const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
-const CLAUDE_READY   = !CLAUDE_API_KEY.includes('YOUR_');
+const USE_PROXY    = !!PROXY_URL;
+const CLAUDE_READY = USE_PROXY || !CLAUDE_API_KEY.includes('YOUR_');
 
 const TASK_EMOJIS = [
   '🧹', '🧽', '🛁', '📚', '🍽️', '🌱', '🐕', '🛏️',
   '👕', '🎒', '🚿', '♻️', '💻', '🎨', '🧺', '🌿',
 ];
 
-// Call Claude API via fetch
+// Call Claude — via Supabase proxy (production) or direct API (dev)
 async function callClaude(prompt) {
+  if (USE_PROXY) {
+    // Secure: key lives on the server, never in the app binary
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, max_tokens: 800 }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || `Proxy error ${res.status}`);
+    }
+    const data = await res.json();
+    return data.text || '';
+  }
+
+  // Direct API call (dev / fallback)
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -288,12 +314,15 @@ Example format:
           {/* Not configured notice */}
           {!CLAUDE_READY && (
             <View style={styles.notConfiguredCard}>
-              <Text style={styles.notConfiguredTitle}>🔑 Claude API Key Required</Text>
+              <Text style={styles.notConfiguredTitle}>🔑 AI Not Yet Configured</Text>
               <Text style={styles.notConfiguredText}>
-                To enable AI quest suggestions, open{'\n'}
-                <Text style={{ fontWeight: '700' }}>src/screens/AIScreen.js</Text>{'\n'}
-                and replace CLAUDE_API_KEY with your key from{'\n'}
-                console.anthropic.com
+                <Text style={{ fontWeight: '700' }}>Production (recommended):{'\n'}</Text>
+                Deploy the Supabase Edge Function in{'\n'}
+                <Text style={{ fontWeight: '700' }}>supabase/functions/claude-proxy</Text>
+                {'\n'}and set EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY in .env{'\n\n'}
+                <Text style={{ fontWeight: '700' }}>Development:{'\n'}</Text>
+                Set EXPO_PUBLIC_CLAUDE_API_KEY in .env{'\n'}
+                Get your key at console.anthropic.com
               </Text>
             </View>
           )}
