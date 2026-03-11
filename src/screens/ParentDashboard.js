@@ -115,8 +115,8 @@ function HomeTab({ navigation }) {
   // Per-kid star tally for leaderboard snippet
   const kidStars = family.kids.map(kid => ({
     kid,
-    stars: tasks.filter(t => t.assignedTo === kid.id && t.status === 'approved').length,
-    weekStars: completedThisWeek.filter(t => t.assignedTo === kid.id).length,
+    stars: tasks.filter(t => (t.assignedTo || t.assigned_to) === kid.id && t.status === 'approved').length,
+    weekStars: completedThisWeek.filter(t => (t.assignedTo || t.assigned_to) === kid.id).length,
   })).sort((a, b) => b.stars - a.stars);
 
   const topKid = kidStars[0];
@@ -221,7 +221,7 @@ function HomeTab({ navigation }) {
           />
         ) : (
           pendingApproval.map(task => {
-            const kid = family.kids.find(k => k.id === task.assignedTo);
+            const kid = family.kids.find(k => k.id === (task.assignedTo || task.assigned_to));
             return (
               <ApprovalCard
                 key={task.id}
@@ -422,7 +422,7 @@ function TasksTab() {
           <EmptyState icon="📝" title={t('parentDashboard.noQuestsHere')} sub={t('parentDashboard.tryDifferentFilter')} />
         ) : (
           filtered.map(task => {
-            const kid = family.kids.find(k => k.id === task.assignedTo);
+            const kid = family.kids.find(k => k.id === (task.assignedTo || task.assigned_to));
             const s = statusInfo(task.status);
             return (
               <View key={task.id} style={[styles.taskRow, { backgroundColor: colors.surface }]}>
@@ -1182,26 +1182,56 @@ function FamilyTab({ navigation }) {
 
 // ─── Settings Tab ──────────────────────────────────────────────────────────────
 
-const CLAUDE_PROXY   = process.env.EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY || '';
-const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
+// ── Built-in parenting tips engine (no external API required) ─────────────────
+const PARENTING_TIPS = [
+  {
+    keywords: ['motivat', 'bored', 'interest', 'engag', 'excit'],
+    reply: 'Try rotating rewards every 2–3 weeks to keep things fresh. Let kids choose between 2–3 reward options so they feel ownership. Bonus stars for streaks (3 days in a row) also boost engagement significantly.',
+  },
+  {
+    keywords: ['reward', 'prize', 'earn', 'incentiv'],
+    reply: 'Mix tangible rewards (extra screen time, a small treat) with experience rewards (a special outing, choosing dinner). Research shows experience rewards create stronger positive memories than objects.',
+  },
+  {
+    keywords: ['argu', 'refus', 'won\'t', 'resist', 'fight', 'battle'],
+    reply: 'Try the "when/then" technique: "When you finish your chore, then you can play." Avoid power struggles — give two acceptable choices ("Do you want to clean your room before or after dinner?") so they feel control.',
+  },
+  {
+    keywords: ['age', 'old enough', 'too young', 'too old', 'appropriate'],
+    reply: 'Ages 2–4: simple tasks like putting toys away. Ages 5–8: making their bed, setting the table. Ages 9–12: laundry, vacuuming, meal prep. Teens: most household tasks plus budgeting their own rewards.',
+  },
+  {
+    keywords: ['forget', 'remind', 'remember', 'consistenc'],
+    reply: 'Consistency beats intensity. Set a fixed chore time each day (e.g. after school) so it becomes automatic. A short family check-in at dinner helps kids feel accountable without nagging.',
+  },
+  {
+    keywords: ['sibling', 'fair', 'jealous', 'compet'],
+    reply: 'Give each child age-appropriate chores so comparisons feel fair. Avoid pitting siblings against each other — instead, celebrate when the whole family hits a weekly goal together.',
+  },
+  {
+    keywords: ['star', 'point', 'track', 'progress', 'chart'],
+    reply: 'Visual progress trackers work wonders for kids under 10. Seeing stars accumulate gives a dopamine boost. For older kids, tie stars to a weekly allowance so the math feels real and meaningful.',
+  },
+  {
+    keywords: ['allowance', 'money', 'pay', 'cash', 'dollar'],
+    reply: 'A simple rule: $0.50–$1 per year of age per week is a common starting point. Link payment to chore completion — not just behaviour — so kids learn that effort = reward, a life skill that transfers to work.',
+  },
+  {
+    keywords: ['screen', 'phone', 'tablet', 'game', 'tv'],
+    reply: 'Screen time as a reward is very effective for ages 6–14. Set a clear rule: "Earn 30 minutes of screen time by completing your daily quest." Make it automatic so you\'re not the bad guy — the system is.',
+  },
+  {
+    keywords: ['praise', 'encour', 'positiv', 'compliment'],
+    reply: 'Specific praise beats generic praise. Instead of "Good job!", try "I noticed you scrubbed the sink really well — that takes effort!" This builds intrinsic motivation over time.',
+  },
+];
 
-async function callClaudeSettings(prompt) {
-  if (CLAUDE_PROXY) {
-    const res = await fetch(CLAUDE_PROXY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, max_tokens: 600 }),
-    });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Error ${res.status}`); }
-    return (await res.json()).text || '';
+function getLocalSettingsAiResponse(question) {
+  const q = question.toLowerCase();
+  for (const tip of PARENTING_TIPS) {
+    if (tip.keywords.some(kw => q.includes(kw))) return tip.reply;
   }
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Error ${res.status}`); }
-  return (await res.json()).content?.[0]?.text || '';
+  return 'Great question! Here are three universal tips: (1) Keep chore expectations consistent and age-appropriate. (2) Celebrate effort as much as results — "You tried hard" matters. (3) Make it fun when possible — music, timers, or friendly races all help kids build positive habits around responsibilities.';
 }
 
 function SettingsTab({ navigation }) {
@@ -1225,25 +1255,17 @@ function SettingsTab({ navigation }) {
   const [aiInput,    setAiInput]    = useState('');
   const [aiReply,    setAiReply]    = useState('');
   const [aiLoading,  setAiLoading]  = useState(false);
-  const AI_READY = !!(CLAUDE_PROXY || !CLAUDE_API_KEY.includes('YOUR_'));
 
-  async function handleAiAsk() {
+  function handleAiAsk() {
     if (!aiInput.trim()) return;
-    if (!AI_READY) { Alert.alert(t('ai.notConfiguredAlert'), t('ai.notConfiguredAlertMsg')); return; }
     setAiLoading(true);
     setAiReply('');
-    const kidNames = family?.kids?.map(k => k.name).join(', ') || 'my kids';
-    const prompt = `You are a helpful family assistant for a chore/rewards app called Kindo.
-The family has kids named: ${kidNames}.
-Answer this parent's question concisely (2-4 sentences max): ${aiInput.trim()}`;
-    try {
-      const reply = await callClaudeSettings(prompt);
+    // Small delay for UX feedback
+    setTimeout(() => {
+      const reply = getLocalSettingsAiResponse(aiInput.trim());
       setAiReply(reply);
-    } catch (e) {
-      Alert.alert(t('ai.oops'), e.message || 'Something went wrong.');
-    } finally {
       setAiLoading(false);
-    }
+    }, 500);
   }
 
   // Notification preferences
@@ -1308,7 +1330,7 @@ Answer this parent's question concisely (2-4 sentences max): ${aiInput.trim()}`;
           style: 'destructive',
           onPress: async () => {
             await clearAllData();
-            navigation.navigate('Home');
+            // AppNavigator automatically redirects to WelcomeScreen when family becomes null
           },
         },
       ]

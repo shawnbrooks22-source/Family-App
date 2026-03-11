@@ -80,6 +80,7 @@ function StatChip({ emoji, value, label }) {
 
 // ─── Active Quest Card ─────────────────────────────────────────────────────────
 function QuestCard({ task, index, onDone, kidColor }) {
+  const { colors } = useTheme();
   const slideAnim = useRef(new Animated.Value(70)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const btnScale = useRef(new Animated.Value(1)).current;
@@ -116,7 +117,7 @@ function QuestCard({ task, index, onDone, kidColor }) {
     <Animated.View
       style={[
         styles.questCard,
-        { opacity: opacityAnim, transform: [{ translateY: slideAnim }, { scale: cardScale }] },
+        { backgroundColor: colors.surface, opacity: opacityAnim, transform: [{ translateY: slideAnim }, { scale: cardScale }] },
       ]}
     >
       {/* Color bar at top */}
@@ -129,10 +130,10 @@ function QuestCard({ task, index, onDone, kidColor }) {
             <Text style={styles.questEmojiText}>{task.emoji}</Text>
           </View>
           <View style={styles.questInfo}>
-            <Text style={styles.questTitle}>{task.title}</Text>
+            <Text style={[styles.questTitle, { color: colors.text1 }]}>{task.title}</Text>
             <View style={styles.questRewardRow}>
               <Text style={styles.questRewardStar}>⭐</Text>
-              <Text style={styles.questRewardText} numberOfLines={1}>
+              <Text style={[styles.questRewardText, { color: colors.text2 }]} numberOfLines={1}>
                 {task.reward}
               </Text>
             </View>
@@ -165,6 +166,7 @@ function QuestCard({ task, index, onDone, kidColor }) {
 
 // ─── Waiting Card ──────────────────────────────────────────────────────────────
 function WaitingCard({ task }) {
+  const { colors, isDark } = useTheme();
   const dotOpacity = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
@@ -177,12 +179,12 @@ function WaitingCard({ task }) {
   }, []);
 
   return (
-    <View style={styles.waitingCard}>
+    <View style={[styles.waitingCard, { backgroundColor: isDark ? '#2A1F00' : '#FFFBEB' }]}>
       <View style={styles.waitingEmojiBox}>
         <Text style={{ fontSize: 26 }}>{task.emoji}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.waitingTitle}>{task.title}</Text>
+        <Text style={[styles.waitingTitle, { color: colors.text1 }]}>{task.title}</Text>
         <Animated.Text style={[styles.waitingStatus, { opacity: dotOpacity }]}>
           ⏳ Parent is checking your work...
         </Animated.Text>
@@ -199,13 +201,14 @@ function formatDate(ts) {
 }
 
 function DoneCard({ task }) {
+  const { colors, isDark } = useTheme();
   return (
-    <View style={styles.doneCard}>
+    <View style={[styles.doneCard, { backgroundColor: isDark ? '#0A2218' : '#F0FDF4' }]}>
       <View style={styles.doneEmojiBox}>
         <Text style={{ fontSize: 26 }}>{task.emoji}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.doneTitle}>{task.title}</Text>
+        <Text style={[styles.doneTitle, { color: colors.text1 }]}>{task.title}</Text>
         <Text style={styles.doneReward}>⭐ {task.reward}</Text>
         {(task.approvedAt || task.approved_at) ? (
           <Text style={styles.doneDate}>Earned {formatDate(task.approvedAt || task.approved_at)}</Text>
@@ -406,18 +409,18 @@ export default function KidDashboard({ route, navigation }) {
         <View style={styles.content}>
 
           {/* ── Star Goal Card ─────────────────────────────────────────────── */}
-          <View style={styles.goalCard}>
+          <View style={[styles.goalCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
             {goal ? (
               /* Goal exists — show progress */
               <>
                 <View style={styles.goalCardHeader}>
-                  <Text style={styles.goalCardTitle}>🎯 {goal.name}</Text>
+                  <Text style={[styles.goalCardTitle, { color: colors.text1 }]}>🎯 {goal.name}</Text>
                   <TouchableOpacity onPress={handleClearGoal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Text style={styles.goalChangeBtn}>{t('kidDashboard.change')}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.goalCountRow}>
-                  <Text style={styles.goalCountText}>
+                  <Text style={[styles.goalCountText, { color: colors.text2 }]}>
                     {Math.min(totalStars, goal.stars)} / {goal.stars} ⭐
                   </Text>
                   {totalStars >= goal.stars && (
@@ -441,18 +444,18 @@ export default function KidDashboard({ route, navigation }) {
             ) : showGoalForm ? (
               /* Goal form */
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                <Text style={styles.goalFormTitle}>{t('kidDashboard.setGoalTitle')}</Text>
+                <Text style={[styles.goalFormTitle, { color: colors.text1 }]}>{t('kidDashboard.setGoalTitle')}</Text>
                 <TextInput
-                  style={styles.goalInput}
+                  style={[styles.goalInput, { color: colors.text1, backgroundColor: colors.bg, borderColor: colors.border }]}
                   placeholder={t('kidDashboard.goalWhatWant')}
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.text3}
                   value={goalNameInput}
                   onChangeText={setGoalNameInput}
                 />
                 <TextInput
-                  style={[styles.goalInput, { marginTop: 8 }]}
+                  style={[styles.goalInput, { marginTop: 8, color: colors.text1, backgroundColor: colors.bg, borderColor: colors.border }]}
                   placeholder={t('kidDashboard.goalHowManyStars')}
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.text3}
                   value={goalStarsInput}
                   onChangeText={setGoalStarsInput}
                   keyboardType="number-pad"
@@ -470,15 +473,15 @@ export default function KidDashboard({ route, navigation }) {
               /* No goal — invite to set one */
               <TouchableOpacity style={styles.setGoalTap} onPress={() => setShowGoalForm(true)} activeOpacity={0.8}>
                 <Text style={styles.setGoalEmoji}>🎯</Text>
-                <Text style={styles.setGoalTitle}>{t('kidDashboard.setAGoal')}</Text>
-                <Text style={styles.setGoalSub}>{t('kidDashboard.setGoalSub')}</Text>
+                <Text style={[styles.setGoalTitle, { color: colors.text1 }]}>{t('kidDashboard.setAGoal')}</Text>
+                <Text style={[styles.setGoalSub, { color: colors.text3 }]}>{t('kidDashboard.setGoalSub')}</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* Streak banner */}
           {streak >= 2 && (
-            <View style={styles.streakBanner}>
+            <View style={[styles.streakBanner, { backgroundColor: isDark ? '#1A0E00' : '#FFF3E0' }]}>
               <Text style={styles.streakFire}>🔥</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.streakTitle}>{t('kidDashboard.streakTitle', { streak })}</Text>
@@ -491,8 +494,8 @@ export default function KidDashboard({ route, navigation }) {
           {kidTasks.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>🎯</Text>
-              <Text style={styles.emptyTitle}>{t('kidDashboard.noQuestsYet')}</Text>
-              <Text style={styles.emptySub}>
+              <Text style={[styles.emptyTitle, { color: colors.text1 }]}>{t('kidDashboard.noQuestsYet')}</Text>
+              <Text style={[styles.emptySub, { color: colors.text3 }]}>
                 {t('kidDashboard.askForQuests')}
               </Text>
             </View>
@@ -500,10 +503,10 @@ export default function KidDashboard({ route, navigation }) {
 
           {/* All done! */}
           {kidTasks.length > 0 && pendingTasks.length === 0 && waitingTasks.length === 0 && (
-            <View style={styles.allDoneCard}>
+            <View style={[styles.allDoneCard, { backgroundColor: isDark ? '#1A1000' : '#FFFBF0' }]}>
               <Text style={styles.allDoneEmoji}>🎊</Text>
-              <Text style={styles.allDoneTitle}>{t('kidDashboard.youreAStar')}</Text>
-              <Text style={styles.allDoneSub}>{t('kidDashboard.allComplete')}</Text>
+              <Text style={[styles.allDoneTitle, { color: colors.text1 }]}>{t('kidDashboard.youreAStar')}</Text>
+              <Text style={[styles.allDoneSub, { color: colors.text2 }]}>{t('kidDashboard.allComplete')}</Text>
             </View>
           )}
 
@@ -511,7 +514,7 @@ export default function KidDashboard({ route, navigation }) {
           {pendingTasks.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHead}>
-                <Text style={styles.sectionTitle}>{t('kidDashboard.activeQuests')}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text1 }]}>{t('kidDashboard.activeQuests')}</Text>
                 <View style={[styles.sectionBadge, { backgroundColor: '#FF8C00' }]}>
                   <Text style={styles.sectionBadgeText}>{pendingTasks.length}</Text>
                 </View>
@@ -553,11 +556,11 @@ export default function KidDashboard({ route, navigation }) {
                 </View>
               </View>
               {/* All-time stars summary */}
-              <View style={styles.allTimeCard}>
+              <View style={[styles.allTimeCard, { backgroundColor: isDark ? '#1A1000' : '#FFFBF0' }]}>
                 <Text style={styles.allTimeEmoji}>⭐</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.allTimeTitle}>{t('kidDashboard.starsEarnedAllTime', { count: totalStars })}</Text>
-                  <Text style={styles.allTimeSub}>{getStarTitle(totalStars)} — keep it up!</Text>
+                  <Text style={[styles.allTimeTitle, { color: colors.text1 }]}>{t('kidDashboard.starsEarnedAllTime', { count: totalStars })}</Text>
+                  <Text style={[styles.allTimeSub, { color: colors.text2 }]}>{getStarTitle(totalStars)} — keep it up!</Text>
                 </View>
               </View>
               {celebratedTasks.slice().reverse().map(task => (

@@ -317,22 +317,30 @@ export function AppProvider({ children }) {
 
   // ── Task operations ────────────────────────────────────────────────────────
   async function addTask(task) {
+    const kidId = task.assignedTo || task.assigned_to;
     const newTask = {
-      id:          crypto.randomUUID(),
-      family_id:   familyId || undefined,
-      status:      'pending',
-      celebrated:  false,
-      created_at:  Date.now(),
+      id:           crypto.randomUUID(),
+      family_id:    familyId || undefined,
+      status:       'pending',
+      celebrated:   false,
+      created_at:   Date.now(),
       completed_at: null,
       approved_at:  null,
-      recurrence:  task.recurrence || 'none',
-      notes:       task.notes || '',
-      due_date:    task.due_date || null,
+      recurrence:   task.recurrence || 'none',
+      notes:        task.notes || '',
+      due_date:     task.due_date || null,
       ...task,
+      // Ensure both naming conventions are always set
+      assignedTo:   kidId,
+      assigned_to:  kidId,
     };
 
     if (SUPABASE_READY && familyId) {
-      const { error } = await supabase.from('tasks').insert(newTask);
+      // Supabase expects ISO string for timestamps
+      const { error } = await supabase.from('tasks').insert({
+        ...newTask,
+        created_at: new Date().toISOString(),
+      });
       if (error) throw error;
       // Realtime will refresh tasks automatically
     } else {
@@ -381,12 +389,14 @@ export function AppProvider({ children }) {
       await supabase.from('tasks').update(updates).eq('id', taskId);
       // Auto-respawn recurring tasks
       if (task?.recurrence && task.recurrence !== 'none') {
+        const kidId = task.assigned_to || task.assignedTo;
         await supabase.from('tasks').insert({
           ...task,
           id:           crypto.randomUUID(),
+          assigned_to:  kidId,
           status:       'pending',
           celebrated:   false,
-          created_at:   Date.now(),
+          created_at:   new Date().toISOString(),
           completed_at: null,
           approved_at:  null,
         });
@@ -396,9 +406,12 @@ export function AppProvider({ children }) {
         t.id === taskId ? { ...t, ...updates } : t
       );
       if (task?.recurrence && task.recurrence !== 'none') {
+        const kidId = task.assignedTo || task.assigned_to;
         updated = [...updated, {
           ...task,
           id:           crypto.randomUUID(),
+          assignedTo:   kidId,
+          assigned_to:  kidId,
           status:       'pending',
           celebrated:   false,
           created_at:   Date.now(),
