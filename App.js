@@ -16,6 +16,7 @@ import ParentDashboard    from './src/screens/ParentDashboard';
 import KidDashboard       from './src/screens/KidDashboard';
 import CelebrationScreen  from './src/screens/CelebrationScreen';
 import AIScreen           from './src/screens/AIScreen';
+import PaymentsScreen     from './src/screens/PaymentsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,9 +52,10 @@ function AppNavigator() {
           <Stack.Screen name="Parent"      component={ParentDashboard} />
           <Stack.Screen name="Kid"         component={KidDashboard} />
           <Stack.Screen name="Celebration" component={CelebrationScreen} />
-          <Stack.Screen name="AI"          component={AIScreen}   options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="AI"       component={AIScreen}       options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="Payments" component={PaymentsScreen} options={{ animation: 'slide_from_right' }} />
           {/* Allow re-joining/switching family from within the app */}
-          <Stack.Screen name="Join"        component={JoinScreen} options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="Join"     component={JoinScreen}     options={{ animation: 'slide_from_right' }} />
         </>
       )}
     </Stack.Navigator>

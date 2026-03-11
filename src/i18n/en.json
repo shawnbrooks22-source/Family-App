@@ -191,7 +191,9 @@
     "removeKidConfirm": "This will also remove all their quests.",
     "remove": "Remove",
     "delete": "Delete",
-    "noQuestsFilter": "No quests here"
+    "noQuestsFilter": "No quests here",
+    "cashReward": "Cash Reward 💵 (optional)",
+    "cashRewardPlaceholder": "e.g. 5.00 — charged to your card on approval"
   },
 
   "kidDashboard": {
@@ -265,6 +267,22 @@
     "chooseKid": "Choose who to assign this quest to."
   },
 
+  "payments": {
+    "title": "Payments",
+    "subtitle": "Pay kids real money for their quests",
+    "paymentMethod": "PAYMENT METHOD",
+    "savedCard": "Saved card — ready to pay",
+    "change": "Change",
+    "noCardText": "No card on file. Add one to pay kids real money when you approve quests.",
+    "addCard": "Add Payment Method",
+    "kidsBalances": "KIDS' BALANCES",
+    "earned": "available",
+    "payOut": "Pay Out",
+    "history": "PAYMENT HISTORY",
+    "paidTo": "Paid {{name}}",
+    "payoutTo": "Payout to {{name}}"
+  },
+
   "settings": {
     "title": "Settings",
     "manageAccount": "Manage your account",
@@ -294,9 +312,18 @@
     "languageSub": "Choose your preferred language",
     "english": "English",
     "spanish": "Español",
+    "payments": "PAYMENTS",
+    "paymentsTitle": "Real Money Rewards",
+    "paymentsSub": "Pay kids real money for completing quests",
     "aiFeatures": "AI FEATURES",
     "aiQuestCreator": "AI Quest Creator",
     "aiQuestSub": "Let Claude suggest perfect chores for your kids",
+    "aiAssistant": "AI Family Assistant",
+    "aiAssistantSub": "Ask Claude anything about chores & rewards",
+    "aiAssistantPlaceholder": "e.g. What chores suit a 6-year-old?",
+    "aiPrompt1": "Good chores for ages 6–8?",
+    "aiPrompt2": "How to set fair rewards?",
+    "aiPrompt3": "Ideas for weekly routines?",
     "familyInviteCode": "FAMILY INVITE CODE",
     "inviteCodeLabel": "Share this code to let family join on other devices:",
     "inviteCodeHint": "Works on any phone. Open Kindo → Join with Invite Code.",

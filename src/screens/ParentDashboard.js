@@ -13,6 +13,7 @@ import {
   Pressable,
   Modal,
   AppState,
+  ActivityIndicator,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -98,7 +99,7 @@ const headerStyles = StyleSheet.create({
 function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const { tasks, family, approveTask } = useApp();
+  const { tasks, family, approveTask, chargeForTask } = useApp();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
 
   const totalTasks   = tasks.length;
@@ -121,7 +122,31 @@ function HomeTab({ navigation }) {
   const topKid = kidStars[0];
 
   async function handleApprove(task) {
-    await approveTask(task.id);
+    if (task.amount_cents && chargeForTask) {
+      const dollars = `$${(task.amount_cents / 100).toFixed(2)}`;
+      const kid = family.kids.find(k => k.id === (task.assignedTo || task.assigned_to));
+      Alert.alert(
+        `💳 Pay ${dollars} to ${kid?.name || 'kid'}?`,
+        `This will charge your saved card and add ${dollars} to ${kid?.name || 'their'} balance.`,
+        [
+          { text: 'Skip Payment', onPress: () => approveTask(task.id) },
+          {
+            text: `Pay ${dollars}`,
+            onPress: async () => {
+              try {
+                await chargeForTask(task.id, task.assignedTo || task.assigned_to, task.amount_cents);
+                await approveTask(task.id);
+              } catch (e) {
+                Alert.alert('Payment Failed', e.message + '\n\nThe quest was still approved without payment.');
+                await approveTask(task.id);
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      await approveTask(task.id);
+    }
   }
 
   return (
@@ -264,6 +289,13 @@ function ApprovalCard({ task, kid, onApprove }) {
       <View style={styles.approvalRewardRow}>
         <Ionicons name="gift-outline" size={15} color={colors.text3} />
         <Text style={[styles.approvalRewardText, { color: colors.text2 }]}>{task.reward}</Text>
+        {task.amount_cents > 0 && (
+          <View style={[styles.cashBadge, { backgroundColor: '#D1FAE5' }]}>
+            <Text style={[styles.cashBadgeText, { color: '#065F46' }]}>
+              💵 ${(task.amount_cents / 100).toFixed(2)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Approve button */}
@@ -629,8 +661,9 @@ function AddTaskTab() {
   const [selectedKid, setSelectedKid] = useState(null);
   const [selectedEmoji, setSelectedEmoji] = useState('🧹');
   const [recurrence, setRecurrence] = useState('none');
-  const [dueDate, setDueDate] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [dueDate,    setDueDate]    = useState('');
+  const [cashAmount, setCashAmount] = useState(''); // optional dollar reward e.g. "5.00"
+  const [success,    setSuccess]    = useState(false);
 
   async function handleAdd() {
     if (!title.trim())  { Alert.alert(t('parentDashboard.questName'), 'What do you want your kid to do?'); return; }
@@ -640,16 +673,22 @@ function AddTaskTab() {
       Alert.alert('Invalid date', 'Use format YYYY-MM-DD (e.g. 2025-06-15)');
       return;
     }
+    const amountCents = cashAmount.trim() ? Math.round(parseFloat(cashAmount) * 100) : null;
+    if (cashAmount.trim() && (isNaN(amountCents) || amountCents < 1)) {
+      Alert.alert('Invalid amount', 'Enter a valid dollar amount like 5 or 2.50');
+      return;
+    }
 
     await addTask({
-      title: title.trim(),
-      reward: reward.trim(),
-      notes: notes.trim(),
-      assignedTo: selectedKid,
-      assigned_to: selectedKid,
-      emoji: selectedEmoji,
+      title:        title.trim(),
+      reward:       reward.trim(),
+      notes:        notes.trim(),
+      assignedTo:   selectedKid,
+      assigned_to:  selectedKid,
+      emoji:        selectedEmoji,
       recurrence,
-      due_date: dueDate.trim() || null,
+      due_date:     dueDate.trim() || null,
+      amount_cents: amountCents,
     });
 
     setTitle('');
@@ -658,6 +697,7 @@ function AddTaskTab() {
     setSelectedKid(null);
     setRecurrence('none');
     setDueDate('');
+    setCashAmount('');
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2500);
   }
@@ -724,6 +764,23 @@ function AddTaskTab() {
           placeholderTextColor={colors.text3}
           returnKeyType="next"
         />
+
+        {/* Cash Reward (optional) */}
+        <FormLabel label={t('parentDashboard.cashReward')} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+          <View style={[styles.dollarSign, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={{ fontSize: 17, color: colors.text2, fontWeight: '700' }}>$</Text>
+          </View>
+          <TextInput
+            style={[styles.formInput, { flex: 1, borderLeftWidth: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
+            placeholder={t('parentDashboard.cashRewardPlaceholder')}
+            value={cashAmount}
+            onChangeText={v => setCashAmount(v.replace(/[^0-9.]/g, ''))}
+            placeholderTextColor={colors.text3}
+            keyboardType="decimal-pad"
+            returnKeyType="next"
+          />
+        </View>
 
         {/* Notes */}
         <FormLabel label={t('parentDashboard.notes')} />
@@ -1125,6 +1182,28 @@ function FamilyTab({ navigation }) {
 
 // ─── Settings Tab ──────────────────────────────────────────────────────────────
 
+const CLAUDE_PROXY   = process.env.EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY || '';
+const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
+
+async function callClaudeSettings(prompt) {
+  if (CLAUDE_PROXY) {
+    const res = await fetch(CLAUDE_PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, max_tokens: 600 }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Error ${res.status}`); }
+    return (await res.json()).text || '';
+  }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_API_KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Error ${res.status}`); }
+  return (await res.json()).content?.[0]?.text || '';
+}
+
 function SettingsTab({ navigation }) {
   const { colors, isDark, toggleDark } = useTheme();
   const { t, i18n } = useTranslation();
@@ -1141,6 +1220,31 @@ function SettingsTab({ navigation }) {
   const [newPin,     setNewPin]     = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinMsg, setPinMsg] = useState(null); // { text, ok }
+
+  // AI Assistant state
+  const [aiInput,    setAiInput]    = useState('');
+  const [aiReply,    setAiReply]    = useState('');
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const AI_READY = !!(CLAUDE_PROXY || !CLAUDE_API_KEY.includes('YOUR_'));
+
+  async function handleAiAsk() {
+    if (!aiInput.trim()) return;
+    if (!AI_READY) { Alert.alert(t('ai.notConfiguredAlert'), t('ai.notConfiguredAlertMsg')); return; }
+    setAiLoading(true);
+    setAiReply('');
+    const kidNames = family?.kids?.map(k => k.name).join(', ') || 'my kids';
+    const prompt = `You are a helpful family assistant for a chore/rewards app called Kindo.
+The family has kids named: ${kidNames}.
+Answer this parent's question concisely (2-4 sentences max): ${aiInput.trim()}`;
+    try {
+      const reply = await callClaudeSettings(prompt);
+      setAiReply(reply);
+    } catch (e) {
+      Alert.alert(t('ai.oops'), e.message || 'Something went wrong.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   // Notification preferences
   const defaultPrefs = { taskCompleted: true, taskApproved: true };
@@ -1414,10 +1518,29 @@ function SettingsTab({ navigation }) {
           </View>
         </View>
 
-        {/* ── AI Quest Creator ──────────────────────────────────────────── */}
-        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.aiFeatures')}</Text>
+        {/* ── Payments ──────────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.payments')}</Text>
         <TouchableOpacity
           style={[styles.settingsCard, { backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 14 }]}
+          onPress={() => navigation.navigate('Payments')}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.aiIconBox, { backgroundColor: '#D1FAE5' }]}>
+            <Text style={{ fontSize: 26 }}>💳</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.aiCardTitle, { color: colors.text1 }]}>{t('settings.paymentsTitle')}</Text>
+            <Text style={[styles.aiCardSub, { color: colors.text3 }]}>{t('settings.paymentsSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.text3} />
+        </TouchableOpacity>
+
+        {/* ── AI Features ───────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.aiFeatures')}</Text>
+
+        {/* AI Quest Creator shortcut */}
+        <TouchableOpacity
+          style={[styles.settingsCard, { backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 }]}
           onPress={() => navigation.navigate('AI')}
           activeOpacity={0.85}
         >
@@ -1430,6 +1553,61 @@ function SettingsTab({ navigation }) {
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.text3} />
         </TouchableOpacity>
+
+        {/* AI Assistant inline chat */}
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <Text style={{ fontSize: 22 }}>✨</Text>
+            <View>
+              <Text style={[styles.aiCardTitle, { color: colors.text1 }]}>{t('settings.aiAssistant')}</Text>
+              <Text style={[styles.aiCardSub, { color: colors.text3 }]}>{t('settings.aiAssistantSub')}</Text>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              style={[styles.formInput, { flex: 1, marginBottom: 0, borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+              placeholder={t('settings.aiAssistantPlaceholder')}
+              placeholderTextColor={colors.text3}
+              value={aiInput}
+              onChangeText={setAiInput}
+              returnKeyType="send"
+              onSubmitEditing={handleAiAsk}
+            />
+            <TouchableOpacity
+              style={[styles.assignBtn, { paddingHorizontal: 18, backgroundColor: colors.primary, marginBottom: 0 }]}
+              onPress={handleAiAsk}
+              disabled={aiLoading}
+              activeOpacity={0.85}
+            >
+              {aiLoading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={{ color: '#fff', fontSize: 18 }}>→</Text>}
+            </TouchableOpacity>
+          </View>
+
+          {aiReply ? (
+            <View style={[{ marginTop: 14, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14 }]}>
+              <Text style={[{ color: colors.primary, fontSize: 14, lineHeight: 22, fontWeight: '500' }]}>{aiReply}</Text>
+            </View>
+          ) : null}
+
+          {/* Quick prompts */}
+          {!aiReply && !aiLoading && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              {[t('settings.aiPrompt1'), t('settings.aiPrompt2'), t('settings.aiPrompt3')].map((prompt, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[{ borderRadius: 100, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border }]}
+                  onPress={() => { setAiInput(prompt); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[{ fontSize: 12, fontWeight: '600', color: colors.text2 }]}>{prompt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* ── Invite Code ───────────────────────────────────────────────── */}
         {isCloudEnabled && family?.inviteCode && (
@@ -1819,6 +1997,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
+  },
+  cashBadge: {
+    borderRadius: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  cashBadgeText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dollarSign: {
+    borderWidth: 1.5,
+    borderRightWidth: 0,
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'center',
   },
   approveBtn: {
     borderRadius: 100,

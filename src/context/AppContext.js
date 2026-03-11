@@ -183,15 +183,19 @@ export function AppProvider({ children }) {
         parentPin:    parent?.parent_pin || '',
         parentId:     parent?.id     || '',
         notifyPrefs:  parent?.notify_prefs || { taskCompleted: true, taskApproved: true },
+        // Payment fields (parent)
+        stripeCardLast4: parent?.stripe_card_last4 || null,
+        stripeCardBrand: parent?.stripe_card_brand || null,
         kids: kids.map(k => ({
-          id:    k.id,
-          name:  k.name,
-          emoji: k.emoji,
-          color: k.color,
-          phone: k.phone || '',
-          goal:  k.goal || null,
-          streak: k.streak || 0,
+          id:            k.id,
+          name:          k.name,
+          emoji:         k.emoji,
+          color:         k.color,
+          phone:         k.phone || '',
+          goal:          k.goal || null,
+          streak:        k.streak || 0,
           lastCompletedDate: k.last_completed_date || null,
+          balance_cents: k.balance_cents || 0,
         })),
       };
       setFamily(familyData);
@@ -608,6 +612,95 @@ export function AppProvider({ children }) {
     return false;
   }
 
+  // ── Payments ───────────────────────────────────────────────────────────────
+
+  const STRIPE_SETUP_URL  = process.env.EXPO_PUBLIC_SUPABASE_STRIPE_SETUP  || '';
+  const STRIPE_CHARGE_URL = process.env.EXPO_PUBLIC_SUPABASE_STRIPE_CHARGE || '';
+
+  /** Save a Stripe payment method to the parent's profile via Edge Function */
+  async function setupPaymentMethod(paymentMethodId, last4, brand) {
+    if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
+    if (!STRIPE_SETUP_URL) throw new Error('Stripe setup URL not configured');
+
+    const res = await fetch(STRIPE_SETUP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        parentProfileId: family?.parentId,
+        paymentMethodId,
+        last4,
+        brand,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save card');
+
+    // Update local family state so the UI reflects the new card immediately
+    const updated = { ...family, stripeCardLast4: last4, stripeCardBrand: brand };
+    setFamily(updated);
+    await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(updated));
+  }
+
+  /** Charge parent's card for a task reward and credit the kid's balance */
+  async function chargeForTask(taskId, kidId, amountCents) {
+    if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
+    if (!STRIPE_CHARGE_URL) throw new Error('Stripe charge URL not configured');
+
+    const res = await fetch(STRIPE_CHARGE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        parentProfileId: family?.parentId,
+        kidId,
+        taskId,
+        amountCents,
+        familyId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Payment failed');
+
+    // Refresh family data to get updated kid balance
+    await loadFamilyFromSupabase(familyId);
+    return data;
+  }
+
+  /** Record a manual payout (reduces the kid's in-app balance) */
+  async function recordPayout(kidId, amountCents) {
+    if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
+    const kid = family?.kids?.find(k => k.id === kidId);
+    if (!kid) throw new Error('Kid not found');
+
+    const newBalance = Math.max(0, (kid.balance_cents || 0) - amountCents);
+
+    await supabase.from('profiles').update({ balance_cents: newBalance }).eq('id', kidId);
+    await supabase.from('transactions').insert({
+      family_id:    familyId,
+      kid_id:       kidId,
+      amount_cents: amountCents,
+      type:         'payout',
+      note:         'Manual payout recorded by parent',
+    });
+
+    await loadFamilyFromSupabase(familyId);
+    await loadTransactions();
+  }
+
+  const [transactions, setTransactions] = useState([]);
+
+  async function loadTransactions() {
+    if (!SUPABASE_READY || !familyId) return;
+    try {
+      const { data } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('family_id', familyId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (data) setTransactions(data);
+    } catch {}
+  }
+
   async function lockParentZone() {
     await endParentSession();
   }
@@ -657,6 +750,13 @@ export function AppProvider({ children }) {
         unlockParentZone,
         checkParentSession,
         refreshParentSession,
+        // Payments
+        setupPaymentMethod,
+        chargeForTask,
+        recordPayout,
+        transactions,
+        loadTransactions,
+        isPaymentsEnabled: !!(process.env.EXPO_PUBLIC_SUPABASE_STRIPE_SETUP),
       }}
     >
       {children}

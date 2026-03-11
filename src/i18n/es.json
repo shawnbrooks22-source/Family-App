@@ -191,7 +191,9 @@
     "removeKidConfirm": "Esto también eliminará todas sus misiones.",
     "remove": "Eliminar",
     "delete": "Eliminar",
-    "noQuestsFilter": "No hay misiones aquí"
+    "noQuestsFilter": "No hay misiones aquí",
+    "cashReward": "Premio en Efectivo 💵 (opcional)",
+    "cashRewardPlaceholder": "ej. 5.00 — se cobra de tu tarjeta al aprobar"
   },
 
   "kidDashboard": {
@@ -265,6 +267,22 @@
     "chooseKid": "Elige a quién asignar esta misión."
   },
 
+  "payments": {
+    "title": "Pagos",
+    "subtitle": "Paga a los niños dinero real por sus misiones",
+    "paymentMethod": "MÉTODO DE PAGO",
+    "savedCard": "Tarjeta guardada — lista para pagar",
+    "change": "Cambiar",
+    "noCardText": "Sin tarjeta registrada. Añade una para pagar a los niños dinero real al aprobar misiones.",
+    "addCard": "Añadir Método de Pago",
+    "kidsBalances": "SALDOS DE LOS NIÑOS",
+    "earned": "disponible",
+    "payOut": "Pagar",
+    "history": "HISTORIAL DE PAGOS",
+    "paidTo": "Pagado a {{name}}",
+    "payoutTo": "Retiro para {{name}}"
+  },
+
   "settings": {
     "title": "Configuración",
     "manageAccount": "Administra tu cuenta",
@@ -294,9 +312,18 @@
     "languageSub": "Elige tu idioma preferido",
     "english": "English",
     "spanish": "Español",
+    "payments": "PAGOS",
+    "paymentsTitle": "Premios en Dinero Real",
+    "paymentsSub": "Paga a los niños dinero real por completar misiones",
     "aiFeatures": "FUNCIONES DE IA",
     "aiQuestCreator": "Creador de Misiones con IA",
     "aiQuestSub": "Deja que Claude sugiera tareas perfectas para tus hijos",
+    "aiAssistant": "Asistente Familiar IA",
+    "aiAssistantSub": "Pregúntale a Claude sobre tareas y premios",
+    "aiAssistantPlaceholder": "ej. ¿Qué tareas son buenas para 6 años?",
+    "aiPrompt1": "¿Tareas para 6-8 años?",
+    "aiPrompt2": "¿Cómo fijar premios justos?",
+    "aiPrompt3": "¿Ideas para rutinas semanales?",
     "familyInviteCode": "CÓDIGO DE INVITACIÓN FAMILIAR",
     "inviteCodeLabel": "Comparte este código para que la familia se una en otros dispositivos:",
     "inviteCodeHint": "Funciona en cualquier teléfono. Abre Kindo → Unirse con Código de Invitación.",
