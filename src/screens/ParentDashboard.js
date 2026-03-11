@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '../i18n/index';
 import { kidColors, shadows } from '../theme/index';
 
 const Tab = createBottomTabNavigator();
@@ -1125,8 +1126,8 @@ function FamilyTab({ navigation }) {
 // ─── Settings Tab ──────────────────────────────────────────────────────────────
 
 function SettingsTab({ navigation }) {
-  const { colors } = useTheme();
-  const { t } = useTranslation();
+  const { colors, isDark, toggleDark } = useTheme();
+  const { t, i18n } = useTranslation();
   const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled } = useApp();
 
   // Parent profile edit
@@ -1341,6 +1342,45 @@ function SettingsTab({ navigation }) {
             <Ionicons name="lock-closed-outline" size={20} color="#fff" />
             <Text style={styles.assignBtnText}>{t('settings.updatePin')}</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* ── Appearance ────────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.appearance')}</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
+          <View style={styles.notifRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.notifTitle, { color: colors.text1 }]}>{t('settings.nightMode')}</Text>
+              <Text style={[styles.notifSub, { color: colors.text3 }]}>{t('settings.nightModeSub')}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleBtn, isDark && { backgroundColor: colors.primary }]}
+              onPress={toggleDark}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.toggleThumb, isDark && styles.toggleThumbOn]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Language ──────────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.language')}</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.notifSub, { color: colors.text3, marginBottom: 12 }]}>{t('settings.languageSub')}</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {[{ code: 'en', label: t('settings.english') }, { code: 'es', label: t('settings.spanish') }].map(({ code, label }) => {
+              const active = i18n.language === code;
+              return (
+                <TouchableOpacity
+                  key={code}
+                  style={[styles.assignBtn, { flex: 1, backgroundColor: active ? colors.primary : colors.bg, borderWidth: 1.5, borderColor: active ? colors.primary : colors.border }]}
+                  onPress={() => changeLanguage(code)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.assignBtnText, { color: active ? '#fff' : colors.text2 }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* ── Notification Preferences ──────────────────────────────────── */}
