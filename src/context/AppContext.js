@@ -461,6 +461,7 @@ export function AppProvider({ children }) {
         phone:     newKid.phone || '',
         role:      'kid',
       });
+      setFamily(prev => ({ ...prev, kids: [...(prev.kids || []), newKid] }));
     } else {
       const updated = { ...family, kids: [...family.kids, newKid] };
       await saveFamily(updated);
@@ -475,6 +476,10 @@ export function AppProvider({ children }) {
       if (updates.color) dbUpdates.color = updates.color;
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
       await supabase.from('profiles').update(dbUpdates).eq('id', kidId);
+      setFamily(prev => ({
+        ...prev,
+        kids: prev.kids.map(k => k.id === kidId ? { ...k, ...updates } : k),
+      }));
     } else {
       const updated = {
         ...family,
@@ -490,6 +495,7 @@ export function AppProvider({ children }) {
         supabase.from('profiles').delete().eq('id', kidId),
         supabase.from('tasks').delete().eq('assigned_to', kidId),
       ]);
+      setFamily(prev => ({ ...prev, kids: prev.kids.filter(k => k.id !== kidId) }));
     } else {
       const updated = { ...family, kids: family.kids.filter(k => k.id !== kidId) };
       await saveFamily(updated);
