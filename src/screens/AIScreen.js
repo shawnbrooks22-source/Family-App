@@ -1,13 +1,6 @@
 /**
- * AIScreen — AI Chore Suggestions powered by Claude
- *
- * ─── SETUP ───────────────────────────────────────────────────────────────────
- * 1. Get an API key from https://console.anthropic.com
- * 2. Replace CLAUDE_API_KEY below with your key
- *
- * For production: store the key server-side (Supabase Edge Function) and
- * call it from here. Never ship a real API key in a mobile app binary.
- * ─────────────────────────────────────────────────────────────────────────────
+ * AIScreen — Smart Chore Suggestions (built-in, no API required)
+ * Works fully offline. No API keys needed.
  */
 
 import React, { useState } from 'react';
@@ -31,66 +24,119 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-// API routing — proxy is preferred (key stays server-side).
-// Set EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY in .env to use the Edge Function.
-// Fall back to direct key (dev only) via EXPO_PUBLIC_CLAUDE_API_KEY.
-const CLAUDE_PROXY   = process.env.EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY || '';
-const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
-const CLAUDE_READY   = !!(CLAUDE_PROXY || !CLAUDE_API_KEY.includes('YOUR_'));
+// ─── Built-in Chore Database ──────────────────────────────────────────────────
+// Each chore has: title, emoji, reward, why, tags (for interest matching), minAge, maxAge
 
-const TASK_EMOJIS = [
-  '🧹', '🧽', '🛁', '📚', '🍽️', '🌱', '🐕', '🛏️',
-  '👕', '🎒', '🚿', '♻️', '💻', '🎨', '🧺', '🌿',
+const CHORE_DB = [
+  // Toddler / ages 2-4
+  { title: 'Put toys away', emoji: '🎒', reward: 'Extra bedtime story', why: 'Teaches tidiness from an early age.', tags: ['toys', 'play'], minAge: 2, maxAge: 4 },
+  { title: 'Wipe up spills', emoji: '🧽', reward: 'Choose a sticker', why: 'Builds responsibility for accidents.', tags: [], minAge: 2, maxAge: 5 },
+  { title: 'Sort laundry colors', emoji: '👕', reward: 'Pick the movie tonight', why: 'Simple sorting builds early math skills.', tags: ['laundry'], minAge: 3, maxAge: 6 },
+  { title: 'Feed the pet', emoji: '🐕', reward: 'Extra playtime', why: 'Caring for animals builds empathy.', tags: ['animals', 'pets'], minAge: 3, maxAge: 7 },
+  { title: 'Dust low shelves', emoji: '🧹', reward: 'Choose a snack', why: 'Easy win that makes kids feel helpful.', tags: [], minAge: 3, maxAge: 6 },
+  { title: 'Help set the table', emoji: '🍽️', reward: 'Sit in the special chair', why: 'Prepares kids for meal routines.', tags: ['cooking', 'food'], minAge: 3, maxAge: 7 },
+
+  // Young kids / ages 5-8
+  { title: 'Make your bed', emoji: '🛏️', reward: '30 min screen time', why: 'Builds a daily morning routine.', tags: [], minAge: 5, maxAge: 99 },
+  { title: 'Empty the dishwasher', emoji: '🍽️', reward: 'Choose dinner tonight', why: 'Teaches kitchen organization and safety.', tags: ['cooking', 'food'], minAge: 5, maxAge: 99 },
+  { title: 'Water the plants', emoji: '🌱', reward: 'Pick a new seed to grow', why: 'Teaches nurturing and responsibility.', tags: ['nature', 'gardening', 'plants'], minAge: 5, maxAge: 99 },
+  { title: 'Vacuum one room', emoji: '🧹', reward: '20 min extra gaming', why: 'A satisfying, visible result that builds pride.', tags: ['gaming'], minAge: 6, maxAge: 99 },
+  { title: 'Take out recycling', emoji: '♻️', reward: 'Ice cream trip', why: 'Teaches environmental responsibility.', tags: ['nature', 'environment'], minAge: 6, maxAge: 99 },
+  { title: 'Wipe down bathroom sink', emoji: '🚿', reward: 'Bubble bath tonight', why: 'Introduces personal hygiene habits.', tags: [], minAge: 6, maxAge: 99 },
+  { title: 'Pack your school bag', emoji: '🎒', reward: 'Extra 10 min before bed', why: 'Builds independence and planning skills.', tags: ['school'], minAge: 6, maxAge: 12 },
+  { title: 'Sweep the kitchen floor', emoji: '🧹', reward: 'Choose the playlist at dinner', why: 'Teaches thoroughness and follow-through.', tags: ['music'], minAge: 6, maxAge: 99 },
+  { title: 'Fold your laundry', emoji: '👕', reward: 'New book or comic', why: 'Develops fine motor skills and routine.', tags: ['laundry', 'reading'], minAge: 7, maxAge: 99 },
+  { title: 'Weed the garden', emoji: '🌿', reward: 'Plant your own flower', why: 'Connects kids to nature and outdoor work.', tags: ['nature', 'gardening', 'outdoor'], minAge: 7, maxAge: 99 },
+  { title: 'Wash the pet', emoji: '🐕', reward: 'Pick a fun dog treat', why: 'Deepens bond with pets and teaches care.', tags: ['animals', 'pets'], minAge: 7, maxAge: 99 },
+  { title: 'Organize your bookshelf', emoji: '📚', reward: 'Choose a new book', why: 'Builds organizational thinking and love of reading.', tags: ['reading', 'books'], minAge: 7, maxAge: 99 },
+  { title: 'Help cook dinner', emoji: '🍽️', reward: 'Name the dish you made', why: 'Teaches real-life cooking skills early.', tags: ['cooking', 'food'], minAge: 7, maxAge: 99 },
+  { title: 'Clean your desk', emoji: '💻', reward: '30 min extra screen time', why: 'Helps focus and study performance.', tags: ['school', 'art', 'drawing', 'gaming'], minAge: 7, maxAge: 99 },
+
+  // Tweens / ages 9-12
+  { title: 'Mop the kitchen floor', emoji: '🧽', reward: 'Pick a restaurant this week', why: 'Builds deep cleaning skills and stamina.', tags: ['cooking', 'food'], minAge: 9, maxAge: 99 },
+  { title: 'Clean the bathroom', emoji: '🚿', reward: 'Spa night supplies', why: 'Teaches thorough hygiene cleaning.', tags: [], minAge: 9, maxAge: 99 },
+  { title: 'Do a load of laundry', emoji: '🧺', reward: 'Choose a new outfit', why: 'Full laundry cycle teaches independence.', tags: ['laundry'], minAge: 9, maxAge: 99 },
+  { title: 'Rake the leaves', emoji: '🌿', reward: 'Bonfire / s\'mores night', why: 'Outdoor work builds endurance and teamwork.', tags: ['outdoor', 'nature', 'gardening'], minAge: 9, maxAge: 99 },
+  { title: 'Walk the dog daily', emoji: '🐕', reward: 'Adopt a new toy for the dog', why: 'Responsibility + daily exercise habit.', tags: ['animals', 'pets', 'outdoor'], minAge: 9, maxAge: 99 },
+  { title: 'Research a family meal', emoji: '📚', reward: 'Cook it together on Friday', why: 'Combines research, reading and cooking.', tags: ['cooking', 'food', 'reading'], minAge: 9, maxAge: 99 },
+  { title: 'Organize the pantry', emoji: '🍽️', reward: 'Pick this week\'s snacks', why: 'Planning and categorization skill builder.', tags: ['cooking', 'food'], minAge: 10, maxAge: 99 },
+  { title: 'Clean out the car', emoji: '♻️', reward: 'Control the road trip playlist', why: 'Taking ownership of shared family spaces.', tags: ['music'], minAge: 10, maxAge: 99 },
+  { title: 'Paint a fence or wall', emoji: '🎨', reward: 'Choose your room wall color', why: 'Creative + productive work builds confidence.', tags: ['art', 'drawing', 'creative'], minAge: 10, maxAge: 99 },
+  { title: 'Batch cook a side dish', emoji: '🍽️', reward: 'Pick a cooking YouTube channel', why: 'Teaches meal prep and forward planning.', tags: ['cooking', 'food'], minAge: 10, maxAge: 99 },
+  { title: 'Help with grocery list', emoji: '🛒', reward: 'Pick one treat at the store', why: 'Builds math, budgeting and nutrition awareness.', tags: ['cooking', 'food', 'math'], minAge: 10, maxAge: 99 },
+
+  // Teens / ages 13+
+  { title: 'Cook a full meal', emoji: '🍽️', reward: 'Pick any recipe, we\'ll buy it', why: 'Real-world independence and nutrition skills.', tags: ['cooking', 'food'], minAge: 13, maxAge: 99 },
+  { title: 'Mow the lawn', emoji: '🌿', reward: 'Pocket money this week', why: 'Builds outdoor responsibility and physical fitness.', tags: ['outdoor', 'nature', 'gardening'], minAge: 13, maxAge: 99 },
+  { title: 'Deep clean the kitchen', emoji: '🧽', reward: 'Movie night of your choice', why: 'Learning deep cleaning for future independence.', tags: ['cooking', 'food'], minAge: 13, maxAge: 99 },
+  { title: 'Manage all pet care for a week', emoji: '🐕', reward: 'Name the next pet visit destination', why: 'Full ownership builds true responsibility.', tags: ['animals', 'pets'], minAge: 13, maxAge: 99 },
+  { title: 'Redesign your study space', emoji: '💻', reward: 'Budget for new desk item', why: 'Environment design affects focus and results.', tags: ['school', 'art', 'drawing', 'gaming', 'creative'], minAge: 13, maxAge: 99 },
+  { title: 'Do all family laundry', emoji: '🧺', reward: 'New clothing item of choice', why: 'Full household contribution builds independence.', tags: ['laundry'], minAge: 13, maxAge: 99 },
+  { title: 'Plan & cook weekly meals', emoji: '🍽️', reward: 'Full control of menu for a week', why: 'Combines budgeting, nutrition and cooking.', tags: ['cooking', 'food'], minAge: 14, maxAge: 99 },
+  { title: 'Fix something broken at home', emoji: '🔧', reward: 'Keep the leftover materials', why: 'DIY skills save money and build confidence.', tags: ['creative', 'building'], minAge: 14, maxAge: 99 },
+  { title: 'Create a family chore schedule', emoji: '📚', reward: 'Family pizza night', why: 'Leadership and organizational thinking.', tags: ['school', 'reading'], minAge: 14, maxAge: 99 },
 ];
 
-// Call Claude — via Supabase Edge Function proxy (preferred) or direct key (dev)
-async function callClaude(prompt) {
-  if (CLAUDE_PROXY) {
-    // Production path: API key lives in Edge Function secrets, never in the app
-    const res = await fetch(CLAUDE_PROXY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, max_tokens: 800 }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Proxy error ${res.status}`);
-    }
-    const data = await res.json();
-    return data.text || '';
-  }
+const REWARDS = [
+  '30 min screen time', 'Choose dinner tonight', 'Extra bedtime story',
+  'Ice cream trip', '20 min extra gaming', 'Pick the movie tonight',
+  'New book or comic', 'Pocket money this week', 'Choose a snack',
+  'Stay up 30 min later', 'Friend sleepover this weekend', 'Choose a fun outing',
+];
 
-  // Dev fallback: direct API call (never ship a real key in a production build)
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         CLAUDE_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API error ${res.status}`);
+// ─── Smart suggestion engine ──────────────────────────────────────────────────
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  const data = await res.json();
-  return data.content?.[0]?.text || '';
+  return a;
 }
 
-// Parse Claude's JSON response
-function parseSuggestions(text) {
-  try {
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) return [];
-    return JSON.parse(match[0]);
-  } catch {
-    return [];
+function parseAge(ageStr) {
+  const n = parseInt(ageStr, 10);
+  return isNaN(n) ? null : n;
+}
+
+function buildInterestKeywords(interestsStr) {
+  return interestsStr
+    .toLowerCase()
+    .split(/[\s,]+/)
+    .filter(Boolean);
+}
+
+function scoreChore(chore, age, keywords) {
+  if (age < chore.minAge || age > chore.maxAge) return -1;
+  let score = 1;
+  for (const kw of keywords) {
+    if (chore.tags.some(t => t.includes(kw) || kw.includes(t))) score += 2;
+    if (chore.title.toLowerCase().includes(kw)) score += 1;
   }
+  return score;
+}
+
+function generateSuggestions(ageStr, interestsStr, count = 6) {
+  const age = parseAge(ageStr);
+  if (age === null) return [];
+
+  const keywords = buildInterestKeywords(interestsStr);
+
+  const scored = CHORE_DB
+    .map(c => ({ chore: c, score: scoreChore(c, age, keywords) }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // Take top interest-matched chores first, then fill with random age-appropriate ones
+  const top = scored.filter(x => x.score > 1).map(x => x.chore);
+  const rest = shuffle(scored.filter(x => x.score === 1).map(x => x.chore));
+  const pool = [...top, ...rest];
+
+  return pool.slice(0, count).map(c => ({
+    ...c,
+    reward: c.reward || REWARDS[Math.floor(Math.random() * REWARDS.length)],
+  }));
 }
 
 export default function AIScreen({ navigation }) {
@@ -105,51 +151,30 @@ export default function AIScreen({ navigation }) {
   const [loading,      setLoading]      = useState(false);
   const [addedIds,     setAddedIds]     = useState(new Set());
 
-  async function handleGenerate() {
+  function handleGenerate() {
     if (!age.trim()) {
       Alert.alert(t('ai.enterAge'), t('ai.ageHelps'));
-      return;
-    }
-    if (!CLAUDE_READY) {
-      Alert.alert(
-        t('ai.notConfiguredAlert'),
-        t('ai.notConfiguredAlertMsg')
-      );
       return;
     }
     setLoading(true);
     setSuggestions([]);
     setAddedIds(new Set());
 
-    const kid = family?.kids?.find(k => k.id === selectedKid);
-    const kidDesc = kid ? `for a child named ${kid.name}` : 'for a child';
-    const interestLine = interests.trim()
-      ? `The child's interests/hobbies: ${interests.trim()}.`
-      : '';
-
-    const prompt = `You are a helpful family chore assistant. Suggest 6 age-appropriate household chores ${kidDesc} who is ${age} years old. ${interestLine}
-
-Return ONLY a valid JSON array (no other text). Each item should have:
-- "title": short chore name (max 5 words)
-- "emoji": a single relevant emoji from this set: ${TASK_EMOJIS.join(' ')}
-- "reward": a fun, specific reward a parent might give (e.g. "30 min screen time", "Choose dinner tonight", "Extra bedtime story", "Ice cream trip")
-- "why": one short sentence explaining why it's good for this age
-
-Example format:
-[
-  { "title": "Make your bed", "emoji": "🛏️", "reward": "30 min screen time", "why": "Builds daily routine and responsibility." }
-]`;
-
-    try {
-      const text = await callClaude(prompt);
-      const parsed = parseSuggestions(text);
-      if (parsed.length === 0) throw new Error('Could not parse suggestions');
-      setSuggestions(parsed);
-    } catch (e) {
-      Alert.alert(t('ai.oops'), e.message || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // Small timeout so the loading spinner is visible
+    setTimeout(() => {
+      try {
+        const results = generateSuggestions(age.trim(), interests.trim());
+        if (results.length === 0) {
+          Alert.alert('No chores found', 'Try entering a different age.');
+        } else {
+          setSuggestions(results);
+        }
+      } catch (e) {
+        Alert.alert(t('ai.oops'), 'Something went wrong. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }, 600);
   }
 
   async function handleAddSuggestion(s) {
@@ -343,25 +368,6 @@ Example format:
       fontWeight: '700',
     },
 
-    notConfiguredCard: {
-      backgroundColor: '#FFF8E1',
-      borderRadius: 20,
-      padding: 20,
-      borderWidth: 1.5,
-      borderColor: '#FFE082',
-    },
-    notConfiguredTitle: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: '#5D4037',
-      marginBottom: 8,
-    },
-    notConfiguredText: {
-      fontSize: 14,
-      color: '#795548',
-      fontWeight: '500',
-      lineHeight: 22,
-    },
   });
 
   return (
@@ -499,16 +505,6 @@ Example format:
                   </View>
                 );
               })}
-            </View>
-          )}
-
-          {/* Not configured notice */}
-          {!CLAUDE_READY && (
-            <View style={styles.notConfiguredCard}>
-              <Text style={styles.notConfiguredTitle}>{t('ai.notConfiguredTitle')}</Text>
-              <Text style={styles.notConfiguredText}>
-                {t('ai.notConfiguredText')}
-              </Text>
             </View>
           )}
 
