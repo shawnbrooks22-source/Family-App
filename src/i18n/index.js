@@ -14,7 +14,7 @@ export async function initI18n() {
   const lng = savedLang || (deviceLang.startsWith('es') ? 'es' : 'en');
 
   await i18n.use(initReactI18next).init({
-    compatibilityJSON: 'v4',
+    compatibilityJSON: 'v3',
     resources: { en: { translation: en }, es: { translation: es } },
     lng,
     fallbackLng: 'en',
