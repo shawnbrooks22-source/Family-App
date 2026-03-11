@@ -79,12 +79,17 @@ async function sendNotif(title, body) {
   }
 }
 
-// Generate a human-friendly invite code like "KINDO-LION-3847"
+// Generate a human-friendly invite code like "KINDO-LION-384729"
+// Entropy: 20 words × 900,000 numbers = 18,000,000 combinations
 function generateInviteCode() {
-  const animals = ['LION', 'BEAR', 'FOX', 'OWL', 'WOLF', 'DUCK', 'FROG', 'PANDA'];
-  const animal  = animals[Math.floor(Math.random() * animals.length)];
-  const num     = String(Math.floor(1000 + Math.random() * 9000));
-  return `KINDO-${animal}-${num}`;
+  const words = [
+    'LION', 'BEAR', 'FOX',  'OWL',  'WOLF', 'DUCK', 'FROG', 'PANDA',
+    'HAWK', 'DEER', 'SEAL', 'LYNX', 'CROW', 'MOLE', 'SWAN', 'TOAD',
+    'CRAB', 'NEWT', 'VOLE', 'IBIS',
+  ];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const num  = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+  return `KINDO-${word}-${num}`;
 }
 
 export function AppProvider({ children }) {
@@ -253,7 +258,7 @@ export function AppProvider({ children }) {
     if (famErr) throw famErr;
 
     const fid = famRow.id;
-    const parentId = `parent_${Date.now()}`;
+    const parentId = `parent_${crypto.randomUUID()}`;
 
     // Create parent profile
     await supabase.from('profiles').insert({
@@ -269,7 +274,7 @@ export function AppProvider({ children }) {
     // Create kid profiles
     for (const kid of (data.kids || [])) {
       await supabase.from('profiles').insert({
-        id:        kid.id || `kid_${Date.now()}_${Math.random()}`,
+        id:        kid.id || `kid_${crypto.randomUUID()}`,
         family_id: fid,
         name:      kid.name,
         emoji:     kid.emoji,
@@ -309,7 +314,7 @@ export function AppProvider({ children }) {
   // ── Task operations ────────────────────────────────────────────────────────
   async function addTask(task) {
     const newTask = {
-      id:          Date.now().toString(),
+      id:          crypto.randomUUID(),
       family_id:   familyId || undefined,
       status:      'pending',
       celebrated:  false,
@@ -374,7 +379,7 @@ export function AppProvider({ children }) {
       if (task?.recurrence && task.recurrence !== 'none') {
         await supabase.from('tasks').insert({
           ...task,
-          id:           (Date.now() + 1).toString(),
+          id:           crypto.randomUUID(),
           status:       'pending',
           celebrated:   false,
           created_at:   Date.now(),
@@ -389,7 +394,7 @@ export function AppProvider({ children }) {
       if (task?.recurrence && task.recurrence !== 'none') {
         updated = [...updated, {
           ...task,
-          id:           (Date.now() + 1).toString(),
+          id:           crypto.randomUUID(),
           status:       'pending',
           celebrated:   false,
           created_at:   Date.now(),
@@ -428,7 +433,7 @@ export function AppProvider({ children }) {
 
   // ── Kid operations ─────────────────────────────────────────────────────────
   async function addKid(kid) {
-    const newKid = { ...kid, id: Date.now().toString(), goal: null, streak: 0 };
+    const newKid = { ...kid, id: crypto.randomUUID(), goal: null, streak: 0 };
     if (SUPABASE_READY && familyId) {
       await supabase.from('profiles').insert({
         id:        newKid.id,

@@ -60,17 +60,58 @@ create table if not exists public.tasks (
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- ROW LEVEL SECURITY
--- For V1: open access gated by family_id (provided by client).
--- Upgrade to JWT-based RLS in production.
+--
+-- Current model: anon key + unguessable UUID family_ids for data segregation.
+-- Kids do not have Supabase Auth accounts, so auth.uid()-based policies are
+-- not yet possible.
+--
+-- TODO (before public launch): Add Supabase Auth for parents and replace the
+-- policies below with:
+--   using (family_id = (auth.jwt() -> 'family_id')::uuid)
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.families enable row level security;
 alter table public.profiles  enable row level security;
 alter table public.tasks     enable row level security;
 
--- Allow all operations for now (V1 — tighten in production)
-create policy "families_open"  on public.families  for all using (true) with check (true);
-create policy "profiles_open"  on public.profiles  for all using (true) with check (true);
-create policy "tasks_open"     on public.tasks     for all using (true) with check (true);
+-- Drop old wide-open policies if upgrading from a previous schema
+drop policy if exists "families_open" on public.families;
+drop policy if exists "profiles_open" on public.profiles;
+drop policy if exists "tasks_open"    on public.tasks;
+
+-- FAMILIES ────────────────────────────────────────────────────────────────────
+-- SELECT needed: invite-code lookup + loading family name on join
+-- INSERT needed: initial family creation during onboarding
+-- UPDATE needed: rename family
+-- DELETE intentionally blocked from the anon client
+create policy "families_select" on public.families
+  for select using (true);
+create policy "families_insert" on public.families
+  for insert with check (true);
+create policy "families_update" on public.families
+  for update using (true) with check (true);
+
+-- PROFILES ────────────────────────────────────────────────────────────────────
+-- Full CRUD except hard-delete (kids are archived, not deleted, to preserve
+-- task history). family_id NOT NULL enforced so orphan rows can't be inserted.
+create policy "profiles_select" on public.profiles
+  for select using (true);
+create policy "profiles_insert" on public.profiles
+  for insert with check (family_id is not null);
+create policy "profiles_update" on public.profiles
+  for update using (true) with check (family_id is not null);
+
+-- TASKS ───────────────────────────────────────────────────────────────────────
+-- Full CRUD needed: kids complete tasks, parents approve, recurring tasks
+-- auto-respawn, and tasks can be deleted by parents.
+-- family_id NOT NULL enforced on writes.
+create policy "tasks_select" on public.tasks
+  for select using (true);
+create policy "tasks_insert" on public.tasks
+  for insert with check (family_id is not null);
+create policy "tasks_update" on public.tasks
+  for update using (true) with check (family_id is not null);
+create policy "tasks_delete" on public.tasks
+  for delete using (true);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- REALTIME

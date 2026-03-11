@@ -31,18 +31,36 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-// ⬇️  Set EXPO_PUBLIC_CLAUDE_API_KEY in your .env file
-// For production, proxy this through a Supabase Edge Function instead.
+// API routing — proxy is preferred (key stays server-side).
+// Set EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY in .env to use the Edge Function.
+// Fall back to direct key (dev only) via EXPO_PUBLIC_CLAUDE_API_KEY.
+const CLAUDE_PROXY   = process.env.EXPO_PUBLIC_SUPABASE_CLAUDE_PROXY || '';
 const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || 'YOUR_ANTHROPIC_API_KEY';
-const CLAUDE_READY   = !CLAUDE_API_KEY.includes('YOUR_');
+const CLAUDE_READY   = !!(CLAUDE_PROXY || !CLAUDE_API_KEY.includes('YOUR_'));
 
 const TASK_EMOJIS = [
   '🧹', '🧽', '🛁', '📚', '🍽️', '🌱', '🐕', '🛏️',
   '👕', '🎒', '🚿', '♻️', '💻', '🎨', '🧺', '🌿',
 ];
 
-// Call Claude API via fetch
+// Call Claude — via Supabase Edge Function proxy (preferred) or direct key (dev)
 async function callClaude(prompt) {
+  if (CLAUDE_PROXY) {
+    // Production path: API key lives in Edge Function secrets, never in the app
+    const res = await fetch(CLAUDE_PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, max_tokens: 800 }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || `Proxy error ${res.status}`);
+    }
+    const data = await res.json();
+    return data.text || '';
+  }
+
+  // Dev fallback: direct API call (never ship a real key in a production build)
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
