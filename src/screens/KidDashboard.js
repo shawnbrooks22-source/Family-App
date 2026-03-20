@@ -197,6 +197,7 @@ function WaitingCard({ task }) {
 function formatDate(ts) {
   if (!ts) return '';
   const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 

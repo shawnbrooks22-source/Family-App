@@ -99,7 +99,7 @@ const headerStyles = StyleSheet.create({
 function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const { tasks, family, approveTask, chargeForTask } = useApp();
+  const { tasks, family, approveTask, chargeForTask, refreshParentSession } = useApp();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
 
   const totalTasks   = tasks.length;
@@ -122,6 +122,7 @@ function HomeTab({ navigation }) {
   const topKid = kidStars[0];
 
   async function handleApprove(task) {
+    refreshParentSession?.();
     if (task.amount_cents && chargeForTask) {
       const dollars = `$${(task.amount_cents / 100).toFixed(2)}`;
       const kid = family.kids.find(k => k.id === (task.assignedTo || task.assigned_to));
@@ -654,7 +655,7 @@ function TasksTab() {
 function AddTaskTab() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { family, addTask } = useApp();
+  const { family, addTask, refreshParentSession } = useApp();
   const [title, setTitle] = useState('');
   const [reward, setReward] = useState('');
   const [notes, setNotes] = useState('');
@@ -666,6 +667,7 @@ function AddTaskTab() {
   const [success,    setSuccess]    = useState(false);
 
   async function handleAdd() {
+    refreshParentSession?.();
     if (!title.trim())  { Alert.alert(t('parentDashboard.questName'), 'What do you want your kid to do?'); return; }
     if (!reward.trim()) { Alert.alert(t('parentDashboard.reward'), "What will your kid earn for completing this?"); return; }
     if (!selectedKid)   { Alert.alert(t('parentDashboard.assignTo'), 'Choose who should complete this quest.'); return; }
@@ -895,7 +897,7 @@ function AddTaskTab() {
 function FamilyTab({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { family, addKid, removeKid, editKid } = useApp();
+  const { family, addKid, removeKid, editKid, refreshParentSession } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [kidName, setKidName] = useState('');
   const [kidPhone, setKidPhone] = useState('');
@@ -910,6 +912,7 @@ function FamilyTab({ navigation }) {
   const [editKidColor,    setEditKidColor]    = useState(kidColors[0]);
 
   async function handleAddKid() {
+    refreshParentSession?.();
     if (!kidName.trim()) { Alert.alert(t('parentDashboard.name')); return; }
     await addKid({ name: kidName.trim(), emoji: kidEmoji, color: kidColor, phone: kidPhone.trim() });
     setKidName('');

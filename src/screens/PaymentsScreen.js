@@ -36,7 +36,7 @@ let WebView = null;
 try { WebView = require('react-native-webview').WebView; } catch {}
 
 const STRIPE_PK    = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
-const STRIPE_READY = !!(STRIPE_PK && !STRIPE_PK.includes('pk_') === false && STRIPE_PK.startsWith('pk_'));
+const STRIPE_READY = !!(STRIPE_PK && STRIPE_PK.startsWith('pk_'));
 
 function buildCardHTML(publishableKey) {
   return `

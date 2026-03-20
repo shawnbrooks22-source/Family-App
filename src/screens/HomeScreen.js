@@ -667,12 +667,13 @@ export default function HomeScreen({ navigation }) {
   const lockoutTimer  = useRef(null);
 
   // PIN Recovery
-  const [showRecovery,   setShowRecovery]   = useState(false);
-  const [recoveryStep,   setRecoveryStep]   = useState('verify'); // 'verify' | 'newpin' | 'confirm'
-  const [recoveryCode,   setRecoveryCode]   = useState('');
-  const [recoveryNewPin, setRecoveryNewPin] = useState('');
-  const [recoveryConfirm,setRecoveryConfirm]= useState('');
-  const [recoveryError,  setRecoveryError]  = useState('');
+  const [showRecovery,    setShowRecovery]    = useState(false);
+  const [recoveryStep,    setRecoveryStep]    = useState('verify'); // 'verify' | 'newpin' | 'confirm'
+  const [recoveryCode,    setRecoveryCode]    = useState('');
+  const [recoveryNewPin,  setRecoveryNewPin]  = useState('');
+  const [recoveryConfirm, setRecoveryConfirm] = useState('');
+  const [recoveryError,   setRecoveryError]   = useState('');
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const shakeAnim   = useRef(new Animated.Value(0)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -696,7 +697,7 @@ export default function HomeScreen({ navigation }) {
       });
     }, 1000);
     return () => clearInterval(lockoutTimer.current);
-  }, [lockoutSecs > 0]);
+  }, [lockoutSecs]);
 
   // Per-kid star counts — normalize both field naming conventions
   // (Supabase returns assigned_to; local mode uses assignedTo)
@@ -766,6 +767,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   async function handleRecoverySetPin() {
+    if (recoveryLoading) return;
     if (!/^\d{4}$/.test(recoveryNewPin)) {
       setRecoveryError(t('home.pinMustBe4'));
       return;
@@ -774,12 +776,17 @@ export default function HomeScreen({ navigation }) {
       setRecoveryError(t('home.pinsDontMatch'));
       return;
     }
-    await updateParentProfile({ parentPin: recoveryNewPin });
-    await clearPinFailures();
-    setShowRecovery(false);
-    setLockoutSecs(0);
-    setPinAttempts(0);
-    Alert.alert(t('home.pinReset'), t('home.pinUpdated'));
+    setRecoveryLoading(true);
+    try {
+      await updateParentProfile({ parentPin: recoveryNewPin });
+      await clearPinFailures();
+      setShowRecovery(false);
+      setLockoutSecs(0);
+      setPinAttempts(0);
+      Alert.alert(t('home.pinReset'), t('home.pinUpdated'));
+    } finally {
+      setRecoveryLoading(false);
+    }
   }
 
   // ─── PIN sheet ───────────────────────────────────────────────────────────────
@@ -1366,8 +1373,8 @@ export default function HomeScreen({ navigation }) {
                   secureTextEntry
                   maxLength={4}
                 />
-                <TouchableOpacity style={styles.recoveryBtn} onPress={handleRecoverySetPin} activeOpacity={0.85}>
-                  <Text style={styles.recoveryBtnText}>{t('home.setNewPin')}</Text>
+                <TouchableOpacity style={[styles.recoveryBtn, recoveryLoading && { opacity: 0.6 }]} onPress={handleRecoverySetPin} activeOpacity={0.85} disabled={recoveryLoading}>
+                  <Text style={styles.recoveryBtnText}>{recoveryLoading ? '...' : t('home.setNewPin')}</Text>
                 </TouchableOpacity>
               </>
             )}

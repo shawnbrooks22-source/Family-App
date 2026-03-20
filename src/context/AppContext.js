@@ -499,7 +499,7 @@ export function AppProvider({ children }) {
     } else {
       const updated = { ...family, kids: family.kids.filter(k => k.id !== kidId) };
       await saveFamily(updated);
-      await saveTasks(tasks.filter(t => t.assignedTo !== kidId));
+      await saveTasks(tasks.filter(t => t.assignedTo !== kidId && t.assigned_to !== kidId));
     }
   }
 
@@ -717,7 +717,9 @@ export function AppProvider({ children }) {
         .order('created_at', { ascending: false })
         .limit(50);
       if (data) setTransactions(data);
-    } catch {}
+    } catch (e) {
+      console.error('Failed to load transactions:', e);
+    }
   }
 
   async function lockParentZone() {
