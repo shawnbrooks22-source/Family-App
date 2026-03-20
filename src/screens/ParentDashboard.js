@@ -123,14 +123,19 @@ function HomeTab({ navigation }) {
 
   async function handleApprove(task) {
     refreshParentSession?.();
-    if (task.amount_cents && chargeForTask) {
+    const hasCard = !!(family?.stripeCardLast4);
+    if (task.amount_cents && chargeForTask && hasCard) {
       const dollars = `$${(task.amount_cents / 100).toFixed(2)}`;
       const kid = family.kids.find(k => k.id === (task.assignedTo || task.assigned_to));
       Alert.alert(
         `💳 Pay ${dollars} to ${kid?.name || 'kid'}?`,
-        `This will charge your saved card and add ${dollars} to ${kid?.name || 'their'} balance.`,
+        `This will charge your ${family.stripeCardBrand || 'card'} ending in ${family.stripeCardLast4} and add ${dollars} to ${kid?.name || 'their'} balance.`,
         [
-          { text: 'Skip Payment', onPress: () => approveTask(task.id) },
+          { text: 'Skip Payment', onPress: async () => {
+            try { await approveTask(task.id); } catch (e) {
+              Alert.alert('Could not approve quest', e?.message || 'Something went wrong.');
+            }
+          }},
           {
             text: `Pay ${dollars}`,
             onPress: async () => {
@@ -145,8 +150,27 @@ function HomeTab({ navigation }) {
           },
         ]
       );
+    } else if (task.amount_cents && !hasCard) {
+      // Task has a cash reward but no card saved — prompt to set one up
+      const dollars = `$${(task.amount_cents / 100).toFixed(2)}`;
+      Alert.alert(
+        `No card saved`,
+        `This quest has a ${dollars} reward but you haven't added a payment method yet.\n\nApprove the quest without payment, or go to Payments to add a card.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Approve Without Pay', onPress: async () => {
+            try { await approveTask(task.id); } catch (e) {
+              Alert.alert('Could not approve quest', e?.message || 'Something went wrong.');
+            }
+          }},
+        ]
+      );
     } else {
-      await approveTask(task.id);
+      try {
+        await approveTask(task.id);
+      } catch (e) {
+        Alert.alert('Could not approve quest', e?.message || 'Something went wrong. Please try again.');
+      }
     }
   }
 
@@ -331,6 +355,7 @@ function TasksTab() {
   const [editKidId,      setEditKidId]      = useState(null);
   const [editNotes,      setEditNotes]      = useState('');
   const [editDueDate,    setEditDueDate]    = useState('');
+  const [editLoading,    setEditLoading]    = useState(false);
 
   const FILTERS = [
     { key: 'all',       label: t('parentDashboard.all') },
@@ -372,17 +397,24 @@ function TasksTab() {
       Alert.alert('Invalid date', 'Use format YYYY-MM-DD (e.g. 2025-06-15)');
       return;
     }
-    await editTask(editingTask.id, {
-      title: editTitle.trim(),
-      reward: editReward.trim(),
-      emoji: editEmoji,
-      recurrence: editRecurrence,
-      assignedTo: editKidId,
-      assigned_to: editKidId,
-      notes: editNotes.trim(),
-      due_date: editDueDate.trim() || null,
-    });
-    setEditingTask(null);
+    setEditLoading(true);
+    try {
+      await editTask(editingTask.id, {
+        title: editTitle.trim(),
+        reward: editReward.trim(),
+        emoji: editEmoji,
+        recurrence: editRecurrence,
+        assignedTo: editKidId,
+        assigned_to: editKidId,
+        notes: editNotes.trim(),
+        due_date: editDueDate.trim() || null,
+      });
+      setEditingTask(null);
+    } catch (e) {
+      Alert.alert('Failed to save', e?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setEditLoading(false);
+    }
   }
 
   return (
@@ -639,9 +671,19 @@ function TasksTab() {
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32, backgroundColor: colors.primary }]} onPress={handleSaveEdit} activeOpacity={0.85}>
-              <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={styles.assignBtnText}>{t('parentDashboard.saveChanges')}</Text>
+            <TouchableOpacity
+              style={[styles.assignBtn, { marginBottom: 32, backgroundColor: editLoading ? colors.text3 : colors.primary }]}
+              onPress={handleSaveEdit}
+              activeOpacity={0.85}
+              disabled={editLoading}
+            >
+              {editLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              }
+              <Text style={styles.assignBtnText}>
+                {editLoading ? 'Saving…' : t('parentDashboard.saveChanges')}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
           </KeyboardAvoidingView>
@@ -666,6 +708,7 @@ function AddTaskTab() {
   const [dueDate,    setDueDate]    = useState('');
   const [cashAmount, setCashAmount] = useState(''); // optional dollar reward e.g. "5.00"
   const [success,    setSuccess]    = useState(false);
+  const [loading,    setLoading]    = useState(false);
 
   async function handleAdd() {
     refreshParentSession?.();
@@ -682,6 +725,7 @@ function AddTaskTab() {
       return;
     }
 
+    setLoading(true);
     try {
       await addTask({
         title:        title.trim(),
@@ -705,6 +749,8 @@ function AddTaskTab() {
       setTimeout(() => setSuccess(false), 2500);
     } catch (e) {
       Alert.alert('Failed to assign quest', e?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -886,9 +932,19 @@ function AddTaskTab() {
           ))}
         </View>
 
-        <TouchableOpacity style={[styles.assignBtn, { backgroundColor: colors.primary }]} onPress={handleAdd} activeOpacity={0.85}>
-          <Ionicons name="add-circle" size={22} color="#fff" />
-          <Text style={styles.assignBtnText}>{t('parentDashboard.assignQuest')}</Text>
+        <TouchableOpacity
+          style={[styles.assignBtn, { backgroundColor: loading ? colors.text3 : colors.primary }]}
+          onPress={handleAdd}
+          activeOpacity={0.85}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="add-circle" size={22} color="#fff" />
+          }
+          <Text style={styles.assignBtnText}>
+            {loading ? 'Assigning…' : t('parentDashboard.assignQuest')}
+          </Text>
         </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -914,14 +970,22 @@ function FamilyTab({ navigation }) {
   const [editKidPhone,    setEditKidPhone]    = useState('');
   const [editKidEmoji,    setEditKidEmoji]    = useState('🦊');
   const [editKidColor,    setEditKidColor]    = useState(kidColors[0]);
+  const [kidLoading,      setKidLoading]      = useState(false);
 
   async function handleAddKid() {
     refreshParentSession?.();
     if (!kidName.trim()) { Alert.alert(t('parentDashboard.name')); return; }
-    await addKid({ name: kidName.trim(), emoji: kidEmoji, color: kidColor, phone: kidPhone.trim() });
-    setKidName('');
-    setKidPhone('');
-    setShowAdd(false);
+    setKidLoading(true);
+    try {
+      await addKid({ name: kidName.trim(), emoji: kidEmoji, color: kidColor, phone: kidPhone.trim() });
+      setKidName('');
+      setKidPhone('');
+      setShowAdd(false);
+    } catch (e) {
+      Alert.alert('Failed to add kid', e?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setKidLoading(false);
+    }
   }
 
   function confirmRemove(kid) {
@@ -941,13 +1005,20 @@ function FamilyTab({ navigation }) {
 
   async function handleSaveKid() {
     if (!editKidName.trim()) { Alert.alert(t('parentDashboard.name')); return; }
-    await editKid(editingKid.id, {
-      name: editKidName.trim(),
-      phone: editKidPhone.trim(),
-      emoji: editKidEmoji,
-      color: editKidColor,
-    });
-    setEditingKid(null);
+    setKidLoading(true);
+    try {
+      await editKid(editingKid.id, {
+        name: editKidName.trim(),
+        phone: editKidPhone.trim(),
+        emoji: editKidEmoji,
+        color: editKidColor,
+      });
+      setEditingKid(null);
+    } catch (e) {
+      Alert.alert('Failed to save', e?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setKidLoading(false);
+    }
   }
 
   return (
@@ -1075,11 +1146,16 @@ function FamilyTab({ navigation }) {
 
             <View style={styles.addKidFormBtns}>
               <TouchableOpacity
-                style={[styles.assignBtn, { flex: 1, backgroundColor: colors.primary }]}
+                style={[styles.assignBtn, { flex: 1, backgroundColor: kidLoading ? colors.text3 : colors.primary }]}
                 onPress={handleAddKid}
                 activeOpacity={0.85}
+                disabled={kidLoading}
               >
-                <Text style={styles.assignBtnText}>{t('add')}</Text>
+                {kidLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : null
+                }
+                <Text style={styles.assignBtnText}>{kidLoading ? 'Adding…' : t('add')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cancelFormBtn}
@@ -1175,9 +1251,19 @@ function FamilyTab({ navigation }) {
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32, backgroundColor: colors.primary }]} onPress={handleSaveKid} activeOpacity={0.85}>
-              <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={styles.assignBtnText}>{t('parentDashboard.saveChanges')}</Text>
+            <TouchableOpacity
+              style={[styles.assignBtn, { marginBottom: 32, backgroundColor: kidLoading ? colors.text3 : colors.primary }]}
+              onPress={handleSaveKid}
+              activeOpacity={0.85}
+              disabled={kidLoading}
+            >
+              {kidLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              }
+              <Text style={styles.assignBtnText}>
+                {kidLoading ? 'Saving…' : t('parentDashboard.saveChanges')}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
           </KeyboardAvoidingView>

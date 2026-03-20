@@ -7,6 +7,7 @@ import {
   TextInput,
   ScrollView,
   Animated,
+  Alert,
   StatusBar,
   Dimensions,
   KeyboardAvoidingView,
@@ -537,7 +538,13 @@ export default function KidDashboard({ route, navigation }) {
                   task={task}
                   index={i}
                   kidColor={kid.color}
-                  onDone={() => completeTask(task.id)}
+                  onDone={async () => {
+                    try {
+                      await completeTask(task.id);
+                    } catch (e) {
+                      Alert.alert('Could not complete quest', e?.message || 'Something went wrong. Please try again.');
+                    }
+                  }}
                 />
               ))}
             </View>

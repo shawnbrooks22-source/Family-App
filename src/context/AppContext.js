@@ -167,7 +167,7 @@ export function AppProvider({ children }) {
         if (tasksRaw)  setTasks(JSON.parse(tasksRaw));
       }
     } catch (e) {
-      console.error('Failed to load data:', e);
+      if (__DEV__) console.error('Failed to load data:', e);
     } finally {
       setIsLoaded(true);
     }
@@ -210,7 +210,7 @@ export function AppProvider({ children }) {
       // Cache locally for offline reads
       await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(familyData));
     } catch (e) {
-      console.error('Failed to load family from Supabase:', e);
+      if (__DEV__) console.error('Failed to load family from Supabase:', e);
     }
   }
 
@@ -226,7 +226,7 @@ export function AppProvider({ children }) {
         await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(data));
       }
     } catch (e) {
-      console.error('Failed to load tasks from Supabase:', e);
+      if (__DEV__) console.error('Failed to load tasks from Supabase:', e);
     }
   }
 
@@ -539,14 +539,22 @@ export function AppProvider({ children }) {
   }
 
   // ── Streak tracking ────────────────────────────────────────────────────────
+  function localDateString(date = new Date()) {
+    // Returns "YYYY-MM-DD" in the device's local timezone (not UTC)
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   async function updateStreak(kidId) {
     if (!kidId) return;
     const kid = family?.kids?.find(k => k.id === kidId);
     if (!kid) return;
 
-    const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+    const today = localDateString();
     const last  = kid.lastCompletedDate || null;
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const yesterday = localDateString(new Date(Date.now() - 86400000));
 
     let newStreak = kid.streak || 0;
     if (last === today) {
@@ -627,7 +635,7 @@ export function AppProvider({ children }) {
       setFamily(null);
       setFamilyId(null);
     } catch (e) {
-      console.error('Failed to clear data:', e);
+      if (__DEV__) console.error('Failed to clear data:', e);
     }
   }
 
@@ -661,12 +669,27 @@ export function AppProvider({ children }) {
   const STRIPE_SETUP_URL  = process.env.EXPO_PUBLIC_SUPABASE_STRIPE_SETUP  || '';
   const STRIPE_CHARGE_URL = process.env.EXPO_PUBLIC_SUPABASE_STRIPE_CHARGE || '';
 
+  /** fetch() with a 15-second timeout — prevents indefinite hangs on slow networks */
+  async function fetchWithTimeout(url, options, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      return res;
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Request timed out. Please check your connection and try again.');
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Save a Stripe payment method to the parent's profile via Edge Function */
   async function setupPaymentMethod(paymentMethodId, last4, brand) {
     if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
     if (!STRIPE_SETUP_URL) throw new Error('Stripe setup URL not configured');
 
-    const res = await fetch(STRIPE_SETUP_URL, {
+    const res = await fetchWithTimeout(STRIPE_SETUP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -690,7 +713,7 @@ export function AppProvider({ children }) {
     if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
     if (!STRIPE_CHARGE_URL) throw new Error('Stripe charge URL not configured');
 
-    const res = await fetch(STRIPE_CHARGE_URL, {
+    const res = await fetchWithTimeout(STRIPE_CHARGE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -743,7 +766,7 @@ export function AppProvider({ children }) {
         .limit(50);
       if (data) setTransactions(data);
     } catch (e) {
-      console.error('Failed to load transactions:', e);
+      if (__DEV__) console.error('Failed to load transactions:', e);
     }
   }
 
