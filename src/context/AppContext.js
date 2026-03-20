@@ -337,12 +337,11 @@ export function AppProvider({ children }) {
 
     if (SUPABASE_READY && familyId) {
       // Supabase expects ISO string for timestamps
-      const { error } = await supabase.from('tasks').insert({
-        ...newTask,
-        created_at: new Date().toISOString(),
-      });
+      const dbTask = { ...newTask, created_at: new Date().toISOString() };
+      const { error } = await supabase.from('tasks').insert(dbTask);
       if (error) throw error;
-      // Realtime will refresh tasks automatically
+      // Optimistic update — don't rely solely on realtime subscription
+      setTasks(prev => [...prev, dbTask]);
     } else {
       await saveTasks([...tasks, newTask]);
     }

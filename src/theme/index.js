@@ -10,10 +10,10 @@ export const colors = {
   accent: '#EC4899',           // hot pink — kids love it
   accentLight: '#FCE7F3',
 
-  bg: '#FDF8FF',               // barely-there lavender white, warmer than plain white
+  bg: '#EBF6FF',               // light sky blue — bright, Bluey-inspired
   surface: '#FFFFFF',
-  border: '#E8E0FA',
-  divider: '#F3EEFF',
+  border: '#C8E4FF',
+  divider: '#E4F2FF',
 
   text1: '#1E0A3C',            // deep purple-black for headings
   text2: '#4B3A7C',            // mid-purple for body

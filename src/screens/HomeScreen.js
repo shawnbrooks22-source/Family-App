@@ -187,24 +187,26 @@ function KidCard({ profile, onPress, stars, colors }) {
             },
           ]}
         />
-        <View
+        <LinearGradient
+          colors={[profile.color, profile.color + 'AA']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={[
             kidCardStyles.avatarCircle,
             {
-              backgroundColor: profile.color,
               width:  AVATAR_SIZE,
               height: AVATAR_SIZE,
               borderRadius: AVATAR_SIZE / 2,
               shadowColor: profile.color,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.7,
-              shadowRadius: 14,
-              elevation: 8,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.55,
+              shadowRadius: 16,
+              elevation: 10,
             },
           ]}
         >
           <Text style={kidCardStyles.avatarEmoji}>{profile.emoji}</Text>
-        </View>
+        </LinearGradient>
         <Text style={kidCardStyles.profileName} numberOfLines={1}>{profile.name}</Text>
         <View style={kidCardStyles.kidStatsRow}>
           <Text style={kidCardStyles.kidStat}>⭐{stars}</Text>
@@ -883,7 +885,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.bg },
+    container: { flex: 1 },
 
     appBar: {
       alignItems: 'center',
@@ -1160,10 +1162,14 @@ export default function HomeScreen({ navigation }) {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
+    <LinearGradient
+      colors={isDark ? ['#0F0A1E', '#0D1B3E', '#1A0F35'] : ['#B8DEFF', '#FFF9D4', '#FFD6F5']}
+      locations={[0, 0.5, 1]}
+      style={styles.container}
+    >
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
-      <SafeAreaView style={{ backgroundColor: colors.bg }}>
+      <SafeAreaView style={{ backgroundColor: 'transparent' }}>
         <View style={styles.appBar}>
           <Text style={styles.appBarTitle}>Kindo 🌟</Text>
         </View>
@@ -1387,6 +1393,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }

@@ -117,11 +117,22 @@ function QuestCard({ task, index, onDone, kidColor }) {
     <Animated.View
       style={[
         styles.questCard,
-        { backgroundColor: colors.surface, opacity: opacityAnim, transform: [{ translateY: slideAnim }, { scale: cardScale }] },
+        { opacity: opacityAnim, transform: [{ translateY: slideAnim }, { scale: cardScale }] },
       ]}
     >
+      <LinearGradient
+        colors={[kidColor + '18', '#FFFFFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
       {/* Color bar at top */}
-      <View style={[styles.questCardBar, { backgroundColor: kidColor }]} />
+      <LinearGradient
+        colors={[kidColor, kidColor + 'BB']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.questCardBar}
+      />
 
       <View style={styles.questCardBody}>
         {/* Emoji + title */}
@@ -330,7 +341,7 @@ export default function KidDashboard({ route, navigation }) {
   const gradient = getGradient(kid.color);
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#0F0A1E' : '#F8F9FF' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#0F0A1E' : '#E8F4FF' }]}>
       <StatusBar barStyle="light-content" />
 
       <ScrollView
@@ -712,7 +723,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#1565C0',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
