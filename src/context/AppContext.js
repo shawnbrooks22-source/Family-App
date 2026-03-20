@@ -54,6 +54,14 @@ Notifications.setNotificationHandler({
 
 const AppContext = createContext(null);
 
+// UUID v4 generator — crypto.randomUUID() is not available in React Native
+function generateId() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 const FAMILY_KEY     = '@kindo_family';
 const TASKS_KEY      = '@kindo_tasks';
 const FAMILY_ID_KEY  = 'kindo_family_id';    // stored in SecureStore
@@ -262,7 +270,7 @@ export function AppProvider({ children }) {
     if (famErr) throw famErr;
 
     const fid = famRow.id;
-    const parentId = `parent_${crypto.randomUUID()}`;
+    const parentId = `parent_${generateId()}`;
 
     // Create parent profile
     await supabase.from('profiles').insert({
@@ -278,7 +286,7 @@ export function AppProvider({ children }) {
     // Create kid profiles
     for (const kid of (data.kids || [])) {
       await supabase.from('profiles').insert({
-        id:        kid.id || `kid_${crypto.randomUUID()}`,
+        id:        kid.id || `kid_${generateId()}`,
         family_id: fid,
         name:      kid.name,
         emoji:     kid.emoji,
@@ -319,7 +327,7 @@ export function AppProvider({ children }) {
   async function addTask(task) {
     const kidId = task.assignedTo || task.assigned_to;
     const newTask = {
-      id:           crypto.randomUUID(),
+      id:           generateId(),
       family_id:    familyId || undefined,
       status:       'pending',
       celebrated:   false,
@@ -402,7 +410,7 @@ export function AppProvider({ children }) {
         const { assignedTo: _a, approvedAt: _b, completedAt: _c, ...taskBase } = task;
         const respawnedTask = {
           ...taskBase,
-          id:           crypto.randomUUID(),
+          id:           generateId(),
           assigned_to:  kidId,
           status:       'pending',
           celebrated:   false,
@@ -422,7 +430,7 @@ export function AppProvider({ children }) {
         const kidId = task.assignedTo || task.assigned_to;
         updated = [...updated, {
           ...task,
-          id:           crypto.randomUUID(),
+          id:           generateId(),
           assignedTo:   kidId,
           assigned_to:  kidId,
           status:       'pending',
@@ -465,7 +473,7 @@ export function AppProvider({ children }) {
 
   // ── Kid operations ─────────────────────────────────────────────────────────
   async function addKid(kid) {
-    const newKid = { ...kid, id: crypto.randomUUID(), goal: null, streak: 0 };
+    const newKid = { ...kid, id: generateId(), goal: null, streak: 0 };
     if (SUPABASE_READY && familyId) {
       await supabase.from('profiles').insert({
         id:        newKid.id,
