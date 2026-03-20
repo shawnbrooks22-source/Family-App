@@ -504,6 +504,33 @@ function TasksTab() {
             showsVerticalScrollIndicator={false}
             automaticallyAdjustKeyboardInsets={true}
           >
+            {/* Assign To — shown first */}
+            <FormLabel label={t('parentDashboard.assignTo')} />
+            <View style={styles.kidPicker}>
+              {family.kids.map(kid => (
+                <TouchableOpacity
+                  key={kid.id}
+                  style={[
+                    styles.kidPickerBtn,
+                    { backgroundColor: kid.color + (editKidId === kid.id ? 'FF' : '30') },
+                    editKidId === kid.id && styles.kidPickerBtnActive,
+                  ]}
+                  onPress={() => setEditKidId(kid.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 26 }}>{kid.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.kidPickerName,
+                      { color: editKidId === kid.id ? '#fff' : colors.text1 },
+                    ]}
+                  >
+                    {kid.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <FormLabel label={t('parentDashboard.questName')} />
             <TextInput
               style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.surface }]}
@@ -612,32 +639,6 @@ function TasksTab() {
               ))}
             </View>
 
-            <FormLabel label={t('parentDashboard.assignTo')} />
-            <View style={styles.kidPicker}>
-              {family.kids.map(kid => (
-                <TouchableOpacity
-                  key={kid.id}
-                  style={[
-                    styles.kidPickerBtn,
-                    { backgroundColor: kid.color + (editKidId === kid.id ? 'FF' : '30') },
-                    editKidId === kid.id && styles.kidPickerBtnActive,
-                  ]}
-                  onPress={() => setEditKidId(kid.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ fontSize: 26 }}>{kid.emoji}</Text>
-                  <Text
-                    style={[
-                      styles.kidPickerName,
-                      { color: editKidId === kid.id ? '#fff' : colors.text1 },
-                    ]}
-                  >
-                    {kid.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
             <TouchableOpacity style={[styles.assignBtn, { marginBottom: 32, backgroundColor: colors.primary }]} onPress={handleSaveEdit} activeOpacity={0.85}>
               <Ionicons name="checkmark-circle" size={22} color="#fff" />
               <Text style={styles.assignBtnText}>{t('parentDashboard.saveChanges')}</Text>
@@ -724,6 +725,33 @@ function AddTaskTab() {
             <Text style={[styles.successBannerText, { color: colors.success }]}>{t('parentDashboard.questAssigned')}</Text>
           </View>
         )}
+
+        {/* Assign to — shown FIRST so parents never miss it */}
+        <FormLabel label={t('parentDashboard.assignTo')} />
+        <View style={styles.kidPicker}>
+          {family.kids.map(kid => (
+            <TouchableOpacity
+              key={kid.id}
+              style={[
+                styles.kidPickerBtn,
+                { backgroundColor: kid.color + (selectedKid === kid.id ? 'FF' : '30') },
+                selectedKid === kid.id && styles.kidPickerBtnActive,
+              ]}
+              onPress={() => setSelectedKid(kid.id)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 26 }}>{kid.emoji}</Text>
+              <Text
+                style={[
+                  styles.kidPickerName,
+                  { color: selectedKid === kid.id ? '#fff' : colors.text1 },
+                ]}
+              >
+                {kid.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Task name */}
         <FormLabel label={t('parentDashboard.questName')} />
@@ -853,33 +881,6 @@ function AddTaskTab() {
                 recurrence === opt.key && { color: colors.primary },
               ]}>
                 {t(opt.labelKey)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Assign to */}
-        <FormLabel label={t('parentDashboard.assignTo')} />
-        <View style={styles.kidPicker}>
-          {family.kids.map(kid => (
-            <TouchableOpacity
-              key={kid.id}
-              style={[
-                styles.kidPickerBtn,
-                { backgroundColor: kid.color + (selectedKid === kid.id ? 'FF' : '30') },
-                selectedKid === kid.id && styles.kidPickerBtnActive,
-              ]}
-              onPress={() => setSelectedKid(kid.id)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 26 }}>{kid.emoji}</Text>
-              <Text
-                style={[
-                  styles.kidPickerName,
-                  { color: selectedKid === kid.id ? '#fff' : colors.text1 },
-                ]}
-              >
-                {kid.name}
               </Text>
             </TouchableOpacity>
           ))}

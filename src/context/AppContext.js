@@ -337,7 +337,8 @@ export function AppProvider({ children }) {
 
     if (SUPABASE_READY && familyId) {
       // Strip camelCase fields — Supabase only knows snake_case columns
-      const { assignedTo: _a, ...supabaseTask } = { ...newTask, created_at: new Date().toISOString() };
+      // created_at must stay as Date.now() (bigint ms) — NOT an ISO string
+      const { assignedTo: _a, ...supabaseTask } = newTask;
       const { error } = await supabase.from('tasks').insert(supabaseTask);
       if (error) throw error;
       // Optimistic update — don't rely solely on realtime subscription
@@ -350,7 +351,11 @@ export function AppProvider({ children }) {
 
   async function editTask(taskId, updates) {
     if (SUPABASE_READY && familyId) {
-      await supabase.from('tasks').update(updates).eq('id', taskId);
+      // Strip camelCase fields — Supabase only has snake_case columns
+      const { assignedTo: _a, ...supabaseUpdates } = updates;
+      await supabase.from('tasks').update(supabaseUpdates).eq('id', taskId);
+      // Optimistic update with full updates (assignedTo kept for local state filtering)
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
     } else {
       await saveTasks(tasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
     }
@@ -362,6 +367,8 @@ export function AppProvider({ children }) {
 
     if (SUPABASE_READY && familyId) {
       await supabase.from('tasks').update(updates).eq('id', taskId);
+      // Optimistic update so UI reflects the change immediately (don't wait for realtime)
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
     } else {
       await saveTasks(tasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
     }
@@ -386,21 +393,26 @@ export function AppProvider({ children }) {
 
     if (SUPABASE_READY && familyId) {
       await supabase.from('tasks').update(updates).eq('id', taskId);
+      // Optimistic update so UI reflects the approval immediately (don't wait for realtime)
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
       // Auto-respawn recurring tasks
       if (task?.recurrence && task.recurrence !== 'none') {
         const kidId = task.assigned_to || task.assignedTo;
         // Destructure out camelCase fields before Supabase insert
         const { assignedTo: _a, approvedAt: _b, completedAt: _c, ...taskBase } = task;
-        await supabase.from('tasks').insert({
+        const respawnedTask = {
           ...taskBase,
           id:           crypto.randomUUID(),
           assigned_to:  kidId,
           status:       'pending',
           celebrated:   false,
-          created_at:   new Date().toISOString(),
+          created_at:   Date.now(), // bigint ms — matches schema column type
           completed_at: null,
           approved_at:  null,
-        });
+        };
+        await supabase.from('tasks').insert(respawnedTask);
+        // Add respawned task to local state optimistically
+        setTasks(prev => [...prev, { ...respawnedTask, assignedTo: kidId }]);
       }
     } else {
       let updated = tasks.map(t =>
@@ -436,6 +448,8 @@ export function AppProvider({ children }) {
   async function markCelebrated(taskId) {
     if (SUPABASE_READY && familyId) {
       await supabase.from('tasks').update({ celebrated: true }).eq('id', taskId);
+      // Optimistic update to prevent repeat celebration triggers
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, celebrated: true } : t));
     } else {
       await saveTasks(tasks.map(t => t.id === taskId ? { ...t, celebrated: true } : t));
     }
@@ -560,7 +574,8 @@ export function AppProvider({ children }) {
     // If a new plain-text PIN is being set, hash it first
     let processedUpdates = { ...updates };
     if (updates.parentPin && updates.parentPin.length === 4 && /^\d{4}$/.test(updates.parentPin)) {
-      processedUpdates.parentPin = await hashPin(updates.parentPin, familyId || 'local');
+      // Always hash with 'local' to match the salt used in setupFamily
+      processedUpdates.parentPin = await hashPin(updates.parentPin, 'local');
     }
     if (updates.parentName)  processedUpdates.parentName  = sanitize(updates.parentName, 60);
     if (updates.parentPhone) processedUpdates.parentPhone = sanitize(updates.parentPhone, 20);
@@ -617,10 +632,11 @@ export function AppProvider({ children }) {
     if (!family?.parentPin) return false;
     const storedPin = family.parentPin;
 
-    // Already a SHA-256 hex hash (64 chars) — use secure comparison
+    // Already a SHA-256 hex hash (64 chars) — use secure comparison.
+    // PINs are always hashed with familyId='local' (see setupFamily / updateParentProfile),
+    // so we must verify with the same salt regardless of Supabase mode.
     if (storedPin.length === 64) {
-      const fid = familyId || 'local';
-      return checkPin(pin, storedPin, fid);
+      return checkPin(pin, storedPin, 'local');
     }
 
     // Legacy plain-text PIN — verify then silently migrate to hashed version
