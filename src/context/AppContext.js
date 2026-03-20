@@ -336,12 +336,12 @@ export function AppProvider({ children }) {
     };
 
     if (SUPABASE_READY && familyId) {
-      // Supabase expects ISO string for timestamps
-      const dbTask = { ...newTask, created_at: new Date().toISOString() };
-      const { error } = await supabase.from('tasks').insert(dbTask);
+      // Strip camelCase fields — Supabase only knows snake_case columns
+      const { assignedTo: _a, ...supabaseTask } = { ...newTask, created_at: new Date().toISOString() };
+      const { error } = await supabase.from('tasks').insert(supabaseTask);
       if (error) throw error;
       // Optimistic update — don't rely solely on realtime subscription
-      setTasks(prev => [...prev, dbTask]);
+      setTasks(prev => [...prev, supabaseTask]);
     } else {
       await saveTasks([...tasks, newTask]);
     }
@@ -389,8 +389,10 @@ export function AppProvider({ children }) {
       // Auto-respawn recurring tasks
       if (task?.recurrence && task.recurrence !== 'none') {
         const kidId = task.assigned_to || task.assignedTo;
+        // Destructure out camelCase fields before Supabase insert
+        const { assignedTo: _a, approvedAt: _b, completedAt: _c, ...taskBase } = task;
         await supabase.from('tasks').insert({
-          ...task,
+          ...taskBase,
           id:           crypto.randomUUID(),
           assigned_to:  kidId,
           status:       'pending',

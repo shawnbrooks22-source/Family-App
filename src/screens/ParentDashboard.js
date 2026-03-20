@@ -681,27 +681,30 @@ function AddTaskTab() {
       return;
     }
 
-    await addTask({
-      title:        title.trim(),
-      reward:       reward.trim(),
-      notes:        notes.trim(),
-      assignedTo:   selectedKid,
-      assigned_to:  selectedKid,
-      emoji:        selectedEmoji,
-      recurrence,
-      due_date:     dueDate.trim() || null,
-      amount_cents: amountCents,
-    });
-
-    setTitle('');
-    setReward('');
-    setNotes('');
-    setSelectedKid(null);
-    setRecurrence('none');
-    setDueDate('');
-    setCashAmount('');
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 2500);
+    try {
+      await addTask({
+        title:        title.trim(),
+        reward:       reward.trim(),
+        notes:        notes.trim(),
+        assignedTo:   selectedKid,
+        assigned_to:  selectedKid,
+        emoji:        selectedEmoji,
+        recurrence,
+        due_date:     dueDate.trim() || null,
+        amount_cents: amountCents,
+      });
+      setTitle('');
+      setReward('');
+      setNotes('');
+      setSelectedKid(null);
+      setRecurrence('none');
+      setDueDate('');
+      setCashAmount('');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2500);
+    } catch (e) {
+      Alert.alert('Failed to assign quest', e?.message || 'Something went wrong. Please try again.');
+    }
   }
 
   return (
