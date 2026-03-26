@@ -253,7 +253,14 @@ export function AppProvider({ children }) {
       kids: (data.kids || []).map(k => ({ ...k, name: sanitize(k.name, 60) })),
     };
     if (SUPABASE_READY) {
-      await setupFamilyInSupabase(safeData);
+      try {
+        await setupFamilyInSupabase(safeData);
+      } catch (e) {
+        // Supabase unreachable (network error, paused project, wrong credentials, etc.)
+        // Fall back to local-only mode so setup always completes.
+        if (__DEV__) console.warn('Supabase setup failed — using local storage:', e);
+        await saveFamily(safeData);
+      }
     } else {
       await saveFamily(safeData);
     }
