@@ -9,7 +9,6 @@ import {
   Animated,
   Alert,
   StatusBar,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -17,8 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
-
-const { width } = Dimensions.get('window');
+import useDevice from '../hooks/useDevice';
 
 // ─── Gradient map ──────────────────────────────────────────────────────────────
 const GRADIENT_MAP = {
@@ -238,6 +236,7 @@ export default function KidDashboard({ route, navigation }) {
   const { family, tasks, completeTask, setKidGoal } = useApp();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, pad, fs } = useDevice();
   const kid = family.kids.find(k => k.id === kidId);
 
   // Normalize both field naming conventions (local = assignedTo, Supabase = assigned_to)
@@ -347,10 +346,11 @@ export default function KidDashboard({ route, navigation }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={[{ paddingBottom: 60 }, isTablet && { alignItems: 'center' }]}
       >
+        <View style={isTablet ? { width: '100%', maxWidth: 800 } : { width: '100%' }}>
         {/* ─── Gradient Header ──────────────────────────────────────────────── */}
-        <LinearGradient colors={[gradient[0], gradient[1]]} style={styles.header}>
+        <LinearGradient colors={[gradient[0], gradient[1]]} style={[styles.header, isTablet && { paddingHorizontal: pad }]}>
           {/* Back button */}
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -419,7 +419,7 @@ export default function KidDashboard({ route, navigation }) {
         </LinearGradient>
 
         {/* ─── Quest Board Content ───────────────────────────────────────────── */}
-        <View style={styles.content}>
+        <View style={[styles.content, isTablet && { padding: pad }]}>
 
           {/* ── Star Goal Card ─────────────────────────────────────────────── */}
           <View style={[styles.goalCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
@@ -587,6 +587,7 @@ export default function KidDashboard({ route, navigation }) {
               ))}
             </View>
           )}
+        </View>
         </View>
       </ScrollView>
     </View>

@@ -23,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import useDevice from '../hooks/useDevice';
 
 // ─── Built-in Chore Database ──────────────────────────────────────────────────
 // Each chore has: title, emoji, reward, why, tags (for interest matching), minAge, maxAge
@@ -143,6 +144,7 @@ export default function AIScreen({ navigation }) {
   const { family, addTask } = useApp();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, pad, fs } = useDevice();
 
   const [age,          setAge]          = useState('');
   const [interests,    setInterests]    = useState('');
@@ -395,6 +397,8 @@ export default function AIScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <View style={isTablet ? { paddingHorizontal: pad, alignItems: 'center' } : undefined}>
+          <View style={isTablet ? { width: '100%', maxWidth: 680 } : undefined}>
           {/* Config card */}
           <View style={styles.configCard}>
             <Text style={styles.sectionLabel}>{t('ai.assignTo')}</Text>
@@ -509,6 +513,8 @@ export default function AIScreen({ navigation }) {
           )}
 
           <View style={{ height: 40 }} />
+          </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

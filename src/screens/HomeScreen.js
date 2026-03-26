@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Modal,
   Animated,
-  Dimensions,
   ScrollView,
   StatusBar,
   Platform,
@@ -25,16 +24,7 @@ import {
   clearPinFailures,
   getPinLockoutStatus,
 } from '../lib/security';
-
-const { width } = Dimensions.get('window');
-
-const NUM_COLS = width >= 390 ? 3 : 2;
-const CARD_SIZE = (width - 48 - (NUM_COLS - 1) * 16) / NUM_COLS;
-const AVATAR_SIZE = CARD_SIZE - 16;
-
-// Key width: sheet has 28px padding each side, 3 keys, 10px gaps
-const KEY_W = Math.floor((width - 56 - 20) / 3);
-const KEY_H = 58;
+import useDevice from '../hooks/useDevice';
 
 const NUMPAD_ROWS = [
   ['1', '2', '3'],
@@ -657,6 +647,16 @@ export default function HomeScreen({ navigation }) {
   const { family, tasks, verifyPin, unlockParentZone, updateParentProfile, isCloudEnabled } = useApp();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, width, fs, pad, modalWidth } = useDevice();
+
+  // Responsive grid: 2 cols on small phones, 3 on phones, 5 on tablets
+  const NUM_COLS   = isTablet ? 5 : (width >= 390 ? 3 : 2);
+  const CARD_SIZE  = (width - pad * 2 - (NUM_COLS - 1) * 16) / NUM_COLS;
+  const AVATAR_SIZE = CARD_SIZE - 16;
+  // Numpad key width — scoped inside sheet (maxWidth 520 on tablet)
+  const sheetInner = isTablet ? Math.min(520, width * 0.72) : width;
+  const KEY_W = Math.floor((sheetInner - 56 - 20) / 3);
+  const KEY_H = isTablet ? 68 : 58;
   const [showPin,      setShowPin]      = useState(false);
   const [showWeekly,   setShowWeekly]   = useState(false);
   const [pin,          setPin]          = useState('');
@@ -891,29 +891,34 @@ export default function HomeScreen({ navigation }) {
       alignItems: 'center',
       paddingTop: 14,
       paddingBottom: 4,
-      paddingHorizontal: 24,
+      paddingHorizontal: pad,
     },
     appBarTitle: {
-      fontSize: 20,
+      fontSize: fs(20, 24),
       fontWeight: '800',
       color: colors.text1,
       letterSpacing: -0.3,
     },
 
     scrollContent: {
-      paddingHorizontal: 24,
-      paddingTop: 28,
+      paddingHorizontal: pad,
+      paddingTop: isTablet ? 40 : 28,
       paddingBottom: 60,
+      alignItems: isTablet ? 'center' : undefined,
+    },
+    scrollInner: {
+      width: '100%',
+      maxWidth: isTablet ? 900 : undefined,
     },
     greeting: {
-      fontSize: 15,
+      fontSize: fs(15, 18),
       fontWeight: '600',
       color: colors.text3,
       textAlign: 'center',
       marginBottom: 4,
     },
     whoTitle: {
-      fontSize: 34,
+      fontSize: fs(34, 42),
       fontWeight: '800',
       color: colors.text1,
       textAlign: 'center',
@@ -956,22 +961,28 @@ export default function HomeScreen({ navigation }) {
     },
 
     // ─── PIN Modal
-    modalRoot:    { flex: 1, justifyContent: 'flex-end' },
+    modalRoot: {
+      flex: 1,
+      justifyContent: isTablet ? 'center' : 'flex-end',
+      alignItems: isTablet ? 'center' : undefined,
+    },
     modalBackdrop: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(15,23,42,0.55)',
     },
     pinSheet: {
       backgroundColor: colors.surface,
-      borderTopLeftRadius: 32,
-      borderTopRightRadius: 32,
+      borderRadius: isTablet ? 32 : undefined,
+      borderTopLeftRadius: isTablet ? 32 : 32,
+      borderTopRightRadius: isTablet ? 32 : 32,
       paddingHorizontal: 28,
       paddingTop: 14,
-      paddingBottom: 12,
+      paddingBottom: isTablet ? 28 : 12,
       alignItems: 'center',
+      width: modalWidth,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: -8 },
-      shadowOpacity: 0.12,
+      shadowOffset: { width: 0, height: isTablet ? 8 : -8 },
+      shadowOpacity: 0.16,
       shadowRadius: 24,
       elevation: 20,
     },
@@ -991,14 +1002,14 @@ export default function HomeScreen({ navigation }) {
       marginBottom: 12,
     },
     pinSheetTitle: {
-      fontSize: 24,
+      fontSize: fs(24, 28),
       fontWeight: '800',
       color: colors.text1,
       marginBottom: 4,
       letterSpacing: -0.3,
     },
     pinSheetSub: {
-      fontSize: 14,
+      fontSize: fs(14, 16),
       color: colors.text3,
       fontWeight: '500',
       marginBottom: 22,
@@ -1090,27 +1101,29 @@ export default function HomeScreen({ navigation }) {
     // ─── Recovery modal
     recoverySheet: {
       backgroundColor: colors.surface,
+      borderRadius: isTablet ? 32 : undefined,
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
       paddingHorizontal: 28,
       paddingTop: 14,
-      paddingBottom: 12,
+      paddingBottom: isTablet ? 28 : 12,
       alignItems: 'center',
+      width: modalWidth,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: -8 },
+      shadowOffset: { width: 0, height: isTablet ? 8 : -8 },
       shadowOpacity: 0.12,
       shadowRadius: 24,
       elevation: 20,
     },
     recoveryTitle: {
-      fontSize: 24,
+      fontSize: fs(24, 28),
       fontWeight: '800',
       color: colors.text1,
       marginBottom: 8,
       letterSpacing: -0.3,
     },
     recoverySub: {
-      fontSize: 14,
+      fontSize: fs(14, 16),
       color: colors.text3,
       fontWeight: '500',
       marginBottom: 20,
@@ -1176,6 +1189,7 @@ export default function HomeScreen({ navigation }) {
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.scrollInner}>
         <Text style={styles.greeting}>{t('home.greeting')} 👋</Text>
         <Text style={styles.whoTitle}>{t('home.whoIsHere')}</Text>
         <View style={styles.familySubRow}>
@@ -1219,6 +1233,7 @@ export default function HomeScreen({ navigation }) {
         {family.kids.length >= 2 && (
           <LeaderboardBanner kidStars={kidStarsForLeaderboard} colors={colors} t={t} />
         )}
+        </View>
       </ScrollView>
 
       {/* ─── Weekly Summary Modal ─────────────────────────────────────────────── */}

@@ -21,11 +21,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import useDevice from '../hooks/useDevice';
 
 export default function JoinScreen({ navigation }) {
   const { joinFamilyByCode } = useApp();
   const { colors, shadows } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, pad } = useDevice();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -188,6 +190,8 @@ export default function JoinScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <View style={isTablet ? { paddingHorizontal: pad, alignItems: 'center' } : undefined}>
+          <View style={isTablet ? { width: '100%', maxWidth: 520 } : undefined}>
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>{t('join.inviteCode')}</Text>
             <TextInput
@@ -225,6 +229,8 @@ export default function JoinScreen({ navigation }) {
             <Text style={styles.infoText}>
               {t('join.howItWorksText')}
             </Text>
+          </View>
+          </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

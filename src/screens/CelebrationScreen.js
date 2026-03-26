@@ -6,13 +6,11 @@ import {
   TouchableOpacity,
   Animated,
   StatusBar,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
-
-const { width, height } = Dimensions.get('window');
+import useDevice from '../hooks/useDevice';
 
 // ─── Particle config: two rings (inner tight, outer wide) ──────────────────────
 const NUM_PARTICLES = 30;
@@ -36,6 +34,7 @@ export default function CelebrationScreen({ route, navigation }) {
   const { taskId, reward, kidName } = route.params || {};
   const { markCelebrated } = useApp();
   const { t } = useTranslation();
+  const { isTablet, pad } = useDevice();
   const [phase, setPhase] = useState('suspense');
 
   // Mark celebrated right away so KidDashboard won't re-trigger navigation
@@ -328,7 +327,7 @@ export default function CelebrationScreen({ route, navigation }) {
         ))}
       </View>
 
-      <View style={styles.revealedCenter}>
+      <View style={[styles.revealedCenter, isTablet && { maxWidth: 600, paddingHorizontal: pad }]}>
         {/* Trophy */}
         <Animated.Text
           style={[styles.trophyEmoji, { transform: [{ scale: trophyScale }, { rotate: trophyDeg }] }]}

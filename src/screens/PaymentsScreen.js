@@ -30,6 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import useDevice from '../hooks/useDevice';
 
 // Lazy-load WebView to avoid crashes when react-native-webview isn't installed
 let WebView = null;
@@ -119,6 +120,7 @@ export default function PaymentsScreen({ navigation }) {
   const { family, familyId, setupPaymentMethod, recordPayout, transactions, loadTransactions } = useApp();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, pad, modalWidth } = useDevice();
 
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardLoading,   setCardLoading]   = useState(false);
@@ -193,6 +195,8 @@ export default function PaymentsScreen({ navigation }) {
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
+        <View style={isTablet ? { paddingHorizontal: pad, alignItems: 'center' } : undefined}>
+        <View style={isTablet ? { width: '100%', maxWidth: 720 } : undefined}>
         {/* ── Not-configured notice ──────────────────────────────────────── */}
         {!STRIPE_READY && (
           <View style={[styles.noticeCard, { borderColor: '#FCD34D', backgroundColor: '#FFFBEB' }]}>
@@ -315,6 +319,8 @@ export default function PaymentsScreen({ navigation }) {
         )}
 
         <View style={{ height: 40 }} />
+        </View>
+        </View>
       </ScrollView>
 
       {/* ── Stripe Card Modal ──────────────────────────────────────────────── */}

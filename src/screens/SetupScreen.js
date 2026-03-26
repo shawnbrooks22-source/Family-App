@@ -11,7 +11,6 @@ import {
   Alert,
   StatusBar,
   Animated,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,8 +18,7 @@ import { useApp } from '../context/AppContext';
 import { kidColors } from '../theme/index';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
-
-const { width } = Dimensions.get('window');
+import useDevice from '../hooks/useDevice';
 
 const PARENT_EMOJIS = ['👑', '🦸', '🧙', '⭐', '🏆', '💫', '🌟', '🎯'];
 const KID_EMOJIS = ['🦊', '🐱', '🐶', '🐸', '🐻', '🦁', '🐼', '🦄', '🐯', '🐰', '🦋', '🐬'];
@@ -283,6 +281,7 @@ export default function SetupScreen() {
   const { setupFamily, family } = useApp();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, fs, pad, contentWidth } = useDevice();
   const [consentGiven, setConsentGiven] = useState(false);
   const [step, setStep]       = useState(1);
   const [saving, setSaving]   = useState(false);
@@ -376,12 +375,12 @@ export default function SetupScreen() {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 24,
+      paddingHorizontal: pad,
       paddingTop: 12,
       paddingBottom: 12,
     },
     logoText: {
-      fontSize: 20,
+      fontSize: fs(20, 24),
       fontWeight: '800',
       color: colors.text1,
       letterSpacing: -0.3,
@@ -410,22 +409,27 @@ export default function SetupScreen() {
 
     // Scroll
     scroll: {
-      paddingHorizontal: 24,
+      paddingHorizontal: isTablet ? pad : 24,
       paddingBottom: 60,
+      alignItems: isTablet ? 'center' : undefined,
+    },
+    scrollInner: {
+      width: '100%',
+      maxWidth: isTablet ? 600 : undefined,
     },
 
     // Step content
-    stepContent: { paddingTop: 32 },
+    stepContent: { paddingTop: isTablet ? 48 : 32 },
     stepTitle: {
-      fontSize: 32,
+      fontSize: fs(32, 40),
       fontWeight: '800',
       color: colors.text1,
       letterSpacing: -0.6,
-      lineHeight: 40,
+      lineHeight: isTablet ? 50 : 40,
       marginBottom: 8,
     },
     stepSub: {
-      fontSize: 15,
+      fontSize: fs(15, 17),
       color: colors.text3,
       fontWeight: '500',
       marginBottom: 8,
@@ -635,6 +639,7 @@ export default function SetupScreen() {
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets={true}
       >
+        <View style={styles.scrollInner}>
         {step === 1 ? (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>{t('setup.title')}</Text>
@@ -814,6 +819,7 @@ export default function SetupScreen() {
             </TouchableOpacity>
           </View>
         )}
+        </View>
       </ScrollView>
       </KeyboardAvoidingView>
     </View>

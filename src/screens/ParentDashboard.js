@@ -23,8 +23,22 @@ import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../i18n/index';
 import { kidColors, shadows } from '../theme/index';
+import useDevice from '../hooks/useDevice';
 
 const Tab = createBottomTabNavigator();
+
+// Tablet-aware content wrapper used inside each tab's ScrollView
+function TabContent({ children }) {
+  const { isTablet } = useDevice();
+  if (!isTablet) return <>{children}</>;
+  return (
+    <View style={{ alignItems: 'center', width: '100%' }}>
+      <View style={{ width: '100%', maxWidth: 800 }}>
+        {children}
+      </View>
+    </View>
+  );
+}
 
 const TASK_EMOJIS = [
   '🧹', '🧽', '🛁', '📚', '🍽️', '🌱', '🐕', '🛏️',
@@ -100,6 +114,7 @@ function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { tasks, family, approveTask, chargeForTask, refreshParentSession } = useApp();
+  const { isTablet, pad } = useDevice();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
 
   const totalTasks   = tasks.length;
@@ -187,7 +202,11 @@ function HomeTab({ navigation }) {
         }
       />
 
-      <ScrollView contentContainerStyle={styles.tabScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.tabScroll, isTablet && { paddingHorizontal: pad }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <TabContent>
         {/* Stats row */}
         <View style={styles.statsRow}>
           <StatCard label={t('parentDashboard.total')} value={totalTasks} color={colors.primary} icon="list" />
@@ -266,6 +285,7 @@ function HomeTab({ navigation }) {
         >
           <Text style={[styles.homeBtnText, { color: colors.text2 }]}>{t('parentDashboard.backToHome')}</Text>
         </TouchableOpacity>
+        </TabContent>
       </ScrollView>
     </View>
   );
@@ -344,6 +364,7 @@ function TasksTab() {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { tasks, family, deleteTask, editTask } = useApp();
+  const { isTablet, pad } = useDevice();
   const [filter, setFilter] = useState('all');
   const [editingTask, setEditingTask] = useState(null);
 
@@ -450,7 +471,11 @@ function TasksTab() {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.tabScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.tabScroll, isTablet && { paddingHorizontal: pad }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <TabContent>
         {filtered.length === 0 ? (
           <EmptyState icon="📝" title={t('parentDashboard.noQuestsHere')} sub={t('parentDashboard.tryDifferentFilter')} />
         ) : (
@@ -509,6 +534,7 @@ function TasksTab() {
             );
           })
         )}
+        </TabContent>
       </ScrollView>
 
       {/* ── Edit Task Modal ───────────────────────────────────────────────── */}
@@ -699,6 +725,7 @@ function AddTaskTab() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { family, addTask, refreshParentSession } = useApp();
+  const { isTablet, pad } = useDevice();
   const [title, setTitle] = useState('');
   const [reward, setReward] = useState('');
   const [notes, setNotes] = useState('');
@@ -760,11 +787,12 @@ function AddTaskTab() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
-          contentContainerStyle={styles.tabScroll}
+          contentContainerStyle={[styles.tabScroll, isTablet && { paddingHorizontal: pad }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={true}
         >
+          <TabContent>
           {success && (
           <View style={[styles.successBanner, { backgroundColor: colors.successLight, borderColor: colors.success + '40' }]}>
             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
@@ -946,6 +974,7 @@ function AddTaskTab() {
             {loading ? 'Assigning…' : t('parentDashboard.assignQuest')}
           </Text>
         </TouchableOpacity>
+          </TabContent>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -958,6 +987,7 @@ function FamilyTab({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { family, addKid, removeKid, editKid, refreshParentSession } = useApp();
+  const { isTablet, pad } = useDevice();
   const [showAdd, setShowAdd] = useState(false);
   const [kidName, setKidName] = useState('');
   const [kidPhone, setKidPhone] = useState('');
@@ -1027,11 +1057,12 @@ function FamilyTab({ navigation }) {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
-          contentContainerStyle={styles.tabScroll}
+          contentContainerStyle={[styles.tabScroll, isTablet && { paddingHorizontal: pad }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={true}
         >
+        <TabContent>
         {/* Parent */}
         <Text style={[styles.sectionLabel, { color: colors.text3 }]}>{t('parentDashboard.parent_label')}</Text>
         <View style={[styles.memberCard, { backgroundColor: colors.surface }]}>
@@ -1167,6 +1198,7 @@ function FamilyTab({ navigation }) {
             </View>
           </View>
         )}
+        </TabContent>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -1331,6 +1363,7 @@ function SettingsTab({ navigation }) {
   const { colors, isDark, toggleDark } = useTheme();
   const { t, i18n } = useTranslation();
   const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled } = useApp();
+  const { isTablet, pad } = useDevice();
 
   // Parent profile edit
   const [editName,  setEditName]  = useState(family.parentName);
@@ -1436,11 +1469,12 @@ function SettingsTab({ navigation }) {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
-          contentContainerStyle={styles.tabScroll}
+          contentContainerStyle={[styles.tabScroll, isTablet && { paddingHorizontal: pad }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={true}
         >
+          <TabContent>
           {/* ── Parent Profile ──────────────────────────────────────────────── */}
         <Text style={[styles.settingsSectionLabel, { color: colors.text3 }]}>{t('settings.parentProfile')}</Text>
         <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
@@ -1757,6 +1791,7 @@ function SettingsTab({ navigation }) {
         </View>
 
           <View style={{ height: 20 }} />
+          </TabContent>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

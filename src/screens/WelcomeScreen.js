@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import useDevice from '../hooks/useDevice';
 
 const { width, height } = Dimensions.get('window');
 
@@ -52,6 +53,7 @@ export default function WelcomeScreen({ navigation }) {
   const { isCloudEnabled } = useApp();
   const { colors, shadows } = useTheme();
   const { t } = useTranslation();
+  const { isTablet, fs } = useDevice();
 
   const logoAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -85,25 +87,25 @@ export default function WelcomeScreen({ navigation }) {
       <Bubble size={90}  color="rgba(255,255,255,0.07)" x={-30}        y={height * 0.7}  delay={600}  />
       <Bubble size={140} color="rgba(255,255,255,0.05)" x={width - 60}  y={height * 0.65} delay={300} />
 
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={[styles.safe, isTablet && { paddingHorizontal: 80 }]}>
         <Animated.View
           style={[
             styles.logoSection,
             { opacity: fadeAnim, transform: [{ scale: logoAnim }] },
           ]}
         >
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoEmoji}>🌟</Text>
+          <View style={[styles.logoCircle, isTablet && { width: 160, height: 160, borderRadius: 80 }]}>
+            <Text style={[styles.logoEmoji, isTablet && { fontSize: 84 }]}>🌟</Text>
           </View>
-          <Text style={styles.appName}>{t('appName')}</Text>
-          <Text style={styles.tagline}>{t('welcome.tagline')}</Text>
+          <Text style={[styles.appName, { fontSize: fs(52, 68) }]}>{t('appName')}</Text>
+          <Text style={[styles.tagline, { fontSize: fs(18, 22) }]}>{t('welcome.tagline')}</Text>
         </Animated.View>
 
         {/* Feature pills */}
         <Animated.View style={[styles.pills, { opacity: fadeAnim }]}>
           {[t('welcome.earnStars'), t('welcome.winRewards'), t('welcome.completeQuests')].map(pill => (
             <View key={pill} style={styles.pill}>
-              <Text style={styles.pillText}>{pill}</Text>
+              <Text style={[styles.pillText, { fontSize: fs(14, 16) }]}>{pill}</Text>
             </View>
           ))}
         </Animated.View>
@@ -112,6 +114,7 @@ export default function WelcomeScreen({ navigation }) {
         <Animated.View
           style={[
             styles.ctaSection,
+            isTablet && { maxWidth: 480, alignSelf: 'center' },
             { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
@@ -120,7 +123,7 @@ export default function WelcomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Setup')}
             activeOpacity={0.88}
           >
-            <Text style={[styles.primaryBtnText, { color: colors.primary }]}>{t('welcome.createFamily')}</Text>
+            <Text style={[styles.primaryBtnText, { color: colors.primary, fontSize: fs(18, 20) }]}>{t('welcome.createFamily')}</Text>
           </TouchableOpacity>
 
           {isCloudEnabled && (
@@ -129,7 +132,7 @@ export default function WelcomeScreen({ navigation }) {
               onPress={() => navigation.navigate('Join')}
               activeOpacity={0.88}
             >
-              <Text style={styles.secondaryBtnText}>{t('welcome.joinCode')}</Text>
+              <Text style={[styles.secondaryBtnText, { fontSize: fs(17, 19) }]}>{t('welcome.joinCode')}</Text>
             </TouchableOpacity>
           )}
 
