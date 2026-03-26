@@ -14,11 +14,32 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Localization from 'expo-localization';
 import { useApp } from '../context/AppContext';
 import { kidColors } from '../theme/index';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import useDevice from '../hooks/useDevice';
+
+// EU country codes for GDPR detection
+const EU_REGIONS = new Set([
+  'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI',
+  'FR','GR','HR','HU','IE','IT','LT','LU','LV','MT',
+  'NL','PL','PT','RO','SE','SI','SK',
+  // EEA additions
+  'IS','LI','NO',
+  // UK GDPR
+  'GB',
+]);
+
+function isEuUser() {
+  try {
+    const region = Localization.getLocales?.()[0]?.regionCode;
+    return region ? EU_REGIONS.has(region.toUpperCase()) : false;
+  } catch {
+    return false;
+  }
+}
 
 const PARENT_EMOJIS = ['👑', '🦸', '🧙', '⭐', '🏆', '💫', '🌟', '🎯'];
 const KID_EMOJIS = ['🦊', '🐱', '🐶', '🐸', '🐻', '🦁', '🐼', '🦄', '🐯', '🐰', '🦋', '🐬'];
@@ -93,7 +114,10 @@ function Field({ label, optional, hint, colors, t, ...inputProps }) {
 
 // ─── COPPA Consent Screen ──────────────────────────────────────────────────────
 function ConsentScreen({ onAccept, colors, shadows, t }) {
-  const [checked, setChecked] = useState(false);
+  const [checked,      setChecked]      = useState(false);
+  const [gdprChecked,  setGdprChecked]  = useState(false);
+  const showGdpr = isEuUser();
+  const allChecked = checked && (!showGdpr || gdprChecked);
 
   const consentStyles = StyleSheet.create({
     scroll: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 20 },
@@ -248,6 +272,30 @@ function ConsentScreen({ onAccept, colors, shadows, t }) {
         </Text>
       </View>
 
+      {/* GDPR section — only shown for EU users */}
+      {showGdpr && (
+        <View style={[consentStyles.coppaNote, { borderColor: '#3B82F680', backgroundColor: '#EFF6FF' }]}>
+          <Text style={[consentStyles.coppaTitle, { color: '#1D4ED8' }]}>🇪🇺 GDPR — Your Data Rights</Text>
+          <Text style={[consentStyles.coppaText, { color: '#1E40AF' }]}>
+            Under GDPR you have the right to access, correct, export, or erase your data at any time.
+            You can delete all family data from Parent Settings → Reset All Data. We act as data controller
+            for any information stored in our cloud. Data is held within the EU where possible.
+          </Text>
+          <TouchableOpacity
+            style={consentStyles.checkRow}
+            onPress={() => setGdprChecked(c => !c)}
+            activeOpacity={0.7}
+          >
+            <View style={[consentStyles.checkbox, gdprChecked && consentStyles.checkboxChecked]}>
+              {gdprChecked && <Text style={consentStyles.checkmark}>✓</Text>}
+            </View>
+            <Text style={[consentStyles.checkLabel, { color: '#1D4ED8' }]}>
+              I understand my GDPR rights and consent to data processing as described above.
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Checkbox */}
       <TouchableOpacity
         style={consentStyles.checkRow}
@@ -263,10 +311,10 @@ function ConsentScreen({ onAccept, colors, shadows, t }) {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[consentStyles.acceptBtn, !checked && { opacity: 0.4 }]}
-        onPress={checked ? onAccept : undefined}
-        activeOpacity={checked ? 0.85 : 1}
-        disabled={!checked}
+        style={[consentStyles.acceptBtn, !allChecked && { opacity: 0.4 }]}
+        onPress={allChecked ? onAccept : undefined}
+        activeOpacity={allChecked ? 0.85 : 1}
+        disabled={!allChecked}
       >
         <Text style={consentStyles.acceptBtnText}>{t('setup.setupMyFamily')}</Text>
       </TouchableOpacity>
@@ -277,7 +325,7 @@ function ConsentScreen({ onAccept, colors, shadows, t }) {
 }
 
 // ─── Main SetupScreen ──────────────────────────────────────────────────────────
-export default function SetupScreen() {
+export default function SetupScreen({ route }) {
   const { setupFamily, family } = useApp();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useTranslation();
@@ -287,8 +335,8 @@ export default function SetupScreen() {
   const [saving, setSaving]   = useState(false);
   const progressAnim = useRef(new Animated.Value(0.5)).current;
 
-  // Step 1 state
-  const [parentName, setParentName] = useState('');
+  // Step 1 state — pre-populate from Apple Sign-In params if available
+  const [parentName, setParentName] = useState(route?.params?.parentName || '');
   const [parentPhone, setParentPhone] = useState('');
   const [parentPin, setParentPin] = useState('');
   const [parentEmoji, setParentEmoji] = useState('👑');

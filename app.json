@@ -7,6 +7,7 @@
     "userInterfaceStyle": "automatic",
     "description": "Kindo helps families manage kids' chores and rewards. Assign quests, track progress, and pay real money — all in one place.",
     "privacyPolicyUrl": "https://kindo.app/privacy",
+    "scheme": "kindo",
     "splash": {
       "backgroundColor": "#7C3AED"
     },
@@ -15,9 +16,12 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.kindo.app",
       "buildNumber": "1",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Kindo notifies you when quests are completed or approved.",
-        "NSCameraUsageDescription": "Used to take a photo of your child completing a quest.",
+        "NSCameraUsageDescription": "Take a photo to prove your quest is done.",
+        "NSPhotoLibraryUsageDescription": "Choose a photo from your library to prove your quest is done.",
+        "NSFaceIDUsageDescription": "Use Face ID to unlock the Parent Zone quickly.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -31,7 +35,11 @@
         "android.permission.INTERNET",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {},
@@ -41,6 +49,21 @@
         {
           "color": "#7C3AED",
           "defaultChannel": "default"
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Kindo uses your photos to attach proof to completed quests.",
+          "cameraPermission": "Kindo uses the camera to take a photo proving a quest is done."
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "YOUR_SENTRY_ORG",
+          "project": "kindo"
         }
       ]
     ],

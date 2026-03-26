@@ -11,8 +11,10 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +68,55 @@ function getStarTitle(stars) {
   return '🌟 RISING STAR';
 }
 
+// ─── Badge definitions ─────────────────────────────────────────────────────────
+const BADGE_DEFS = [
+  { id: 'first_quest',   emoji: '🌟', name: 'First Quest',     desc: 'Complete your first quest',   check: (stars, streak) => stars >= 1 },
+  { id: 'collector',     emoji: '⭐', name: 'Star Collector',  desc: 'Earn 5 stars',                check: (stars)         => stars >= 5 },
+  { id: 'hero',          emoji: '💫', name: 'Quest Hero',      desc: 'Earn 15 stars',               check: (stars)         => stars >= 15 },
+  { id: 'legend',        emoji: '✨', name: 'Star Legend',     desc: 'Earn 30 stars',               check: (stars)         => stars >= 30 },
+  { id: 'streak3',       emoji: '🔥', name: 'On a Roll',       desc: '3-day streak',                check: (s, streak)     => streak >= 3 },
+  { id: 'streak7',       emoji: '🚀', name: 'Streak Master',   desc: '7-day streak',                check: (s, streak)     => streak >= 7 },
+  { id: 'photo_pro',     emoji: '📸', name: 'Photo Pro',       desc: 'Submit photo proof',          check: (s, st, tasks)  => tasks.some(t => t.photo_proof_uri) },
+];
+
+function getBadges(stars, streak, kidTasks) {
+  return BADGE_DEFS.filter(b => b.check(stars, streak, kidTasks));
+}
+
+// ─── Badges Section ────────────────────────────────────────────────────────────
+function BadgesSection({ stars, streak, kidTasks, colors }) {
+  const earned = getBadges(stars, streak, kidTasks);
+  if (earned.length === 0) return null;
+  return (
+    <View style={{ marginBottom: 20 }}>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text3, marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+        🏅 Badges Earned
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {earned.map(badge => (
+          <View
+            key={badge.id}
+            style={{
+              backgroundColor: colors.primaryLight,
+              borderRadius: 20,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              borderWidth: 1,
+              borderColor: colors.primary + '30',
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>{badge.emoji}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{badge.name}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── Stat chip ─────────────────────────────────────────────────────────────────
 function StatChip({ emoji, value, label }) {
   return (
@@ -109,7 +160,44 @@ function QuestCard({ task, index, onDone, kidColor }) {
     Animated.sequence([
       Animated.spring(cardScale, { toValue: 0.93, friction: 6, useNativeDriver: true }),
       Animated.spring(cardScale, { toValue: 1, friction: 4, tension: 140, useNativeDriver: true }),
-    ]).start(() => onDone && onDone());
+    ]).start(() => {
+      // Ask if the kid wants to add photo proof
+      Alert.alert(
+        '📸 Add Photo Proof?',
+        'Take or choose a photo to show the parent you did it!',
+        [
+          {
+            text: '📷 Take Photo',
+            onPress: async () => {
+              const perm = await ImagePicker.requestCameraPermissionsAsync();
+              if (!perm.granted) { onDone && onDone(); return; }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.6,
+              });
+              onDone && onDone(result.canceled ? undefined : result.assets[0].uri);
+            },
+          },
+          {
+            text: '🖼️ Choose Photo',
+            onPress: async () => {
+              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!perm.granted) { onDone && onDone(); return; }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.6,
+              });
+              onDone && onDone(result.canceled ? undefined : result.assets[0].uri);
+            },
+          },
+          { text: 'Skip', style: 'cancel', onPress: () => onDone && onDone() },
+        ]
+      );
+    });
   }
 
   return (
@@ -538,9 +626,9 @@ export default function KidDashboard({ route, navigation }) {
                   task={task}
                   index={i}
                   kidColor={kid.color}
-                  onDone={async () => {
+                  onDone={async (photoUri) => {
                     try {
-                      await completeTask(task.id);
+                      await completeTask(task.id, photoUri);
                     } catch (e) {
                       Alert.alert('Could not complete quest', e?.message || 'Something went wrong. Please try again.');
                     }
@@ -564,6 +652,14 @@ export default function KidDashboard({ route, navigation }) {
               ))}
             </View>
           )}
+
+          {/* ── Badges ── */}
+          <BadgesSection
+            stars={totalStars}
+            streak={kid?.streak || 0}
+            kidTasks={kidTasks}
+            colors={colors}
+          />
 
           {/* ── Rewards won */}
           {celebratedTasks.length > 0 && (

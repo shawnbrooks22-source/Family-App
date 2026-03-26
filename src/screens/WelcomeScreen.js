@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -54,10 +57,38 @@ export default function WelcomeScreen({ navigation }) {
   const { colors, shadows } = useTheme();
   const { t } = useTranslation();
   const { isTablet, fs } = useDevice();
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const logoAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
+    }
+  }, []);
+
+  async function handleAppleSignIn() {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      // Apple returns the name only on first sign-in — cache it if available
+      const firstName = credential.fullName?.givenName || '';
+      const lastName  = credential.fullName?.familyName || '';
+      const name      = [firstName, lastName].filter(Boolean).join(' ');
+      // Navigate to Setup with pre-filled parent name
+      navigation.navigate('Setup', { appleUserId: credential.user, parentName: name });
+    } catch (e) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Apple Sign-In failed', 'Please try again or create a family manually.');
+      }
+    }
+  }
 
   useEffect(() => {
     Animated.sequence([
@@ -125,6 +156,16 @@ export default function WelcomeScreen({ navigation }) {
           >
             <Text style={[styles.primaryBtnText, { color: colors.primary, fontSize: fs(18, 20) }]}>{t('welcome.createFamily')}</Text>
           </TouchableOpacity>
+
+          {appleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={16}
+              style={{ width: '100%', height: 52, marginTop: 8 }}
+              onPress={handleAppleSignIn}
+            />
+          )}
 
           {isCloudEnabled && (
             <TouchableOpacity

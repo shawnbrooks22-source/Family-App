@@ -402,9 +402,13 @@ export function AppProvider({ children }) {
     }
   }
 
-  async function completeTask(taskId) {
+  async function completeTask(taskId, photoUri) {
     const task = tasks.find(t => t.id === taskId);
-    const updates = { status: 'completed', completed_at: Date.now() };
+    const updates = {
+      status:       'completed',
+      completed_at: Date.now(),
+      ...(photoUri ? { photo_proof_uri: photoUri } : {}),
+    };
 
     if (SUPABASE_READY && familyId) {
       await supabase.from('tasks').update(updates).eq('id', taskId);

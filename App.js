@@ -1,12 +1,14 @@
 // Polyfill URL for Supabase (must be first import)
 import 'react-native-url-polyfill/auto';
+import * as Sentry from '@sentry/react-native';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/context/AppContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import { initI18n } from './src/i18n/index';
 import WelcomeScreen      from './src/screens/WelcomeScreen';
 import HomeScreen         from './src/screens/HomeScreen';
@@ -18,7 +20,30 @@ import CelebrationScreen  from './src/screens/CelebrationScreen';
 import AIScreen           from './src/screens/AIScreen';
 import PaymentsScreen     from './src/screens/PaymentsScreen';
 
+// ─── Sentry (crash reporting) ──────────────────────────────────────────────────
+// Set EXPO_PUBLIC_SENTRY_DSN in your .env to enable.
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0.2,   // 20% of sessions captured for performance
+    environment: __DEV__ ? 'development' : 'production',
+  });
+}
+
 const Stack = createNativeStackNavigator();
+
+// Deep-link configuration: kindo://join/CODE  →  JoinScreen
+const linking = {
+  prefixes: ['kindo://', 'https://kindo.app'],
+  config: {
+    screens: {
+      Welcome: 'welcome',
+      Join: 'join/:code',
+      Home: 'home',
+    },
+  },
+};
 
 function AppNavigator() {
   const { isLoaded, family } = useApp();
@@ -54,7 +79,6 @@ function AppNavigator() {
           <Stack.Screen name="Celebration" component={CelebrationScreen} />
           <Stack.Screen name="AI"       component={AIScreen}       options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="Payments" component={PaymentsScreen} options={{ animation: 'slide_from_right' }} />
-          {/* Allow re-joining/switching family from within the app */}
           <Stack.Screen name="Join"     component={JoinScreen}     options={{ animation: 'slide_from_right' }} />
         </>
       )}
@@ -62,7 +86,7 @@ function AppNavigator() {
   );
 }
 
-export default function App() {
+function AppRoot() {
   const [i18nReady, setI18nReady] = useState(false);
 
   useEffect(() => {
@@ -81,12 +105,17 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <ThemeProvider>
-          <NavigationContainer>
-            <AppNavigator />
-          </NavigationContainer>
-        </ThemeProvider>
+        <SubscriptionProvider>
+          <ThemeProvider>
+            <NavigationContainer linking={linking}>
+              <AppNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SubscriptionProvider>
       </AppProvider>
     </SafeAreaProvider>
   );
 }
+
+// Wrap with Sentry error boundary in production
+export default SENTRY_DSN ? Sentry.wrap(AppRoot) : AppRoot;

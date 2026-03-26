@@ -13,6 +13,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
@@ -667,6 +668,43 @@ export default function HomeScreen({ navigation }) {
   const [revealIdx,    setRevealIdx]    = useState(-1);
   const revealTimer   = useRef(null);
   const lockoutTimer  = useRef(null);
+
+  // Biometric state
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType,      setBiometricType]      = useState(null); // 'face' | 'fingerprint' | null
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled   = await LocalAuthentication.isEnrolledAsync();
+        if (compatible && enrolled) {
+          setBiometricAvailable(true);
+          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+          const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+          setBiometricType(hasFace ? 'face' : 'fingerprint');
+        }
+      } catch { /* silently ignore on simulators/emulators */ }
+    })();
+  }, []);
+
+  async function tryBiometric() {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage:    'Unlock Parent Zone',
+        fallbackLabel:    'Use PIN',
+        cancelLabel:      'Cancel',
+        disableDeviceFallback: false,
+      });
+      if (result.success) {
+        await unlockParentZone();
+        closePin();
+        setTimeout(() => navigation.navigate('Parent'), 280);
+      }
+    } catch {
+      // Biometric not available — user falls back to PIN
+    }
+  }
 
   // PIN Recovery
   const [showRecovery,    setShowRecovery]    = useState(false);
@@ -1327,6 +1365,18 @@ export default function HomeScreen({ navigation }) {
               disabled={lockoutActive}
               colors={colors}
             />
+
+            {/* ── Biometric button ── */}
+            {biometricAvailable && !lockoutActive && (
+              <TouchableOpacity
+                style={[styles.cancelBtn, { backgroundColor: colors.primaryLight, marginTop: 4 }]}
+                onPress={tryBiometric}
+              >
+                <Text style={[styles.cancelBtnText, { color: colors.primary, fontWeight: '700' }]}>
+                  {biometricType === 'face' ? '🔬 Use Face ID' : '👆 Use Touch ID'}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={styles.cancelBtn} onPress={closePin}>
               <Text style={styles.cancelBtnText}>{t('cancel')}</Text>

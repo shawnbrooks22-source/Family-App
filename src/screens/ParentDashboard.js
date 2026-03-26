@@ -14,6 +14,8 @@ import {
   Modal,
   AppState,
   ActivityIndicator,
+  Image,
+  Share,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -342,6 +344,18 @@ function ApprovalCard({ task, kid, onApprove }) {
           </View>
         )}
       </View>
+
+      {/* Photo proof thumbnail */}
+      {task.photo_proof_uri ? (
+        <View style={{ marginBottom: 12 }}>
+          <Text style={[styles.approvalNotes, { color: colors.text3, marginBottom: 6 }]}>📸 Photo Proof</Text>
+          <Image
+            source={{ uri: task.photo_proof_uri }}
+            style={{ width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.divider }}
+            resizeMode="cover"
+          />
+        </View>
+      ) : null}
 
       {/* Approve button */}
       <TouchableOpacity style={[styles.approveBtn, { backgroundColor: colors.success }]} onPress={onApprove} activeOpacity={0.85}>
@@ -1770,6 +1784,19 @@ function SettingsTab({ navigation }) {
               <Text style={[styles.inviteCodeHint, { color: colors.text3 }]}>
                 {t('settings.inviteCodeHint')}
               </Text>
+              <TouchableOpacity
+                style={[styles.assignBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
+                onPress={() => {
+                  Share.share({
+                    title: 'Join my Kindo family!',
+                    message: `Hey! Join my family on Kindo 🌟\n\nUse invite code: ${family.inviteCode}\nOr tap this link: kindo://join/${family.inviteCode}`,
+                  });
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="share-outline" size={18} color="#fff" />
+                <Text style={styles.assignBtnText}>Share Invite Link</Text>
+              </TouchableOpacity>
             </View>
           </>
         )}
