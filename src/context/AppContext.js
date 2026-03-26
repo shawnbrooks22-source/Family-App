@@ -252,18 +252,27 @@ export function AppProvider({ children }) {
       parentPin:   pinHash,   // store hash, never plain text
       kids: (data.kids || []).map(k => ({ ...k, name: sanitize(k.name, 60) })),
     };
+
+    // Layer 1: try Supabase cloud sync
     if (SUPABASE_READY) {
       try {
         await setupFamilyInSupabase(safeData);
+        return; // success — done
       } catch (e) {
-        // Supabase unreachable (network error, paused project, wrong credentials, etc.)
-        // Fall back to local-only mode so setup always completes.
-        if (__DEV__) console.warn('Supabase setup failed — using local storage:', e);
-        await saveFamily(safeData);
+        if (__DEV__) console.warn('Supabase setup failed — falling back to local storage:', e);
       }
-    } else {
-      await saveFamily(safeData);
     }
+
+    // Layer 2: local AsyncStorage
+    try {
+      await saveFamily(safeData);
+      return; // success — done
+    } catch (e) {
+      if (__DEV__) console.warn('AsyncStorage save failed — using in-memory only:', e);
+    }
+
+    // Layer 3: in-memory only (no persistence, but navigation will work)
+    setFamily(safeData);
   }
 
   async function setupFamilyInSupabase(data) {

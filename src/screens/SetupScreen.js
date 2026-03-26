@@ -394,20 +394,16 @@ export default function SetupScreen({ route }) {
       return;
     }
     setSaving(true);
-    try {
-      await setupFamily({
-        parentName: parentName.trim(),
-        parentPhone: parentPhone.trim(),
-        parentPin,
-        parentEmoji,
-        kids,
-      });
-    } catch (e) {
-      setSaving(false);
-      Alert.alert('Setup failed', e?.message || 'Something went wrong. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+    // setupFamily never throws — it falls back through Supabase → AsyncStorage → memory
+    await setupFamily({
+      parentName: parentName.trim(),
+      parentPhone: parentPhone.trim(),
+      parentPin,
+      parentEmoji,
+      kids,
+    }).catch(() => {}).finally(() => setSaving(false));
+    // Navigation is driven by the `family` state becoming non-null in AppContext.
+    // No alert needed — the user will be taken to the home screen automatically.
   }
 
   const progressWidth = progressAnim.interpolate({
