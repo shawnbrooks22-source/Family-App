@@ -280,7 +280,7 @@ function ConsentScreen({ onAccept, colors, shadows, t }) {
 
 // ─── Main SetupScreen ──────────────────────────────────────────────────────────
 export default function SetupScreen() {
-  const { setupFamily } = useApp();
+  const { setupFamily, family } = useApp();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useTranslation();
   const [consentGiven, setConsentGiven] = useState(false);
@@ -356,6 +356,7 @@ export default function SetupScreen() {
         kids,
       });
     } catch (e) {
+      setSaving(false);
       Alert.alert('Setup failed', e?.message || 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);

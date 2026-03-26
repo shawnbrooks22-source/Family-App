@@ -273,7 +273,7 @@ export function AppProvider({ children }) {
     const parentId = `parent_${generateId()}`;
 
     // Create parent profile
-    await supabase.from('profiles').insert({
+    const { error: parentErr } = await supabase.from('profiles').insert({
       id:         parentId,
       family_id:  fid,
       name:       data.parentName,
@@ -282,24 +282,57 @@ export function AppProvider({ children }) {
       role:       'parent',
       parent_pin: data.parentPin,
     });
+    if (parentErr) throw parentErr;
 
     // Create kid profiles
-    for (const kid of (data.kids || [])) {
-      await supabase.from('profiles').insert({
-        id:        kid.id || `kid_${generateId()}`,
-        family_id: fid,
-        name:      kid.name,
-        emoji:     kid.emoji,
-        color:     kid.color,
-        phone:     kid.phone || '',
-        role:      'kid',
-      });
+    const kidRows = (data.kids || []).map(k => ({
+      id:        k.id || `kid_${generateId()}`,
+      family_id: fid,
+      name:      k.name,
+      emoji:     k.emoji,
+      color:     k.color,
+      phone:     k.phone || '',
+      role:      'kid',
+    }));
+    if (kidRows.length > 0) {
+      const { error: kidsErr } = await supabase.from('profiles').insert(kidRows);
+      if (kidsErr) throw kidsErr;
     }
 
     // Persist family ID in SecureStore (encrypted on device)
     await secureSave(FAMILY_ID_KEY, fid);
     setFamilyId(fid);
-    await loadFamilyFromSupabase(fid);
+
+    // Set family state immediately from local data so navigation is never blocked,
+    // then refresh from Supabase to pick up any server-side fields.
+    const localFamilyData = {
+      _supabaseFamilyId: fid,
+      inviteCode,
+      parentName:  data.parentName,
+      parentEmoji: data.parentEmoji,
+      parentPhone: data.parentPhone || '',
+      parentPin:   data.parentPin,
+      parentId,
+      notifyPrefs: { taskCompleted: true, taskApproved: true },
+      kids: kidRows.map(k => ({
+        id:                k.id,
+        name:              k.name,
+        emoji:             k.emoji,
+        color:             k.color,
+        phone:             k.phone || '',
+        goal:              null,
+        streak:            0,
+        lastCompletedDate: null,
+        balance_cents:     0,
+      })),
+    };
+    setFamily(localFamilyData);
+    await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(localFamilyData));
+
+    // Best-effort refresh from Supabase (won't block navigation if it fails)
+    loadFamilyFromSupabase(fid).catch(e => {
+      if (__DEV__) console.error('Post-setup Supabase refresh failed:', e);
+    });
     subscribeRealtime(fid);
   }
 
