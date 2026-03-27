@@ -72,7 +72,6 @@ serve(async (req: Request) => {
         body: new URLSearchParams({
           description: `Kindo parent: ${profile?.name || parentProfileId}`,
           ...(profile?.phone ? { phone: profile.phone } : {}),
-          'metadata[kindo_profile_id]': parentProfileId,
         }),
       });
       const customer = await res.json();
