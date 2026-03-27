@@ -13,6 +13,7 @@ import { initI18n } from './src/i18n/index';
 import WelcomeScreen      from './src/screens/WelcomeScreen';
 import HomeScreen         from './src/screens/HomeScreen';
 import SetupScreen        from './src/screens/SetupScreen';
+import LoginScreen        from './src/screens/LoginScreen';
 import JoinScreen         from './src/screens/JoinScreen';
 import ParentDashboard    from './src/screens/ParentDashboard';
 import KidDashboard       from './src/screens/KidDashboard';
@@ -68,6 +69,7 @@ function AppNavigator() {
         <>
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Setup"   component={SetupScreen}   options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="Login"   component={LoginScreen}   options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="Join"    component={JoinScreen}    options={{ animation: 'slide_from_right' }} />
         </>
       ) : (

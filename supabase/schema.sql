@@ -10,11 +10,13 @@ create extension if not exists "uuid-ossp";
 -- Each family has a unique invite code for joining on new devices
 -- ─────────────────────────────────────────────────────────────────────────────
 create table if not exists public.families (
-  id          uuid    default uuid_generate_v4() primary key,
-  name        text    not null default 'My Family',
-  invite_code text    unique not null,
-  created_at  timestamptz default now()
+  id              uuid    default uuid_generate_v4() primary key,
+  name            text    not null default 'My Family',
+  invite_code     text    unique not null,
+  parent_auth_id  uuid    references auth.users(id),  -- Supabase Auth user who owns this family
+  created_at      timestamptz default now()
 );
+create index if not exists families_parent_auth_id_idx on public.families(parent_auth_id);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PROFILES
@@ -85,66 +87,85 @@ create table if not exists public.transactions (
 -- ─────────────────────────────────────────────────────────────────────────────
 -- ROW LEVEL SECURITY
 --
--- Current model: anon key + unguessable UUID family_ids for data segregation.
--- Kids do not have Supabase Auth accounts, so auth.uid()-based policies are
--- not yet possible.
---
--- TODO (before public launch): Add Supabase Auth for parents and replace the
--- policies below with:
---   using (family_id = (auth.jwt() -> 'family_id')::uuid)
+-- Auth model: parents sign up with email/password via Supabase Auth.
+-- Kids do NOT have auth accounts — they access through the parent's session.
+-- Every operation is scoped to the authenticated parent's family via the
+-- helper function below.
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.families     enable row level security;
 alter table public.profiles     enable row level security;
 alter table public.tasks        enable row level security;
 alter table public.transactions enable row level security;
 
--- Drop old wide-open policies if upgrading from a previous schema
-drop policy if exists "families_open" on public.families;
-drop policy if exists "profiles_open" on public.profiles;
-drop policy if exists "tasks_open"    on public.tasks;
-
--- FAMILIES ────────────────────────────────────────────────────────────────────
--- SELECT needed: invite-code lookup + loading family name on join
--- INSERT needed: initial family creation during onboarding
--- UPDATE needed: rename family
--- DELETE intentionally blocked from the anon client
-create policy "families_select" on public.families
-  for select using (true);
-create policy "families_insert" on public.families
-  for insert with check (true);
-create policy "families_update" on public.families
-  for update using (true) with check (true);
-
--- PROFILES ────────────────────────────────────────────────────────────────────
--- Full CRUD except hard-delete (kids are archived, not deleted, to preserve
--- task history). family_id NOT NULL enforced so orphan rows can't be inserted.
-create policy "profiles_select" on public.profiles
-  for select using (true);
-create policy "profiles_insert" on public.profiles
-  for insert with check (family_id is not null);
-create policy "profiles_update" on public.profiles
-  for update using (true) with check (family_id is not null);
-
--- TASKS ───────────────────────────────────────────────────────────────────────
--- Full CRUD needed: kids complete tasks, parents approve, recurring tasks
--- auto-respawn, and tasks can be deleted by parents.
--- family_id NOT NULL enforced on writes.
-create policy "tasks_select" on public.tasks
-  for select using (true);
-create policy "tasks_insert" on public.tasks
-  for insert with check (family_id is not null);
-create policy "tasks_update" on public.tasks
-  for update using (true) with check (family_id is not null);
-create policy "tasks_delete" on public.tasks
-  for delete using (true);
-
--- TRANSACTIONS ─────────────────────────────────────────────────────────────────
+-- Drop all old policies so this script is safe to re-run
+drop policy if exists "families_open"   on public.families;
+drop policy if exists "families_select" on public.families;
+drop policy if exists "families_insert" on public.families;
+drop policy if exists "families_update" on public.families;
+drop policy if exists "profiles_open"   on public.profiles;
+drop policy if exists "profiles_select" on public.profiles;
+drop policy if exists "profiles_insert" on public.profiles;
+drop policy if exists "profiles_update" on public.profiles;
+drop policy if exists "tasks_open"      on public.tasks;
+drop policy if exists "tasks_select"    on public.tasks;
+drop policy if exists "tasks_insert"    on public.tasks;
+drop policy if exists "tasks_update"    on public.tasks;
+drop policy if exists "tasks_delete"    on public.tasks;
 drop policy if exists "transactions_select" on public.transactions;
 drop policy if exists "transactions_insert" on public.transactions;
+
+-- Helper: returns the family_id owned by the currently authenticated parent.
+-- Returns NULL if not authenticated (safely blocks all access).
+create or replace function public.my_family_id()
+returns uuid language sql stable security definer as $$
+  select id from public.families where parent_auth_id = auth.uid() limit 1;
+$$;
+
+-- FAMILIES ────────────────────────────────────────────────────────────────────
+-- SELECT: authenticated parents see only their own family.
+--         Unauthenticated reads are allowed ONLY for invite-code lookups
+--         (family name is not sensitive; Stripe data lives in profiles).
+-- INSERT: only authenticated users; parent_auth_id must match their uid.
+-- UPDATE: only the owning parent.
+-- DELETE: blocked (use clearAllData which calls the service-role Edge Function).
+create policy "families_select" on public.families
+  for select using (
+    parent_auth_id = auth.uid()          -- authenticated parent sees their family
+    or auth.uid() is null                -- unauthenticated can look up by invite_code
+  );
+create policy "families_insert" on public.families
+  for insert with check (parent_auth_id = auth.uid());
+create policy "families_update" on public.families
+  for update using (parent_auth_id = auth.uid())
+              with check (parent_auth_id = auth.uid());
+
+-- PROFILES ────────────────────────────────────────────────────────────────────
+-- All profile access (including Stripe card data) scoped to the authenticated
+-- parent's family only.
+create policy "profiles_select" on public.profiles
+  for select using (family_id = public.my_family_id());
+create policy "profiles_insert" on public.profiles
+  for insert with check (family_id = public.my_family_id());
+create policy "profiles_update" on public.profiles
+  for update using (family_id = public.my_family_id())
+              with check (family_id = public.my_family_id());
+
+-- TASKS ───────────────────────────────────────────────────────────────────────
+create policy "tasks_select" on public.tasks
+  for select using (family_id = public.my_family_id());
+create policy "tasks_insert" on public.tasks
+  for insert with check (family_id = public.my_family_id());
+create policy "tasks_update" on public.tasks
+  for update using (family_id = public.my_family_id())
+              with check (family_id = public.my_family_id());
+create policy "tasks_delete" on public.tasks
+  for delete using (family_id = public.my_family_id());
+
+-- TRANSACTIONS ─────────────────────────────────────────────────────────────────
 create policy "transactions_select" on public.transactions
-  for select using (true);
+  for select using (family_id = public.my_family_id());
 create policy "transactions_insert" on public.transactions
-  for insert with check (family_id is not null);
+  for insert with check (family_id = public.my_family_id());
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- REALTIME
@@ -169,3 +190,8 @@ alter publication supabase_realtime add table public.profiles;
 -- alter table public.profiles add column if not exists stripe_card_brand        text;
 -- alter table public.profiles add column if not exists balance_cents            integer default 0;
 -- create table if not exists public.transactions ( ... );  -- see full definition above
+
+-- v1.3: Add Supabase Auth for parents (run this if upgrading from v1.2)
+-- alter table public.families add column if not exists parent_auth_id uuid references auth.users(id);
+-- create index if not exists families_parent_auth_id_idx on public.families(parent_auth_id);
+-- (then re-run the RLS section above to replace the old wide-open policies)

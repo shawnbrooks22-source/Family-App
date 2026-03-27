@@ -336,10 +336,12 @@ export default function SetupScreen({ route }) {
   const progressAnim = useRef(new Animated.Value(0.5)).current;
 
   // Step 1 state — pre-populate from Apple Sign-In params if available
-  const [parentName, setParentName] = useState(route?.params?.parentName || '');
-  const [parentPhone, setParentPhone] = useState('');
-  const [parentPin, setParentPin] = useState('');
-  const [parentEmoji, setParentEmoji] = useState('👑');
+  const [parentName,     setParentName]     = useState(route?.params?.parentName || '');
+  const [parentEmail,    setParentEmail]    = useState(route?.params?.appleEmail || '');
+  const [parentPassword, setParentPassword] = useState('');
+  const [parentPhone,    setParentPhone]    = useState('');
+  const [parentPin,      setParentPin]      = useState('');
+  const [parentEmoji,    setParentEmoji]    = useState('👑');
 
   // Step 2 state
   const [kids, setKids] = useState([]);
@@ -351,6 +353,14 @@ export default function SetupScreen({ route }) {
   function goToStep2() {
     if (!parentName.trim()) {
       Alert.alert('One more thing', 'Please enter your name to continue.');
+      return;
+    }
+    if (!parentEmail.trim() || !parentEmail.includes('@')) {
+      Alert.alert('Email required', 'Please enter a valid email address. This lets you log in on new devices.');
+      return;
+    }
+    if (parentPassword.length < 8) {
+      Alert.alert('Password too short', 'Your password must be at least 8 characters.');
       return;
     }
     if (parentPin.length !== 4) {
@@ -396,8 +406,10 @@ export default function SetupScreen({ route }) {
     setSaving(true);
     // setupFamily never throws — it falls back through Supabase → AsyncStorage → memory
     await setupFamily({
-      parentName: parentName.trim(),
-      parentPhone: parentPhone.trim(),
+      parentName:     parentName.trim(),
+      parentEmail:    parentEmail.trim(),
+      parentPassword,
+      parentPhone:    parentPhone.trim(),
       parentPin,
       parentEmoji,
       kids,
@@ -711,6 +723,31 @@ export default function SetupScreen({ route }) {
               placeholder={t('setup.namePlaceholder')}
               value={parentName}
               onChangeText={setParentName}
+              returnKeyType="next"
+              colors={colors}
+              t={t}
+            />
+
+            <Field
+              label="Email Address"
+              placeholder="you@example.com"
+              value={parentEmail}
+              onChangeText={setParentEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              colors={colors}
+              t={t}
+            />
+
+            <Field
+              label="Password"
+              hint="At least 8 characters — used to log in on new devices"
+              placeholder="Create a password"
+              value={parentPassword}
+              onChangeText={setParentPassword}
+              secureTextEntry
               returnKeyType="next"
               colors={colors}
               t={t}

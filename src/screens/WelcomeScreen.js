@@ -170,10 +170,19 @@ export default function WelcomeScreen({ navigation }) {
           {isCloudEnabled && (
             <TouchableOpacity
               style={styles.secondaryBtn}
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.88}
+            >
+              <Text style={[styles.secondaryBtnText, { fontSize: fs(17, 19) }]}>I already have an account</Text>
+            </TouchableOpacity>
+          )}
+
+          {isCloudEnabled && (
+            <TouchableOpacity
               onPress={() => navigation.navigate('Join')}
               activeOpacity={0.88}
             >
-              <Text style={[styles.secondaryBtnText, { fontSize: fs(17, 19) }]}>{t('welcome.joinCode')}</Text>
+              <Text style={[styles.disclaimer, { color: 'rgba(255,255,255,0.75)', marginTop: 0 }]}>{t('welcome.joinCode')}</Text>
             </TouchableOpacity>
           )}
 

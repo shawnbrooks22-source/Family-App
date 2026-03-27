@@ -105,6 +105,7 @@ export function AppProvider({ children }) {
   const [family,   setFamily]     = useState(null);
   const [tasks,    setTasks]      = useState([]);
   const [familyId, setFamilyId]   = useState(null); // Supabase families.id
+  const [authUser, setAuthUser]   = useState(null);  // Supabase auth user
   const realtimeSub = useRef(null);
 
   useEffect(() => {
@@ -146,15 +147,39 @@ export function AppProvider({ children }) {
   // ── Load family data ───────────────────────────────────────────────────────
   async function loadData() {
     try {
-      // Family ID is stored in SecureStore; everything else in AsyncStorage cache
+      // First try to restore an existing Supabase Auth session
+      if (SUPABASE_READY) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setAuthUser(session.user);
+          // Find the family owned by this auth user
+          const { data: famRow } = await supabase
+            .from('families')
+            .select('id')
+            .eq('parent_auth_id', session.user.id)
+            .single();
+          if (famRow) {
+            const fid = famRow.id;
+            setFamilyId(fid);
+            await secureSave(FAMILY_ID_KEY, fid);
+            await Promise.all([
+              loadFamilyFromSupabase(fid),
+              loadTasksFromSupabase(fid),
+            ]);
+            subscribeRealtime(fid);
+            return;
+          }
+        }
+      }
+
+      // Fallback: SecureStore family ID (pre-auth installs or local mode)
       const [storedFamilyId, familyRaw, tasksRaw] = await Promise.all([
-        secureLoad(FAMILY_ID_KEY),          // SecureStore (encrypted)
-        AsyncStorage.getItem(FAMILY_KEY),   // AsyncStorage cache
+        secureLoad(FAMILY_ID_KEY),
+        AsyncStorage.getItem(FAMILY_KEY),
         AsyncStorage.getItem(TASKS_KEY),
       ]);
 
       if (SUPABASE_READY && storedFamilyId) {
-        // Load from Supabase
         setFamilyId(storedFamilyId);
         await Promise.all([
           loadFamilyFromSupabase(storedFamilyId),
@@ -162,7 +187,6 @@ export function AppProvider({ children }) {
         ]);
         subscribeRealtime(storedFamilyId);
       } else {
-        // Local AsyncStorage fallback
         if (familyRaw) setFamily(JSON.parse(familyRaw));
         if (tasksRaw)  setTasks(JSON.parse(tasksRaw));
       }
@@ -276,11 +300,27 @@ export function AppProvider({ children }) {
   }
 
   async function setupFamilyInSupabase(data) {
+    // Sign up parent with Supabase Auth (email + password required)
+    let authUserId = null;
+    if (data.parentEmail && data.parentPassword) {
+      const { data: authData, error: signUpErr } = await supabase.auth.signUp({
+        email:    data.parentEmail.trim().toLowerCase(),
+        password: data.parentPassword,
+      });
+      if (signUpErr) throw signUpErr;
+      authUserId = authData.user?.id ?? null;
+      if (authUserId) setAuthUser(authData.user);
+    }
+
     const inviteCode = generateInviteCode();
-    // Create family row
+    // Create family row — link to auth user if we have one
     const { data: famRow, error: famErr } = await supabase
       .from('families')
-      .insert({ name: `${data.parentName}'s Family`, invite_code: inviteCode })
+      .insert({
+        name:           `${data.parentName}'s Family`,
+        invite_code:    inviteCode,
+        ...(authUserId ? { parent_auth_id: authUserId } : {}),
+      })
       .select()
       .single();
     if (famErr) throw famErr;
@@ -683,10 +723,12 @@ export function AppProvider({ children }) {
       await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY]);
       await secureDelete(FAMILY_ID_KEY);
       await endParentSession();
+      if (SUPABASE_READY) await supabase.auth.signOut().catch(() => {});
       realtimeSub.current?.unsubscribe();
       setTasks([]);
       setFamily(null);
       setFamilyId(null);
+      setAuthUser(null);
     } catch (e) {
       if (__DEV__) console.error('Failed to clear data:', e);
     }
@@ -715,6 +757,47 @@ export function AppProvider({ children }) {
       return true;
     }
     return false;
+  }
+
+  // ── Auth (email/password sign-in for returning parents) ────────────────────
+
+  async function authSignIn(email, password) {
+    if (!SUPABASE_READY) throw new Error('Supabase not configured');
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email:    email.trim().toLowerCase(),
+      password,
+    });
+    if (error) throw error;
+    setAuthUser(data.user);
+
+    // Load family owned by this auth user
+    const { data: famRow, error: famErr } = await supabase
+      .from('families')
+      .select('id')
+      .eq('parent_auth_id', data.user.id)
+      .single();
+    if (famErr || !famRow) {
+      await supabase.auth.signOut();
+      setAuthUser(null);
+      throw new Error('No family found for this account. Please set up a new family.');
+    }
+    const fid = famRow.id;
+    setFamilyId(fid);
+    await secureSave(FAMILY_ID_KEY, fid);
+    await Promise.all([
+      loadFamilyFromSupabase(fid),
+      loadTasksFromSupabase(fid),
+    ]);
+    subscribeRealtime(fid);
+  }
+
+  async function authResetPassword(email) {
+    if (!SUPABASE_READY) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: 'kindo://reset-password' }
+    );
+    if (error) throw error;
   }
 
   // ── Payments ───────────────────────────────────────────────────────────────
@@ -847,7 +930,11 @@ export function AppProvider({ children }) {
         family,
         tasks,
         familyId,
+        authUser,
         isCloudEnabled: SUPABASE_READY,
+        // Auth
+        authSignIn,
+        authResetPassword,
         // Family setup & join
         setupFamily,
         joinFamilyByCode,
