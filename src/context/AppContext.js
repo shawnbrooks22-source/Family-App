@@ -752,8 +752,9 @@ export function AppProvider({ children }) {
         brand,
       }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to save card');
+    let data = {};
+    try { data = await res.json(); } catch { /* non-JSON body */ }
+    if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
 
     // Update local family state so the UI reflects the new card immediately
     const updated = { ...family, stripeCardLast4: last4, stripeCardBrand: brand };
