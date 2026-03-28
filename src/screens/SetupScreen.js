@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
   StatusBar,
   Animated,
   ActivityIndicator,
@@ -318,6 +319,15 @@ function ConsentScreen({ onAccept, colors, shadows, t }) {
       >
         <Text style={consentStyles.acceptBtnText}>{t('setup.setupMyFamily')}</Text>
       </TouchableOpacity>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 16 }}>
+        <TouchableOpacity onPress={() => Linking.openURL('https://kindo.app/privacy')}>
+          <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => Linking.openURL('https://kindo.app/terms')}>
+          <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Terms of Service</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={{ height: 40 }} />
     </ScrollView>

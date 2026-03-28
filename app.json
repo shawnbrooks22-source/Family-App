@@ -64,8 +64,8 @@
       [
         "@sentry/react-native/expo",
         {
-          "organization": "YOUR_SENTRY_ORG",
-          "project": "kindo"
+          "organization": "kindo",
+          "project": "kindo-app"
         }
       ]
     ],

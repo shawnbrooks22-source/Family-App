@@ -60,9 +60,11 @@ create table if not exists public.tasks (
   assigned_to    text    references public.profiles(id),
   status         text    default 'pending',  -- 'pending' | 'completed' | 'approved'
   recurrence     text    default 'none',     -- 'none' | 'daily' | 'weekly'
-  celebrated     boolean default false,
-  due_date       text,     -- ISO date string 'YYYY-MM-DD', optional deadline
-  amount_cents   integer,  -- optional real-money reward in cents (e.g. 500 = $5.00)
+  celebrated      boolean default false,
+  due_date        text,     -- ISO date string 'YYYY-MM-DD', optional deadline
+  amount_cents    integer,  -- optional real-money reward in cents (e.g. 500 = $5.00)
+  photo_proof_uri text,     -- Supabase Storage public URL (uploaded on task completion)
+  payment_status  text,     -- null | 'failed' — set by stripe-webhook when charge fails
   created_at     bigint,   -- epoch ms from client
   completed_at   bigint,
   approved_at    bigint
@@ -166,6 +168,37 @@ create policy "transactions_select" on public.transactions
   for select using (family_id = public.my_family_id());
 create policy "transactions_insert" on public.transactions
   for insert with check (family_id = public.my_family_id());
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STORAGE
+-- Bucket for task photo proofs. Run this once in Supabase Dashboard → Storage,
+-- or via the SQL editor.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Create bucket (public so thumbnail URLs work without signing)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'task-photos',
+  'task-photos',
+  true,                          -- public bucket — URLs work without tokens
+  5242880,                       -- 5 MB max per photo
+  array['image/jpeg','image/jpg','image/png','image/webp','image/heic']
+)
+on conflict (id) do nothing;
+
+-- Storage RLS: parents in a family can upload/read their own family's photos.
+-- Path format: {family_id}/{task_id}.{ext}
+create policy "task_photos_insert" on storage.objects
+  for insert with check (
+    bucket_id = 'task-photos'
+    and (storage.foldername(name))[1] = public.my_family_id()::text
+  );
+create policy "task_photos_select" on storage.objects
+  for select using (bucket_id = 'task-photos');  -- public read (URLs are unguessable UUIDs)
+create policy "task_photos_delete" on storage.objects
+  for delete using (
+    bucket_id = 'task-photos'
+    and (storage.foldername(name))[1] = public.my_family_id()::text
+  );
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- REALTIME

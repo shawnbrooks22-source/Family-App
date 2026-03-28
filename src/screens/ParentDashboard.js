@@ -117,6 +117,7 @@ function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { tasks, family, approveTask, chargeForTask, refreshParentSession } = useApp();
+  const { isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
 
@@ -142,6 +143,22 @@ function HomeTab({ navigation }) {
   async function handleApprove(task) {
     refreshParentSession?.();
     const hasCard = !!(family?.stripeCardLast4);
+    // Cash rewards require Premium — gate free tier users to the upgrade screen
+    if (task.amount_cents && !isPremium) {
+      Alert.alert(
+        '👑 Premium Feature',
+        'Real cash rewards require Kindo Premium. Upgrade to pay kids automatically when quests are approved.',
+        [
+          { text: 'Approve Without Pay', onPress: async () => {
+            try { await approveTask(task.id); } catch (e) {
+              Alert.alert('Could not approve quest', e?.message || 'Something went wrong.');
+            }
+          }},
+          { text: 'Upgrade →', onPress: () => navigation.navigate('Upgrade') },
+        ]
+      );
+      return;
+    }
     if (task.amount_cents && chargeForTask && hasCard) {
       const dollars = `$${(task.amount_cents / 100).toFixed(2)}`;
       const kid = family.kids.find(k => k.id === (task.assignedTo || task.assigned_to));

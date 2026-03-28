@@ -458,12 +458,48 @@ export function AppProvider({ children }) {
     }
   }
 
+  /**
+   * Uploads a local photo URI to Supabase Storage and returns the public URL.
+   * Falls back to the original local URI if upload fails (e.g. offline).
+   */
+  async function uploadTaskPhoto(localUri, taskId) {
+    if (!SUPABASE_READY || !familyId || !localUri) return localUri;
+    try {
+      // Convert local URI to a Blob using fetch (works in React Native)
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+      const ext  = localUri.split('.').pop()?.split('?')[0] || 'jpg';
+      const path = `${familyId}/${taskId}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('task-photos')
+        .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('task-photos')
+        .getPublicUrl(path);
+
+      return publicUrl;
+    } catch (e) {
+      if (__DEV__) console.warn('Photo upload failed — using local URI fallback:', e);
+      return localUri; // graceful fallback keeps the app functional offline
+    }
+  }
+
   async function completeTask(taskId, photoUri) {
     const task = tasks.find(t => t.id === taskId);
+
+    // Upload photo to Supabase Storage so it's accessible on all devices
+    const resolvedPhotoUri = photoUri
+      ? await uploadTaskPhoto(photoUri, taskId)
+      : null;
+
     const updates = {
       status:       'completed',
       completed_at: Date.now(),
-      ...(photoUri ? { photo_proof_uri: photoUri } : {}),
+      ...(resolvedPhotoUri ? { photo_proof_uri: resolvedPhotoUri } : {}),
     };
 
     if (SUPABASE_READY && familyId) {
@@ -713,13 +749,26 @@ export function AppProvider({ children }) {
     }
   }
 
-  // ── Clear all data ─────────────────────────────────────────────────────────
+  // ── Clear all data + delete auth account ──────────────────────────────────
+  const DELETE_ACCOUNT_URL = process.env.EXPO_PUBLIC_SUPABASE_DELETE_ACCOUNT || '';
+
   async function clearAllData() {
     try {
-      if (SUPABASE_READY && familyId) {
-        // Delete family and all related data (cascade)
-        await supabase.from('families').delete().eq('id', familyId);
+      if (SUPABASE_READY && familyId && authUser?.id && DELETE_ACCOUNT_URL) {
+        // Use the Edge Function so the service-role key can delete the auth user
+        // and storage files — the anon key cannot do this.
+        await fetch(DELETE_ACCOUNT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ familyId, authUserId: authUser.id }),
+        }).catch(() => {
+          // Fallback: best-effort local cascade delete via anon key
+          supabase.from('families').delete().eq('id', familyId).catch(() => {});
+        });
+      } else if (SUPABASE_READY && familyId) {
+        await supabase.from('families').delete().eq('id', familyId).catch(() => {});
       }
+
       await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY]);
       await secureDelete(FAMILY_ID_KEY);
       await endParentSession();
