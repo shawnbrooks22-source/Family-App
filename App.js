@@ -20,7 +20,8 @@ import KidDashboard       from './src/screens/KidDashboard';
 import CelebrationScreen  from './src/screens/CelebrationScreen';
 import AIScreen           from './src/screens/AIScreen';
 import PaymentsScreen     from './src/screens/PaymentsScreen';
-import UpgradeScreen      from './src/screens/UpgradeScreen';
+import UpgradeScreen                  from './src/screens/UpgradeScreen';
+import NotificationsPermissionScreen  from './src/screens/NotificationsPermissionScreen';
 
 // ─── Sentry (crash reporting) ──────────────────────────────────────────────────
 // Set EXPO_PUBLIC_SENTRY_DSN in your .env to enable.
@@ -48,7 +49,7 @@ const linking = {
 };
 
 function AppNavigator() {
-  const { isLoaded, family } = useApp();
+  const { isLoaded, family, notificationsAsked } = useApp();
   const { colors } = useTheme();
 
   if (!isLoaded) {
@@ -76,6 +77,14 @@ function AppNavigator() {
       ) : (
         // ── Main app ───────────────────────────────────────────────────────
         <>
+          {/* Show notification permission screen once, right after onboarding */}
+          {!notificationsAsked && (
+            <Stack.Screen
+              name="NotificationsPermission"
+              component={NotificationsPermissionScreen}
+              options={{ animation: 'fade' }}
+            />
+          )}
           <Stack.Screen name="Home"        component={HomeScreen} />
           <Stack.Screen name="Parent"      component={ParentDashboard} />
           <Stack.Screen name="Kid"         component={KidDashboard} />

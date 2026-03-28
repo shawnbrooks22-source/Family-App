@@ -62,19 +62,11 @@ function generateId() {
   });
 }
 
-const FAMILY_KEY     = '@kindo_family';
-const TASKS_KEY      = '@kindo_tasks';
-const FAMILY_ID_KEY  = 'kindo_family_id';    // stored in SecureStore
-const PARENT_PIN_KEY = 'kindo_parent_pin';   // stored in SecureStore (hashed)
-
-async function requestNotifPermissions() {
-  try {
-    const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
-  } catch {
-    return false;
-  }
-}
+const FAMILY_KEY      = '@kindo_family';
+const TASKS_KEY       = '@kindo_tasks';
+const FAMILY_ID_KEY   = 'kindo_family_id';    // stored in SecureStore
+const PARENT_PIN_KEY  = 'kindo_parent_pin';   // stored in SecureStore (hashed)
+const NOTIF_ASKED_KEY = '@kindo_notif_asked'; // true once user has seen the permission screen
 
 async function sendNotif(title, body) {
   try {
@@ -101,16 +93,16 @@ function generateInviteCode() {
 }
 
 export function AppProvider({ children }) {
-  const [isLoaded, setIsLoaded]   = useState(false);
-  const [family,   setFamily]     = useState(null);
-  const [tasks,    setTasks]      = useState([]);
-  const [familyId, setFamilyId]   = useState(null); // Supabase families.id
-  const [authUser, setAuthUser]   = useState(null);  // Supabase auth user
+  const [isLoaded,          setIsLoaded]          = useState(false);
+  const [family,            setFamily]            = useState(null);
+  const [tasks,             setTasks]             = useState([]);
+  const [familyId,          setFamilyId]          = useState(null); // Supabase families.id
+  const [authUser,          setAuthUser]          = useState(null);  // Supabase auth user
+  const [notificationsAsked, setNotificationsAsked] = useState(false); // shown permission screen?
   const realtimeSub = useRef(null);
 
   useEffect(() => {
     loadData();
-    requestNotifPermissions();
     return () => {
       // Cleanup real-time subscription on unmount
       realtimeSub.current?.unsubscribe();
@@ -144,9 +136,19 @@ export function AppProvider({ children }) {
       .subscribe();
   }
 
+  // ── Mark that the user has seen the notification permission screen ───────────
+  async function markNotificationsAsked() {
+    await AsyncStorage.setItem(NOTIF_ASKED_KEY, 'true');
+    setNotificationsAsked(true);
+  }
+
   // ── Load family data ───────────────────────────────────────────────────────
   async function loadData() {
     try {
+      // Check if user has already seen the notification permission screen
+      const notifAsked = await AsyncStorage.getItem(NOTIF_ASKED_KEY);
+      if (notifAsked === 'true') setNotificationsAsked(true);
+
       // First try to restore an existing Supabase Auth session
       if (SUPABASE_READY) {
         const { data: { session } } = await supabase.auth.getSession();
@@ -980,6 +982,8 @@ export function AppProvider({ children }) {
         tasks,
         familyId,
         authUser,
+        notificationsAsked,
+        markNotificationsAsked,
         isCloudEnabled: SUPABASE_READY,
         // Auth
         authSignIn,
