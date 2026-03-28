@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../i18n/index';
 import { kidColors, shadows } from '../theme/index';
@@ -1001,6 +1002,7 @@ function FamilyTab({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { family, addKid, removeKid, editKid, refreshParentSession } = useApp();
+  const { canAddKid, isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const [showAdd, setShowAdd] = useState(false);
   const [kidName, setKidName] = useState('');
@@ -1124,7 +1126,16 @@ function FamilyTab({ navigation }) {
 
         {/* Add kid */}
         {!showAdd ? (
-          <TouchableOpacity style={[styles.addKidDashedBtn, { borderColor: colors.border }]} onPress={() => setShowAdd(true)}>
+          <TouchableOpacity
+            style={[styles.addKidDashedBtn, { borderColor: colors.border }]}
+            onPress={() => {
+              if (!canAddKid(family.kids.length)) {
+                navigation.navigate('Upgrade');
+              } else {
+                setShowAdd(true);
+              }
+            }}
+          >
             <Ionicons name="add" size={20} color={colors.primary} />
             <Text style={[styles.addKidDashedText, { color: colors.primary }]}>{t('parentDashboard.addAnotherKid')}</Text>
           </TouchableOpacity>
@@ -1377,7 +1388,9 @@ function SettingsTab({ navigation }) {
   const { colors, isDark, toggleDark } = useTheme();
   const { t, i18n } = useTranslation();
   const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled } = useApp();
+  const { isPremium, premiumPriceString, restorePurchases, purchasing } = useSubscription();
   const { isTablet, pad } = useDevice();
+  const [restoringPurchases, setRestoringPurchases] = useState(false);
 
   // Parent profile edit
   const [editName,  setEditName]  = useState(family.parentName);
@@ -1680,6 +1693,49 @@ function SettingsTab({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── Subscription ──────────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>SUBSCRIPTION</Text>
+        {isPremium ? (
+          <View style={[styles.settingsCard, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC', borderWidth: 1.5 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 26 }}>⭐</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.aiCardTitle, { color: '#166534' }]}>Kindo Premium — Active</Text>
+                <Text style={[styles.aiCardSub, { color: '#15803D' }]}>Unlimited kids · Cash rewards · All features</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={{ marginTop: 14, alignItems: 'center', paddingVertical: 8 }}
+              disabled={restoringPurchases}
+              onPress={async () => {
+                setRestoringPurchases(true);
+                await restorePurchases().catch(() => {});
+                setRestoringPurchases(false);
+              }}
+            >
+              {restoringPurchases
+                ? <ActivityIndicator size="small" color="#166534" />
+                : <Text style={{ color: '#166534', fontSize: 13, fontWeight: '600' }}>Restore Purchases</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.settingsCard, { backgroundColor: '#FAF5FF', borderColor: '#C4B5FD', borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 14 }]}
+            onPress={() => navigation.navigate('Upgrade')}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.aiCardIcon, { backgroundColor: '#EDE9FE' }]}>
+              <Text style={{ fontSize: 26 }}>👑</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.aiCardTitle, { color: '#5B21B6' }]}>Upgrade to Premium</Text>
+              <Text style={[styles.aiCardSub, { color: '#7C3AED' }]}>{premiumPriceString} · Unlimited kids + cash rewards</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+          </TouchableOpacity>
+        )}
 
         {/* ── Payments ──────────────────────────────────────────────────── */}
         <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text3 }]}>{t('settings.payments')}</Text>

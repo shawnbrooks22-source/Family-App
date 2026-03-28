@@ -20,6 +20,7 @@ import KidDashboard       from './src/screens/KidDashboard';
 import CelebrationScreen  from './src/screens/CelebrationScreen';
 import AIScreen           from './src/screens/AIScreen';
 import PaymentsScreen     from './src/screens/PaymentsScreen';
+import UpgradeScreen      from './src/screens/UpgradeScreen';
 
 // ─── Sentry (crash reporting) ──────────────────────────────────────────────────
 // Set EXPO_PUBLIC_SENTRY_DSN in your .env to enable.
@@ -81,6 +82,7 @@ function AppNavigator() {
           <Stack.Screen name="Celebration" component={CelebrationScreen} />
           <Stack.Screen name="AI"       component={AIScreen}       options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="Payments" component={PaymentsScreen} options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="Upgrade"  component={UpgradeScreen}  options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="Join"     component={JoinScreen}     options={{ animation: 'slide_from_right' }} />
         </>
       )}

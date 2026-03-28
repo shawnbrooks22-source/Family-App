@@ -39,11 +39,13 @@
         "android.permission.CAMERA",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {},
     "plugins": [
+      "react-native-iap",
       [
         "expo-notifications",
         {
