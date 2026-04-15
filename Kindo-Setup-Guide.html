@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kindo – Your Setup Checklist</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #1a1a1a; padding: 32px; max-width: 780px; margin: auto; }
+  h1 { font-size: 24px; color: #7C3AED; margin-bottom: 4px; }
+  .subtitle { color: #666; margin-bottom: 28px; font-size: 13px; }
+  .task { border: 1px solid #e2d9f3; border-radius: 10px; margin-bottom: 18px; overflow: hidden; }
+  .task-header { background: #7C3AED; color: white; padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
+  .task-header .num { background: white; color: #7C3AED; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; flex-shrink: 0; }
+  .task-header h2 { font-size: 15px; font-weight: 700; }
+  .task-header .badge { margin-left: auto; background: rgba(255,255,255,0.25); border-radius: 20px; padding: 2px 10px; font-size: 11px; white-space: nowrap; }
+  .task-body { padding: 14px 16px; }
+  .plain-english { background: #f5f0ff; border-left: 4px solid #7C3AED; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-style: italic; color: #4a4a4a; line-height: 1.5; }
+  ol { padding-left: 20px; }
+  ol li { margin-bottom: 8px; line-height: 1.55; }
+  code { background: #f0f0f0; border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 12px; color: #c0392b; }
+  .url { color: #7C3AED; word-break: break-all; }
+  .tip { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 12px; }
+  .tip strong { color: #92400e; }
+  @media print {
+    body { padding: 16px; }
+    .task { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🌟 Kindo — Your Setup Checklist</h1>
+<p class="subtitle">Open this in Chrome or Safari → File → Print → Save as PDF &nbsp;|&nbsp; Do these steps in order. Each one builds on the last.</p>
+
+<!-- 1 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">1</div>
+    <h2>Run npm install on your computer</h2>
+    <span class="badge">5 min · Your laptop</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Your app uses a shopping cart plugin called react-native-iap to handle subscriptions. Running npm install is like pressing "Download" so the plugin actually shows up on your computer.</p>
+    <ol>
+      <li>Open <strong>Terminal</strong> (Mac: press <code>Cmd+Space</code>, type Terminal, hit Enter).</li>
+      <li>Type <code>cd ~/Family-App</code> and press Enter to go to your project folder.</li>
+      <li>Type <code>npm install</code> and press Enter. Wait for it to finish (takes about 1–2 minutes).</li>
+      <li>You'll see something like <em>"added 312 packages"</em> — that means it worked!</li>
+    </ol>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">2</div>
+    <h2>Run the database schema in Supabase</h2>
+    <span class="badge">10 min · supabase.com</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Your database is like a filing cabinet. Right now some drawers are missing labels. This step adds the missing labels (columns, security rules, and a photo storage bucket) so everything saves correctly.</p>
+    <ol>
+      <li>Go to <span class="url">https://supabase.com</span> and log in.</li>
+      <li>Click your <strong>Kindo project</strong>.</li>
+      <li>In the left sidebar click <strong>SQL Editor</strong>.</li>
+      <li>Click <strong>+ New query</strong>.</li>
+      <li>Open the file <code>supabase/schema.sql</code> from your project folder in any text editor, select ALL the text (<code>Cmd+A</code>), copy it (<code>Cmd+C</code>).</li>
+      <li>Paste it into the Supabase SQL editor and click <strong>Run</strong> (green button, top right).</li>
+      <li>You should see <em>"Success. No rows returned."</em> — that means it worked!</li>
+    </ol>
+    <div class="tip"><strong>Tip:</strong> If you see a red error saying something already exists, that's usually fine — it just means part of it ran before. Scroll down to check the rest ran OK.</div>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">3</div>
+    <h2>Deploy the two Edge Functions</h2>
+    <span class="badge">10 min · Terminal + Supabase</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Edge Functions are little helper programs that live on Supabase's servers. One deletes accounts safely, the other handles Stripe payment alerts. You need to upload them so they're live.</p>
+    <ol>
+      <li>In Terminal, make sure you're in your project folder: <code>cd ~/Family-App</code></li>
+      <li>If you haven't installed the Supabase CLI yet, run: <code>npm install -g supabase</code></li>
+      <li>Log in to Supabase CLI: <code>npx supabase login</code> — it will open your browser to confirm.</li>
+      <li>Link your project (replace YOUR_PROJECT_REF with the ID from your Supabase project URL):<br><code>npx supabase link --project-ref YOUR_PROJECT_REF</code></li>
+      <li>Deploy the delete-account function:<br><code>npx supabase functions deploy delete-account --no-verify-jwt</code></li>
+      <li>Deploy the Stripe webhook function:<br><code>npx supabase functions deploy stripe-webhook --no-verify-jwt</code></li>
+      <li>Both should say <em>"Deployed successfully"</em>.</li>
+    </ol>
+    <div class="tip"><strong>Where's my project ref?</strong> Go to supabase.com → your project → Settings → General. It's the string after "Reference ID".</div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">4</div>
+    <h2>Add secret keys to your Edge Functions</h2>
+    <span class="badge">5 min · supabase.com</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Your Edge Functions need two secret passwords to work — one lets them delete accounts safely, and one lets them verify Stripe is really talking to them. You add these like hiding a key under a mat.</p>
+    <ol>
+      <li>Go to supabase.com → your project → <strong>Settings → Edge Functions</strong>.</li>
+      <li>Click <strong>Add new secret</strong>.</li>
+      <li>Add secret #1: Name = <code>SUPABASE_SERVICE_ROLE_KEY</code>, Value = your service role key (found in Settings → API → "service_role" key).</li>
+      <li>Add secret #2: Name = <code>STRIPE_WEBHOOK_SECRET</code>, Value = you'll get this in Step 5 — come back and add it after.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">5</div>
+    <h2>Set up Stripe webhook</h2>
+    <span class="badge">10 min · stripe.com</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Stripe needs your app's address so it can tap you on the shoulder when a payment fails or a refund happens. A webhook is just Stripe's way of sending you a text message.</p>
+    <ol>
+      <li>Go to <span class="url">https://dashboard.stripe.com</span> and log in.</li>
+      <li>In the left sidebar click <strong>Developers → Webhooks</strong>.</li>
+      <li>Click <strong>+ Add endpoint</strong>.</li>
+      <li>For the URL, paste your Supabase Edge Function URL — it looks like:<br><code>https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook</code></li>
+      <li>Under <em>Select events</em>, search for and check these two:<br>
+        <code>payment_intent.payment_failed</code><br>
+        <code>charge.refunded</code>
+      </li>
+      <li>Click <strong>Add endpoint</strong>.</li>
+      <li>On the next page click <strong>Reveal signing secret</strong> — copy that value.</li>
+      <li>Go back to Step 4 and paste it as the <code>STRIPE_WEBHOOK_SECRET</code>.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- 6 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">6</div>
+    <h2>Create the subscription product in App Store Connect</h2>
+    <span class="badge">20 min · appstoreconnect.apple.com</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">You need to tell Apple "hey, I'm selling a $X/month subscription called Kindo Premium." Without this, the upgrade button in the app won't show a price and purchases won't work.</p>
+    <ol>
+      <li>Go to <span class="url">https://appstoreconnect.apple.com</span> and log in.</li>
+      <li>Click your <strong>Kindo app</strong> → <strong>Monetization → Subscriptions</strong>.</li>
+      <li>Click <strong>+</strong> to create a Subscription Group — name it <em>Kindo Premium</em>.</li>
+      <li>Inside that group, click <strong>+</strong> to add a subscription.</li>
+      <li>Set the <strong>Product ID</strong> to exactly: <code>kindo_premium_monthly</code> (must match exactly!)</li>
+      <li>Set the duration to <strong>1 Month</strong>.</li>
+      <li>Click <strong>Add Localizations</strong> → add a display name (<em>Kindo Premium</em>) and description.</li>
+      <li>Click <strong>Set Price</strong> → choose your monthly price (e.g. $4.99).</li>
+      <li>Save everything.</li>
+    </ol>
+    <div class="tip"><strong>Tip:</strong> Apple requires a Privacy Policy URL before you can submit. That's your <code>kindo.app/privacy</code> link — set it up in Step 8 first if needed.</div>
+  </div>
+</div>
+
+<!-- 7 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">7</div>
+    <h2>Create the subscription product in Google Play Console</h2>
+    <span class="badge">20 min · play.google.com/console</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Same as Step 6, but for Android. Google Play needs its own copy of the product listing.</p>
+    <ol>
+      <li>Go to <span class="url">https://play.google.com/console</span> and log in.</li>
+      <li>Click your <strong>Kindo app</strong> → <strong>Monetize → Subscriptions</strong>.</li>
+      <li>Click <strong>Create subscription</strong>.</li>
+      <li>Set Product ID to exactly: <code>kindo_premium_monthly</code></li>
+      <li>Add a name (<em>Kindo Premium</em>) and description.</li>
+      <li>Under <em>Base plan</em>, click <strong>Add base plan</strong> → choose <strong>Auto-renewing</strong> → set your monthly price.</li>
+      <li>Click <strong>Activate</strong> to make it live.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- 8 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">8</div>
+    <h2>Host your Privacy Policy and Terms pages</h2>
+    <span class="badge">15 min · Your website host</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Apple and Google require every app to have a real Privacy Policy on the internet. You already wrote them — you just need to put them online at your kindo.app website.</p>
+    <ol>
+      <li>Find the two files in your project: <code>legal/privacy.html</code> and <code>legal/terms.html</code>.</li>
+      <li>Upload <code>privacy.html</code> to your web host so it's reachable at <code>https://kindo.app/privacy</code>.</li>
+      <li>Upload <code>terms.html</code> so it's reachable at <code>https://kindo.app/terms</code>.</li>
+      <li>Open both URLs in your browser to confirm they load.</li>
+    </ol>
+    <div class="tip"><strong>Don't have hosting yet?</strong> The easiest free option is Netlify Drop — go to <span class="url">https://app.netlify.com/drop</span>, drag your <code>legal</code> folder in, and it gives you a live URL in seconds. You can then set a custom domain.</div>
+  </div>
+</div>
+
+<!-- 9 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">9</div>
+    <h2>Create an EAS account and link your app</h2>
+    <span class="badge">10 min · expo.dev</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">EAS is Expo's build service — it's the machine that packages your app into an actual .ipa (iPhone) or .apk (Android) file you can submit to the stores. Think of it like a printing press for your app.</p>
+    <ol>
+      <li>Go to <span class="url">https://expo.dev</span> and create a free account.</li>
+      <li>In Terminal, run: <code>npm install -g eas-cli</code></li>
+      <li>Log in: <code>eas login</code></li>
+      <li>In your project folder, run: <code>eas build:configure</code></li>
+      <li>It will ask questions — choose <strong>All</strong> for platform, and say <strong>Yes</strong> to creating a new project.</li>
+      <li>This updates your <code>app.json</code> with the correct project ID automatically.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- 10 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">10</div>
+    <h2>Create a Sentry account for crash reports</h2>
+    <span class="badge">10 min · sentry.io</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Sentry watches your live app 24/7 and texts you (via email) when something crashes. Like having a security camera for bugs — you'll see exactly what went wrong and on which phone.</p>
+    <ol>
+      <li>Go to <span class="url">https://sentry.io</span> and create a free account.</li>
+      <li>Create a new project → choose <strong>React Native</strong>.</li>
+      <li>Sentry will show you a DSN — it looks like <code>https://abc123@o123.ingest.sentry.io/456</code>. Copy it.</li>
+      <li>In your project folder, open the file <code>.env</code> (or create it by copying <code>.env.example</code>).</li>
+      <li>Find the line <code>EXPO_PUBLIC_SENTRY_DSN=</code> and paste your DSN after the equals sign.</li>
+      <li>Save the file.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- 11 -->
+<div class="task">
+  <div class="task-header">
+    <div class="num">11</div>
+    <h2>Add your app icon and splash screen</h2>
+    <span class="badge">15 min · Your computer</span>
+  </div>
+  <div class="task-body">
+    <p class="plain-english">Right now the app has a placeholder star icon. You need a real icon to submit to the App Store — Apple requires a 1024×1024 pixel PNG image with no rounded corners (Apple rounds it for you).</p>
+    <ol>
+      <li>Create or export your app icon as a <strong>PNG file, 1024×1024 pixels, no transparency, no rounded corners</strong>.</li>
+      <li>Name it <code>icon.png</code> and place it in your project's <code>assets/</code> folder, replacing the existing one.</li>
+      <li>For the splash screen, create a <strong>PNG, 1284×2778 pixels</strong> (iPhone 14 Pro Max size). Name it <code>splash.png</code> and place it in <code>assets/</code> too.</li>
+      <li>Open <code>app.json</code> and confirm these lines exist:<br>
+        <code>"icon": "./assets/icon.png"</code><br>
+        <code>"splash": { "image": "./assets/splash.png" }</code>
+      </li>
+      <li>Need a quick icon? Try <span class="url">https://www.canva.com</span> — search "app icon", design yours, export as PNG 1024×1024.</li>
+    </ol>
+  </div>
+</div>
+
+<div style="margin-top: 28px; border-top: 2px solid #7C3AED; padding-top: 16px; color: #555; font-size: 12px; line-height: 1.8;">
+  <strong style="color:#7C3AED; font-size:14px;">Do these in this order:</strong><br>
+  1 → 2 → 3 → 4 → 5 → 8 → 6 → 7 → 9 → 10 → 11<br><br>
+  Once all 11 are done, come back and we'll run your first EAS build and submit to the stores!
+</div>
+
+</body>
+</html>
