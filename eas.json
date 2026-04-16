@@ -12,8 +12,8 @@
       "ios": { "simulator": false, "distribution": "internal" }
     },
     "production": {
-      "android": { "buildType": "aab" },
-      "ios": { "distribution": "app-store" },
+      "android": { "buildType": "app-bundle" },
+      "ios": { "distribution": "store" },
       "autoIncrement": true
     }
   },
