@@ -11,7 +11,9 @@
     "splash": {
       "backgroundColor": "#7C3AED"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kindo.app",
@@ -40,7 +42,8 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
-        "com.android.vending.BILLING"
+        "com.android.vending.BILLING",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {},
@@ -71,7 +74,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "4efaab0a-a411-4528-a7b1-b83160f7ac1f"
       }
     }
   }
