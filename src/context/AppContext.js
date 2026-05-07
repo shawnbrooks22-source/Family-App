@@ -383,6 +383,7 @@ export function AppProvider({ children }) {
         streak:            0,
         lastCompletedDate: null,
         balance_cents:     0,
+        milestones:        [],
       })),
     };
     setFamily(localFamilyData);
@@ -635,7 +636,7 @@ export function AppProvider({ children }) {
 
   // ── Kid operations ─────────────────────────────────────────────────────────
   async function addKid(kid) {
-    const newKid = { ...kid, id: generateId(), goal: null, streak: 0 };
+    const newKid = { ...kid, id: generateId(), goal: null, streak: 0, milestones: [] };
     if (SUPABASE_READY && familyId) {
       await supabase.from('profiles').insert({
         id:        newKid.id,

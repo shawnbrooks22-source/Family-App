@@ -42,7 +42,7 @@ function getStarTitle(stars) {
 }
 
 // ─── Custom In-App Numpad ───────────────────────────────────────────────────────
-function NumPad({ onPress, onBackspace, disabled = false, colors }) {
+function NumPad({ onPress, onBackspace, disabled = false, colors, keyW, keyH }) {
   const numpadStyles = StyleSheet.create({
     numpad: {
       width: '100%',
@@ -55,8 +55,8 @@ function NumPad({ onPress, onBackspace, disabled = false, colors }) {
       justifyContent: 'center',
     },
     numpadKey: {
-      width: KEY_W,
-      height: KEY_H,
+      width: keyW,
+      height: keyH,
       borderRadius: 16,
       backgroundColor: colors.surface,
       alignItems: 'center',
@@ -86,7 +86,7 @@ function NumPad({ onPress, onBackspace, disabled = false, colors }) {
         <View key={ri} style={numpadStyles.numpadRow}>
           {row.map((key, ki) => {
             if (key === '') {
-              return <View key={ki} style={{ width: KEY_W, height: KEY_H }} />;
+              return <View key={ki} style={{ width: keyW, height: keyH }} />;
             }
             if (key === '⌫') {
               return (
@@ -212,16 +212,16 @@ function KidCard({ profile, onPress, stars, colors, cardSize, avatarSize }) {
 }
 
 // ─── Parent Profile Card ────────────────────────────────────────────────────────
-function ParentCard({ profile, onPress, colors, t }) {
+function ParentCard({ profile, onPress, colors, t, cardSize, avatarSize }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   function pressIn()  { Animated.spring(scaleAnim, { toValue: 0.92, friction: 10, tension: 300, useNativeDriver: true }).start(); }
   function pressOut() { Animated.spring(scaleAnim, { toValue: 1,    friction: 5,  tension: 180, useNativeDriver: true }).start(); }
 
   const parentCardStyles = StyleSheet.create({
-    profileItem: { width: CARD_SIZE, alignItems: 'center' },
+    profileItem: { width: cardSize, alignItems: 'center' },
     avatarCircle: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-    avatarEmoji: { fontSize: AVATAR_SIZE * 0.42 },
+    avatarEmoji: { fontSize: avatarSize * 0.42 },
     lockBadge: {
       position: 'absolute', bottom: 4, right: 4,
       backgroundColor: '#fff', borderRadius: 14, padding: 4,
@@ -246,9 +246,9 @@ function ParentCard({ profile, onPress, colors, t }) {
             parentCardStyles.avatarCircle,
             {
               backgroundColor: colors.primary,
-              width:  AVATAR_SIZE,
-              height: AVATAR_SIZE,
-              borderRadius: AVATAR_SIZE / 2,
+              width:  avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
               ...shadows.md,
             },
           ]}
@@ -1255,7 +1255,7 @@ export default function HomeScreen({ navigation }) {
                 style={{ opacity: ea.opacity, transform: [{ translateY: ea.y }] }}
               >
                 {isParent ? (
-                  <ParentCard profile={profile} onPress={openPin} colors={colors} t={t} />
+                  <ParentCard profile={profile} onPress={openPin} colors={colors} t={t} cardSize={CARD_SIZE} avatarSize={AVATAR_SIZE} />
                 ) : (
                   <KidCard
                     profile={profile}
@@ -1368,6 +1368,8 @@ export default function HomeScreen({ navigation }) {
               onBackspace={handleBackspace}
               disabled={lockoutActive}
               colors={colors}
+              keyW={KEY_W}
+              keyH={KEY_H}
             />
 
             {/* ── Biometric button ── */}
