@@ -106,6 +106,7 @@ drop policy if exists "families_open"   on public.families;
 drop policy if exists "families_select" on public.families;
 drop policy if exists "families_insert" on public.families;
 drop policy if exists "families_update" on public.families;
+drop policy if exists "families_delete" on public.families;
 drop policy if exists "profiles_open"   on public.profiles;
 drop policy if exists "profiles_select" on public.profiles;
 drop policy if exists "profiles_insert" on public.profiles;
@@ -138,7 +139,9 @@ $$;
 --         (family name is not sensitive; Stripe data lives in profiles).
 -- INSERT: only authenticated users; parent_auth_id must match their uid.
 -- UPDATE: only the owning parent.
--- DELETE: blocked (use clearAllData which calls the service-role Edge Function).
+-- DELETE: the owning parent can delete their family (cascade-deletes profiles,
+--         tasks, and transactions via the FK constraints). Auth-user deletion
+--         and storage cleanup still require the service-role Edge Function.
 create policy "families_select" on public.families
   for select using (
     parent_auth_id = auth.uid()          -- authenticated parent sees their family
@@ -149,6 +152,8 @@ create policy "families_insert" on public.families
 create policy "families_update" on public.families
   for update using (parent_auth_id = auth.uid())
               with check (parent_auth_id = auth.uid());
+create policy "families_delete" on public.families
+  for delete using (parent_auth_id = auth.uid());
 
 -- PROFILES ────────────────────────────────────────────────────────────────────
 -- All profile access (including Stripe card data) scoped to the authenticated
