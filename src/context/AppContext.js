@@ -779,10 +779,16 @@ export function AppProvider({ children }) {
   }
 
   async function markCelebrated(taskId) {
+    // Update local state FIRST so KidDashboard won't re-navigate to the
+    // celebration screen on its next render — otherwise a Supabase failure
+    // here would trigger an infinite celebration loop.
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, celebrated: true } : t));
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('tasks').update({ celebrated: true }).eq('id', taskId);
-      // Optimistic update to prevent repeat celebration triggers
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, celebrated: true } : t));
+      try {
+        await supabase.from('tasks').update({ celebrated: true }).eq('id', taskId);
+      } catch (e) {
+        if (__DEV__) console.warn('markCelebrated cloud write failed (will sync later):', e);
+      }
     } else {
       await saveTasks(tasks.map(t => t.id === taskId ? { ...t, celebrated: true } : t));
     }

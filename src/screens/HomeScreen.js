@@ -826,6 +826,8 @@ export default function HomeScreen({ navigation }) {
       setLockoutSecs(0);
       setPinAttempts(0);
       Alert.alert(t('home.pinReset'), t('home.pinUpdated'));
+    } catch (e) {
+      setRecoveryError(e?.message || t('home.pinResetFailed') || 'Could not reset PIN. Please try again.');
     } finally {
       setRecoveryLoading(false);
     }
@@ -893,25 +895,34 @@ export default function HomeScreen({ navigation }) {
       clearTimeout(revealTimer.current);
       setRevealIdx(-1);
 
-      const ok = await verifyPin(newPin);
-      if (ok) {
-        await clearPinFailures();
-        await unlockParentZone();   // start the 30-min session timer
-        setPinAttempts(0);
-        setLockoutSecs(0);
-        closePin();
-        setTimeout(() => navigation.navigate('Parent'), 280);
-      } else {
-        const lockStatus = await recordPinFailure();
-        setPinAttempts(lockStatus.attempts);
-        if (lockStatus.locked) {
-          setLockoutSecs(lockStatus.secondsLeft);
-          setPin('');
-          setPinError(false);
+      try {
+        const ok = await verifyPin(newPin);
+        if (ok) {
+          await clearPinFailures();
+          await unlockParentZone();   // start the 30-min session timer
+          setPinAttempts(0);
+          setLockoutSecs(0);
+          closePin();
+          setTimeout(() => navigation.navigate('Parent'), 280);
         } else {
-          setPinError(true);
-          shakeAndClear();
+          const lockStatus = await recordPinFailure();
+          setPinAttempts(lockStatus.attempts);
+          if (lockStatus.locked) {
+            setLockoutSecs(lockStatus.secondsLeft);
+            setPin('');
+            setPinError(false);
+          } else {
+            setPinError(true);
+            shakeAndClear();
+          }
         }
+      } catch (e) {
+        // verifyPin can throw if the legacy PIN migration hits a network
+        // error inside updateParentProfile. Treat as an incorrect PIN so
+        // the user can retry instead of being silently blocked.
+        if (__DEV__) console.error('PIN verify error:', e);
+        setPinError(true);
+        shakeAndClear();
       }
     }
   }

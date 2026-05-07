@@ -174,12 +174,20 @@ function HomeTab({ navigation }) {
           {
             text: `Pay ${dollars}`,
             onPress: async () => {
+              let charged = false;
               try {
                 await chargeForTask(task.id, task.assignedTo || task.assigned_to, task.amount_cents);
+                charged = true;
+              } catch (e) {
+                Alert.alert('Payment Failed', (e?.message || 'Could not charge card.') + '\n\nThe quest will still be approved without payment.');
+              }
+              try {
                 await approveTask(task.id);
               } catch (e) {
-                Alert.alert('Payment Failed', e.message + '\n\nThe quest was still approved without payment.');
-                await approveTask(task.id);
+                Alert.alert(
+                  charged ? 'Payment succeeded but approval failed' : 'Could not approve quest',
+                  e?.message || 'Please try again.'
+                );
               }
             },
           },
