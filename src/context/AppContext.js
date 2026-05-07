@@ -629,6 +629,7 @@ export function AppProvider({ children }) {
   async function deleteTask(taskId) {
     if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('tasks').delete().eq('id', taskId);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
     } else {
       await saveTasks(tasks.filter(t => t.id !== taskId));
     }
@@ -709,15 +710,20 @@ export function AppProvider({ children }) {
   // ── Star Milestones ────────────────────────────────────────────────────────
 
   async function updateKidMilestones(kidId, milestones) {
-    const updated = {
-      ...family,
-      kids: family.kids.map(k => k.id === kidId ? { ...k, milestones } : k),
-    };
-    setFamily(updated);
+    let savedData = null;
+    setFamily(prev => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        kids: prev.kids.map(k => k.id === kidId ? { ...k, milestones } : k),
+      };
+      savedData = updated;
+      return updated;
+    });
     if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('profiles').update({ milestones }).eq('id', kidId);
-    } else {
-      await saveFamily(updated);
+    } else if (savedData) {
+      await saveFamily(savedData);
     }
   }
 
@@ -900,7 +906,7 @@ export function AppProvider({ children }) {
 
     // Legacy plain-text PIN — verify then silently migrate to hashed version
     if (storedPin === pin) {
-      const hashed = await hashPin(pin, familyId || 'local');
+      const hashed = await hashPin(pin, 'local');
       await updateParentProfile({ parentPin: hashed });
       return true;
     }

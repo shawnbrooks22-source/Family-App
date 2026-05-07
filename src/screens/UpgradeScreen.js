@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,16 +26,23 @@ const FEATURES = [
 ];
 
 export default function UpgradeScreen({ navigation }) {
-  const { purchasePremium, restorePurchases, premiumPriceString, purchasing, iapReady } = useSubscription();
+  const { purchasePremium, restorePurchases, premiumPriceString, purchasing, iapReady, isPremium } = useSubscription();
   const { colors, shadows } = useTheme();
   const [restoring, setRestoring] = useState(false);
+
+  // Navigate away when purchase completes — purchasePremium() only opens the native sheet;
+  // the actual success arrives asynchronously via purchaseUpdatedListener → isPremium flipping true.
+  useEffect(() => {
+    if (isPremium) {
+      Alert.alert('Welcome to Premium! 🎉', 'All features are now unlocked for your family.');
+      navigation.goBack();
+    }
+  }, [isPremium]);
 
   async function handlePurchase() {
     try {
       await purchasePremium();
-      // Success — navigation driven by isPremium state change
-      Alert.alert('Welcome to Premium! 🎉', 'All features are now unlocked for your family.');
-      navigation.goBack();
+      // Result arrives via purchaseUpdatedListener — handled by the useEffect above
     } catch (e) {
       if (e?.code !== 'E_USER_CANCELLED') {
         Alert.alert('Purchase failed', e.message || 'Please try again or contact support.');

@@ -197,7 +197,7 @@ export default function JoinScreen({ navigation }) {
             <TextInput
               style={styles.codeInput}
               value={code}
-              onChangeText={t => setCode(formatCode(t))}
+              onChangeText={text => setCode(formatCode(text))}
               placeholder={t('join.placeholder')}
               placeholderTextColor={colors.text3}
               autoCapitalize="characters"
