@@ -1018,7 +1018,7 @@ function AddTaskTab() {
 function FamilyTab({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { family, addKid, removeKid, editKid, refreshParentSession } = useApp();
+  const { family, addKid, removeKid, editKid, refreshParentSession, addMilestone, redeemMilestone, deleteMilestone } = useApp();
   const { canAddKid, isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const [showAdd, setShowAdd] = useState(false);
@@ -1034,6 +1034,11 @@ function FamilyTab({ navigation }) {
   const [editKidEmoji,    setEditKidEmoji]    = useState('🦊');
   const [editKidColor,    setEditKidColor]    = useState(kidColors[0]);
   const [kidLoading,      setKidLoading]      = useState(false);
+
+  // Milestone state
+  const [newMilestoneStars,  setNewMilestoneStars]  = useState('');
+  const [newMilestoneReward, setNewMilestoneReward] = useState('');
+  const [milestoneLoading,   setMilestoneLoading]   = useState(false);
 
   async function handleAddKid() {
     refreshParentSession?.();
@@ -1339,6 +1344,102 @@ function FamilyTab({ navigation }) {
                 {kidLoading ? 'Saving…' : t('parentDashboard.saveChanges')}
               </Text>
             </TouchableOpacity>
+
+            {/* ── Star Milestones ──────────────────────────────────────────── */}
+            <View style={[styles.milestoneSection, { borderTopColor: colors.divider }]}>
+              <Text style={[styles.milestoneSectionTitle, { color: colors.text1 }]}>🏆 Star Milestones</Text>
+              <Text style={[styles.milestoneSectionSub, { color: colors.text3 }]}>
+                Set rewards that unlock when {editingKid?.name || 'your kid'} reaches a star count.
+              </Text>
+
+              {/* Existing milestones */}
+              {(editingKid ? (family?.kids?.find(k => k.id === editingKid.id)?.milestones || []) : [])
+                .sort((a, b) => a.stars_required - b.stars_required)
+                .map(m => (
+                <View key={m.id} style={[styles.milestoneRow, { backgroundColor: colors.surface, borderColor: m.achieved && !m.redeemed ? '#F59E0B' : colors.border }]}>
+                  <View style={styles.milestoneRowLeft}>
+                    <Text style={styles.milestoneStarBadge}>⭐ {m.stars_required}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.milestoneRewardText, { color: colors.text1 }]}>{m.reward}</Text>
+                      {m.redeemed
+                        ? <Text style={[styles.milestoneStatus, { color: '#10B981' }]}>✅ Given</Text>
+                        : m.achieved
+                        ? <Text style={[styles.milestoneStatus, { color: '#F59E0B' }]}>🎉 Earned — tap to give!</Text>
+                        : <Text style={[styles.milestoneStatus, { color: colors.text3 }]}>Locked</Text>
+                      }
+                    </View>
+                  </View>
+                  <View style={styles.milestoneRowRight}>
+                    {m.achieved && !m.redeemed && (
+                      <TouchableOpacity
+                        style={[styles.milestoneGiveBtn, { backgroundColor: '#F59E0B' }]}
+                        onPress={async () => {
+                          Alert.alert(
+                            '🎉 Give the reward?',
+                            `Give "${m.reward}" to ${editingKid?.name}?`,
+                            [
+                              { text: 'Not yet', style: 'cancel' },
+                              { text: 'Yes, given!', onPress: async () => {
+                                await redeemMilestone(editingKid.id, m.id);
+                                setEditingKid({ ...editingKid });
+                              }},
+                            ]
+                          );
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Give 🎁</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => Alert.alert('Delete milestone?', `Remove "${m.reward}"?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteMilestone(editingKid.id, m.id) },
+                      ])}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.text3} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {/* Add new milestone */}
+              <View style={[styles.milestoneAddRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <TextInput
+                  style={[styles.milestoneStarInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+                  value={newMilestoneStars}
+                  onChangeText={setNewMilestoneStars}
+                  placeholder="Stars"
+                  keyboardType="number-pad"
+                  placeholderTextColor={colors.text3}
+                  maxLength={3}
+                />
+                <TextInput
+                  style={[styles.milestoneRewardInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+                  value={newMilestoneReward}
+                  onChangeText={setNewMilestoneReward}
+                  placeholder="Reward (e.g. Pizza night 🍕)"
+                  placeholderTextColor={colors.text3}
+                  maxLength={60}
+                />
+                <TouchableOpacity
+                  style={[styles.milestoneAddBtn, { backgroundColor: milestoneLoading ? colors.text3 : colors.primary }]}
+                  disabled={milestoneLoading}
+                  onPress={async () => {
+                    const stars = parseInt(newMilestoneStars, 10);
+                    if (!stars || stars < 1) { Alert.alert('Enter a star count (e.g. 5)'); return; }
+                    if (!newMilestoneReward.trim()) { Alert.alert('Enter a reward description'); return; }
+                    setMilestoneLoading(true);
+                    await addMilestone(editingKid.id, { stars_required: stars, reward: newMilestoneReward });
+                    setNewMilestoneStars('');
+                    setNewMilestoneReward('');
+                    setMilestoneLoading(false);
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -2375,6 +2476,22 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
   },
+
+  // ─── Milestones
+  milestoneSection:       { marginTop: 8, paddingTop: 20, borderTopWidth: 1 },
+  milestoneSectionTitle:  { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  milestoneSectionSub:    { fontSize: 13, marginBottom: 16, lineHeight: 18 },
+  milestoneRow:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, borderWidth: 1.5, padding: 12, marginBottom: 10 },
+  milestoneRowLeft:       { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
+  milestoneRowRight:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  milestoneStarBadge:     { fontSize: 15, fontWeight: '800', minWidth: 48 },
+  milestoneRewardText:    { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  milestoneStatus:        { fontSize: 12, fontWeight: '500' },
+  milestoneGiveBtn:       { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  milestoneAddRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 10, marginTop: 4, marginBottom: 32 },
+  milestoneStarInput:     { width: 56, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 8, textAlign: 'center', fontSize: 14, fontWeight: '700' },
+  milestoneRewardInput:   { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
+  milestoneAddBtn:        { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // ─── Form
   formLabel: {

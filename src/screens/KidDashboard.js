@@ -580,6 +580,58 @@ export default function KidDashboard({ route, navigation }) {
             )}
           </View>
 
+          {/* ── Star Milestones ─────────────────────────────────────────────── */}
+          {(kid?.milestones || []).length > 0 && (() => {
+            const milestones = [...(kid.milestones || [])].sort((a, b) => a.stars_required - b.stars_required);
+            const nextMilestone = milestones.find(m => !m.achieved);
+            const achievedNotRedeemed = milestones.filter(m => m.achieved && !m.redeemed);
+            return (
+              <View style={[styles.milestonesCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <Text style={[styles.milestonesTitle, { color: colors.text1 }]}>🏆 Milestone Rewards</Text>
+
+                {/* Celebrate achieved-but-not-yet-given milestones */}
+                {achievedNotRedeemed.map(m => (
+                  <View key={m.id} style={styles.milestoneEarnedBanner}>
+                    <Text style={styles.milestoneEarnedText}>🎉 You earned: {m.reward}!</Text>
+                    <Text style={styles.milestoneEarnedSub}>Ask a parent to give you your reward!</Text>
+                  </View>
+                ))}
+
+                {/* Progress toward next milestone */}
+                {nextMilestone && (
+                  <View style={{ marginBottom: 14 }}>
+                    <View style={styles.milestoneNextRow}>
+                      <Text style={[styles.milestoneNextLabel, { color: colors.text2 }]}>Next: {nextMilestone.reward}</Text>
+                      <Text style={[styles.milestoneNextCount, { color: colors.text2 }]}>
+                        {Math.min(totalStars, nextMilestone.stars_required)}/{nextMilestone.stars_required} ⭐
+                      </Text>
+                    </View>
+                    <View style={styles.milestoneTrack}>
+                      <View style={[styles.milestoneFill, {
+                        width: `${Math.min(totalStars / nextMilestone.stars_required, 1) * 100}%`,
+                        backgroundColor: colors.primary,
+                      }]} />
+                    </View>
+                  </View>
+                )}
+
+                {/* All milestones list */}
+                <View style={styles.milestoneTrophyRow}>
+                  {milestones.map(m => (
+                    <View key={m.id} style={[styles.milestoneTrophy, {
+                      backgroundColor: m.redeemed ? '#10B98120' : m.achieved ? '#F59E0B20' : colors.bg,
+                      borderColor: m.redeemed ? '#10B981' : m.achieved ? '#F59E0B' : colors.border,
+                    }]}>
+                      <Text style={styles.milestoneTrophyIcon}>{m.redeemed ? '✅' : m.achieved ? '🎁' : '🔒'}</Text>
+                      <Text style={[styles.milestoneTrophyStars, { color: colors.text1 }]}>⭐{m.stars_required}</Text>
+                      <Text style={[styles.milestoneTrophyReward, { color: colors.text3 }]} numberOfLines={2}>{m.reward}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })()}
+
           {/* Streak banner */}
           {streak >= 2 && (
             <View style={[styles.streakBanner, { backgroundColor: isDark ? '#1A0E00' : '#FFF3E0' }]}>
@@ -1025,6 +1077,22 @@ const styles = StyleSheet.create({
   },
 
   // ─── Goal card
+  milestonesCard:       { borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1 },
+  milestonesTitle:      { fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  milestoneEarnedBanner:{ backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, marginBottom: 10 },
+  milestoneEarnedText:  { fontSize: 15, fontWeight: '700', color: '#92400E' },
+  milestoneEarnedSub:   { fontSize: 12, color: '#92400E', marginTop: 2 },
+  milestoneNextRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  milestoneNextLabel:   { fontSize: 13, fontWeight: '600', flex: 1 },
+  milestoneNextCount:   { fontSize: 13, fontWeight: '700' },
+  milestoneTrack:       { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
+  milestoneFill:        { height: 8, borderRadius: 4 },
+  milestoneTrophyRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  milestoneTrophy:      { alignItems: 'center', borderRadius: 12, borderWidth: 1.5, padding: 10, minWidth: 80, flex: 1 },
+  milestoneTrophyIcon:  { fontSize: 22, marginBottom: 4 },
+  milestoneTrophyStars: { fontSize: 12, fontWeight: '800', marginBottom: 2 },
+  milestoneTrophyReward:{ fontSize: 11, textAlign: 'center', lineHeight: 14 },
+
   goalCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,

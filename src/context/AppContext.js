@@ -230,6 +230,7 @@ export function AppProvider({ children }) {
           streak:        k.streak || 0,
           lastCompletedDate: k.last_completed_date || null,
           balance_cents: k.balance_cents || 0,
+          milestones:    k.milestones || [],
         })),
       };
       setFamily(familyData);
@@ -574,13 +575,43 @@ export function AppProvider({ children }) {
       await saveTasks(updated);
     }
 
-    // Notify
+    // Notify task approved
     const kid = family?.kids?.find(k => k.id === (task?.assignedTo || task?.assigned_to));
     if (kid && family?.notifyPrefs?.taskApproved !== false) {
       await sendNotif(
         '⭐ Reward Released!',
         `${kid.name} earned "${task?.reward}" for completing ${task?.emoji} ${task?.title}! 🎉`
       );
+    }
+
+    // Check star milestones — count stars after this approval
+    if (kid) {
+      const newStarCount = tasks.filter(t =>
+        (t.assignedTo || t.assigned_to) === kid.id &&
+        (t.status === 'approved' || t.id === taskId)
+      ).length;
+
+      const milestones = kid.milestones || [];
+      const newlyAchieved = milestones.filter(m =>
+        !m.achieved && m.stars_required <= newStarCount
+      );
+
+      if (newlyAchieved.length > 0) {
+        const updatedMilestones = milestones.map(m =>
+          newlyAchieved.find(n => n.id === m.id)
+            ? { ...m, achieved: true, achieved_at: Date.now() }
+            : m
+        );
+        await updateKidMilestones(kid.id, updatedMilestones);
+
+        // Notify parent for each newly achieved milestone
+        for (const m of newlyAchieved) {
+          await sendNotif(
+            '🏆 Milestone Reached!',
+            `${kid.name} hit ${m.stars_required} ⭐ and earned: "${m.reward}"! Tap to give the reward.`
+          );
+        }
+      }
     }
   }
 
@@ -667,6 +698,54 @@ export function AppProvider({ children }) {
       };
       await saveFamily(updated);
     }
+  }
+
+  // ── Star Milestones ────────────────────────────────────────────────────────
+
+  async function updateKidMilestones(kidId, milestones) {
+    const updated = {
+      ...family,
+      kids: family.kids.map(k => k.id === kidId ? { ...k, milestones } : k),
+    };
+    setFamily(updated);
+    if (SUPABASE_READY && familyId) {
+      await supabase.from('profiles').update({ milestones }).eq('id', kidId);
+    } else {
+      await saveFamily(updated);
+    }
+  }
+
+  async function addMilestone(kidId, { stars_required, reward }) {
+    const kid = family?.kids?.find(k => k.id === kidId);
+    if (!kid) return;
+    const milestone = {
+      id: generateId(),
+      stars_required,
+      reward: reward.trim(),
+      achieved: false,
+      achieved_at: null,
+      redeemed: false,
+      redeemed_at: null,
+    };
+    const milestones = [...(kid.milestones || []), milestone]
+      .sort((a, b) => a.stars_required - b.stars_required);
+    await updateKidMilestones(kidId, milestones);
+  }
+
+  async function redeemMilestone(kidId, milestoneId) {
+    const kid = family?.kids?.find(k => k.id === kidId);
+    if (!kid) return;
+    const milestones = (kid.milestones || []).map(m =>
+      m.id === milestoneId ? { ...m, redeemed: true, redeemed_at: Date.now() } : m
+    );
+    await updateKidMilestones(kidId, milestones);
+  }
+
+  async function deleteMilestone(kidId, milestoneId) {
+    const kid = family?.kids?.find(k => k.id === kidId);
+    if (!kid) return;
+    const milestones = (kid.milestones || []).filter(m => m.id !== milestoneId);
+    await updateKidMilestones(kidId, milestones);
   }
 
   // ── Streak tracking ────────────────────────────────────────────────────────
@@ -1003,6 +1082,9 @@ export function AppProvider({ children }) {
         editKid,
         removeKid,
         setKidGoal,
+        addMilestone,
+        redeemMilestone,
+        deleteMilestone,
         // Profile
         updateParentProfile,
         updateNotifyPrefs,

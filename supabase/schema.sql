@@ -44,6 +44,8 @@ create table if not exists public.profiles (
   stripe_card_brand         text,
   -- Kid balance (kid profiles only) — in cents, e.g. 500 = $5.00
   balance_cents   integer default 0,
+  -- Star milestones set by parent: [{ id, stars_required, reward, achieved, achieved_at, redeemed, redeemed_at }]
+  milestones      jsonb default '[]'::jsonb,
   created_at      timestamptz default now()
 );
 
@@ -210,6 +212,9 @@ alter publication supabase_realtime add table public.profiles;
 -- ─────────────────────────────────────────────────────────────────────────────
 -- MIGRATIONS (run only if upgrading an existing installation)
 -- ─────────────────────────────────────────────────────────────────────────────
+
+-- v1.4: Add star milestones to kid profiles
+-- alter table public.profiles add column if not exists milestones jsonb default '[]'::jsonb;
 
 -- v1.1: Add due_date to tasks and notification preferences to profiles
 -- alter table public.tasks    add column if not exists due_date    text;
