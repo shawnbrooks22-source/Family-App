@@ -103,11 +103,38 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     loadData();
+
+    // Keep authUser state in sync with the real Supabase session.
+    // Without this, React state can drift from the actual session — leading to
+    // RLS failures because we attempt cloud writes when no JWT is present.
+    let authSub = null;
+    if (SUPABASE_READY) {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        setAuthUser(session?.user || null);
+      });
+      authSub = data?.subscription;
+    }
+
     return () => {
-      // Cleanup real-time subscription on unmount
       realtimeSub.current?.unsubscribe();
+      authSub?.unsubscribe?.();
     };
   }, []);
+
+  // Returns a valid session or null. Forces a refresh attempt if the access
+  // token is missing/expired so writes don't go out without a JWT.
+  async function ensureSession() {
+    if (!SUPABASE_READY) return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) return session;
+      // No token in cache — try a refresh in case there's a refresh token
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      return refreshed?.session || null;
+    } catch {
+      return null;
+    }
+  }
 
   // ── Subscribe to real-time task updates from Supabase ─────────────────────
   function subscribeRealtime(fid) {
@@ -150,9 +177,11 @@ export function AppProvider({ children }) {
       if (notifAsked === 'true') setNotificationsAsked(true);
 
       // First try to restore an existing Supabase Auth session
+      let hasSession = false;
       if (SUPABASE_READY) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          hasSession = true;
           setAuthUser(session.user);
           // Find the family owned by this auth user
           const { data: famRow } = await supabase
@@ -171,6 +200,12 @@ export function AppProvider({ children }) {
             subscribeRealtime(fid);
             return;
           }
+          // Authed but no family owned — clear any stale cached family id
+          // so we don't try to write to a family this user doesn't own
+          // (which would produce an RLS violation on the next insert).
+          await secureDelete(FAMILY_ID_KEY).catch(() => {});
+          await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY]).catch(() => {});
+          return;
         }
       }
 
@@ -181,7 +216,9 @@ export function AppProvider({ children }) {
         AsyncStorage.getItem(TASKS_KEY),
       ]);
 
-      if (SUPABASE_READY && storedFamilyId) {
+      // Only use a cached familyId in cloud mode if we have a valid session;
+      // otherwise we'd attempt RLS-protected writes without a JWT and fail.
+      if (SUPABASE_READY && storedFamilyId && hasSession) {
         setFamilyId(storedFamilyId);
         await Promise.all([
           loadFamilyFromSupabase(storedFamilyId),
@@ -189,6 +226,7 @@ export function AppProvider({ children }) {
         ]);
         subscribeRealtime(storedFamilyId);
       } else {
+        // Pure local/offline mode — read from AsyncStorage
         if (familyRaw) setFamily(JSON.parse(familyRaw));
         if (tasksRaw)  setTasks(JSON.parse(tasksRaw));
       }
@@ -306,13 +344,44 @@ export function AppProvider({ children }) {
     // Sign up parent with Supabase Auth (email + password required)
     let authUserId = null;
     if (data.parentEmail && data.parentPassword) {
-      const { data: authData, error: signUpErr } = await supabase.auth.signUp({
-        email:    data.parentEmail.trim().toLowerCase(),
-        password: data.parentPassword,
-      });
-      if (signUpErr) throw signUpErr;
-      authUserId = authData.user?.id ?? null;
-      if (authUserId) setAuthUser(authData.user);
+      const email    = data.parentEmail.trim().toLowerCase();
+      const password = data.parentPassword;
+
+      const { data: authData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+
+      // Handle "User already registered" by signing in instead.
+      // (Common in dev when retrying setup with the same email.)
+      let session = authData?.session ?? null;
+      let user    = authData?.user ?? null;
+
+      if (signUpErr) {
+        const msg = (signUpErr.message || '').toLowerCase();
+        if (msg.includes('already') || msg.includes('registered')) {
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInErr) throw new Error('An account with this email already exists. Please use the Sign In screen with your existing password.');
+          session = signInData.session;
+          user    = signInData.user;
+        } else {
+          throw signUpErr;
+        }
+      }
+
+      // CRITICAL: signUp returns user but NO session when "Confirm email" is
+      // enabled in the Supabase project (the default). Without a session, the
+      // Supabase client sends no JWT, server-side auth.uid() is null, and ALL
+      // RLS-protected inserts fail. Fix by signing in immediately. If sign-in
+      // fails, email confirmation is required — surface that clearly.
+      if (!session && user) {
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInErr) {
+          throw new Error('Email confirmation is enabled on this Supabase project. Disable it in Authentication → Providers → Email → "Confirm email", or have the user confirm via email before continuing.');
+        }
+        session = signInData.session;
+        user    = signInData.user;
+      }
+
+      authUserId = user?.id ?? null;
+      if (user) setAuthUser(user);
     }
 
     const inviteCode = generateInviteCode();
@@ -437,6 +506,13 @@ export function AppProvider({ children }) {
     };
 
     if (SUPABASE_READY && familyId && authUser) {
+      // Verify a real session exists before attempting the cloud write —
+      // React state may say authUser is set, but the actual JWT could be
+      // expired/missing, which would cause an RLS violation server-side.
+      const session = await ensureSession();
+      if (!session) {
+        throw new Error('Your session has expired. Please sign in again to add quests.');
+      }
       // Strip camelCase fields — Supabase only knows snake_case columns
       // created_at must stay as Date.now() (bigint ms) — NOT an ISO string
       const { assignedTo: _a, ...supabaseTask } = newTask;
