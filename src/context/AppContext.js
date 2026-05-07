@@ -436,7 +436,7 @@ export function AppProvider({ children }) {
       assigned_to:  kidId,
     };
 
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       // Strip camelCase fields — Supabase only knows snake_case columns
       // created_at must stay as Date.now() (bigint ms) — NOT an ISO string
       const { assignedTo: _a, ...supabaseTask } = newTask;
@@ -451,7 +451,7 @@ export function AppProvider({ children }) {
   }
 
   async function editTask(taskId, updates) {
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       // Strip camelCase fields — Supabase only has snake_case columns
       const { assignedTo: _a, ...supabaseUpdates } = updates;
       await supabase.from('tasks').update(supabaseUpdates).eq('id', taskId);
@@ -467,7 +467,7 @@ export function AppProvider({ children }) {
    * Falls back to the original local URI if upload fails (e.g. offline).
    */
   async function uploadTaskPhoto(localUri, taskId) {
-    if (!SUPABASE_READY || !familyId || !localUri) return localUri;
+    if (!SUPABASE_READY || !familyId || !authUser || !localUri) return localUri;
     try {
       // Convert local URI to a Blob using fetch (works in React Native)
       const response = await fetch(localUri);
@@ -506,7 +506,7 @@ export function AppProvider({ children }) {
       ...(resolvedPhotoUri ? { photo_proof_uri: resolvedPhotoUri } : {}),
     };
 
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('tasks').update(updates).eq('id', taskId);
       // Optimistic update so UI reflects the change immediately (don't wait for realtime)
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
@@ -532,7 +532,7 @@ export function AppProvider({ children }) {
     const task = tasks.find(t => t.id === taskId);
     const updates = { status: 'approved', celebrated: false, approved_at: Date.now() };
 
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('tasks').update(updates).eq('id', taskId);
       // Optimistic update so UI reflects the approval immediately (don't wait for realtime)
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
@@ -617,7 +617,7 @@ export function AppProvider({ children }) {
   }
 
   async function markCelebrated(taskId) {
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('tasks').update({ celebrated: true }).eq('id', taskId);
       // Optimistic update to prevent repeat celebration triggers
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, celebrated: true } : t));
@@ -627,7 +627,7 @@ export function AppProvider({ children }) {
   }
 
   async function deleteTask(taskId) {
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('tasks').delete().eq('id', taskId);
     } else {
       await saveTasks(tasks.filter(t => t.id !== taskId));
@@ -637,7 +637,7 @@ export function AppProvider({ children }) {
   // ── Kid operations ─────────────────────────────────────────────────────────
   async function addKid(kid) {
     const newKid = { ...kid, id: generateId(), goal: null, streak: 0, milestones: [] };
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('profiles').insert({
         id:        newKid.id,
         family_id: familyId,
@@ -655,7 +655,7 @@ export function AppProvider({ children }) {
   }
 
   async function editKid(kidId, updates) {
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       const dbUpdates = {};
       if (updates.name)  dbUpdates.name  = updates.name;
       if (updates.emoji) dbUpdates.emoji = updates.emoji;
@@ -676,7 +676,7 @@ export function AppProvider({ children }) {
   }
 
   async function removeKid(kidId) {
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await Promise.all([
         supabase.from('profiles').delete().eq('id', kidId),
         supabase.from('tasks').delete().eq('assigned_to', kidId),
@@ -695,7 +695,7 @@ export function AppProvider({ children }) {
       ...prev,
       kids: prev.kids.map(k => k.id === kidId ? { ...k, goal } : k),
     } : prev);
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('profiles').update({ goal }).eq('id', kidId);
     } else {
       const updated = {
@@ -714,7 +714,7 @@ export function AppProvider({ children }) {
       kids: family.kids.map(k => k.id === kidId ? { ...k, milestones } : k),
     };
     setFamily(updated);
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('profiles').update({ milestones }).eq('id', kidId);
     } else {
       await saveFamily(updated);
@@ -791,7 +791,7 @@ export function AppProvider({ children }) {
         k.id === kidId ? { ...k, streak: newStreak, lastCompletedDate: today } : k
       ),
     } : prev);
-    if (SUPABASE_READY && familyId) {
+    if (SUPABASE_READY && familyId && authUser) {
       await supabase.from('profiles').update({
         streak: newStreak,
         last_completed_date: today,
@@ -818,7 +818,7 @@ export function AppProvider({ children }) {
     if (updates.parentName)  processedUpdates.parentName  = sanitize(updates.parentName, 60);
     if (updates.parentPhone) processedUpdates.parentPhone = sanitize(updates.parentPhone, 20);
 
-    if (SUPABASE_READY && familyId && family?.parentId) {
+    if (SUPABASE_READY && familyId && authUser && family?.parentId) {
       const dbUpdates = {};
       if (processedUpdates.parentName)  dbUpdates.name       = processedUpdates.parentName;
       if (processedUpdates.parentEmoji) dbUpdates.emoji      = processedUpdates.parentEmoji;
@@ -838,7 +838,7 @@ export function AppProvider({ children }) {
     const merged = { ...(family?.notifyPrefs || { taskCompleted: true, taskApproved: true }), ...prefs };
     // Optimistic update so toggle is instant
     setFamily(prev => prev ? { ...prev, notifyPrefs: merged } : prev);
-    if (SUPABASE_READY && familyId && family?.parentId) {
+    if (SUPABASE_READY && familyId && authUser && family?.parentId) {
       await supabase.from('profiles').update({ notify_prefs: merged }).eq('id', family.parentId);
     } else {
       const updated = { ...family, notifyPrefs: merged };
@@ -854,16 +854,18 @@ export function AppProvider({ children }) {
       if (SUPABASE_READY && familyId && authUser?.id && DELETE_ACCOUNT_URL) {
         // Use the Edge Function so the service-role key can delete the auth user
         // and storage files — the anon key cannot do this.
-        await fetch(DELETE_ACCOUNT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ familyId, authUserId: authUser.id }),
-        }).catch(() => {
-          // Fallback: best-effort local cascade delete via anon key
-          supabase.from('families').delete().eq('id', familyId).catch(() => {});
-        });
-      } else if (SUPABASE_READY && familyId) {
-        await supabase.from('families').delete().eq('id', familyId).catch(() => {});
+        try {
+          await fetch(DELETE_ACCOUNT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ familyId, authUserId: authUser.id }),
+          });
+        } catch {
+          // Fallback: best-effort cascade delete via anon key
+          try { await supabase.from('families').delete().eq('id', familyId); } catch { /* ignore */ }
+        }
+      } else if (SUPABASE_READY && familyId && authUser) {
+        try { await supabase.from('families').delete().eq('id', familyId); } catch { /* ignore */ }
       }
 
       await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY]);
