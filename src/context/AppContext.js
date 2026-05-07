@@ -183,12 +183,16 @@ export function AppProvider({ children }) {
         if (session?.user) {
           hasSession = true;
           setAuthUser(session.user);
-          // Find the family owned by this auth user
-          const { data: famRow } = await supabase
+          // Find the family owned by this auth user. Use limit(1) +
+          // order desc so this never errors on legacy duplicate rows
+          // and always agrees with the server's my_family_id() function.
+          const { data: famRows } = await supabase
             .from('families')
             .select('id')
             .eq('parent_auth_id', session.user.id)
-            .single();
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const famRow = famRows?.[0];
           if (famRow) {
             const fid = famRow.id;
             setFamilyId(fid);
@@ -1082,12 +1086,15 @@ export function AppProvider({ children }) {
     if (error) throw error;
     setAuthUser(data.user);
 
-    // Load family owned by this auth user
-    const { data: famRow, error: famErr } = await supabase
+    // Load family owned by this auth user. limit(1) + order desc so legacy
+    // duplicate rows don't error out and we agree with my_family_id().
+    const { data: famRows, error: famErr } = await supabase
       .from('families')
       .select('id')
       .eq('parent_auth_id', data.user.id)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const famRow = famRows?.[0];
     if (famErr || !famRow) {
       await supabase.auth.signOut();
       setAuthUser(null);
