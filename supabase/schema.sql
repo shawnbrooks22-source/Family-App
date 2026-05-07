@@ -120,9 +120,16 @@ drop policy if exists "transactions_insert" on public.transactions;
 
 -- Helper: returns the family_id owned by the currently authenticated parent.
 -- Returns NULL if not authenticated (safely blocks all access).
+-- Deterministic ordering (most recently created first) so that if a user
+-- somehow ends up with multiple family rows (e.g. duplicate dev test runs),
+-- this function always returns the same one — keeping client-side familyId
+-- and server-side RLS checks in agreement.
 create or replace function public.my_family_id()
 returns uuid language sql stable security definer as $$
-  select id from public.families where parent_auth_id = auth.uid() limit 1;
+  select id from public.families
+  where parent_auth_id = auth.uid()
+  order by created_at desc
+  limit 1;
 $$;
 
 -- FAMILIES ────────────────────────────────────────────────────────────────────

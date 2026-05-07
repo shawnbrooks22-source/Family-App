@@ -384,44 +384,92 @@ export function AppProvider({ children }) {
       if (user) setAuthUser(user);
     }
 
-    const inviteCode = generateInviteCode();
-    // Create family row — link to auth user if we have one
-    const { data: famRow, error: famErr } = await supabase
-      .from('families')
-      .insert({
-        name:           `${data.parentName}'s Family`,
-        invite_code:    inviteCode,
-        ...(authUserId ? { parent_auth_id: authUserId } : {}),
-      })
-      .select()
-      .single();
-    if (famErr) throw famErr;
+    // CRITICAL: Reuse an existing family for this auth user if one exists.
+    // Otherwise re-running setup (common in dev) creates duplicate family
+    // rows for the same parent_auth_id. The server's my_family_id() does
+    // LIMIT 1 with no deterministic order, so it can return a different
+    // family than the one in React state — causing every subsequent task
+    // insert to fail the RLS check `family_id = my_family_id()`.
+    let famRow = null;
+    let inviteCode;
+    if (authUserId) {
+      const { data: existing } = await supabase
+        .from('families')
+        .select('*')
+        .eq('parent_auth_id', authUserId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      famRow = existing?.[0] || null;
+    }
+
+    if (famRow) {
+      inviteCode = famRow.invite_code;
+    } else {
+      inviteCode = generateInviteCode();
+      const { data: newFam, error: famErr } = await supabase
+        .from('families')
+        .insert({
+          name:           `${data.parentName}'s Family`,
+          invite_code:    inviteCode,
+          ...(authUserId ? { parent_auth_id: authUserId } : {}),
+        })
+        .select()
+        .single();
+      if (famErr) throw famErr;
+      famRow = newFam;
+    }
 
     const fid = famRow.id;
-    const parentId = `parent_${generateId()}`;
 
-    // Create parent profile
-    const { error: parentErr } = await supabase.from('profiles').insert({
-      id:         parentId,
-      family_id:  fid,
-      name:       data.parentName,
-      emoji:      data.parentEmoji,
-      phone:      data.parentPhone || '',
-      role:       'parent',
-      parent_pin: data.parentPin,
-    });
-    if (parentErr) throw parentErr;
+    // Reuse existing parent profile for this family if one exists, otherwise
+    // create one. Same de-duping rationale as the family check above.
+    let parentId;
+    const { data: existingParent } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('family_id', fid)
+      .eq('role', 'parent')
+      .limit(1);
+    if (existingParent && existingParent[0]) {
+      parentId = existingParent[0].id;
+      await supabase.from('profiles').update({
+        name:       data.parentName,
+        emoji:      data.parentEmoji,
+        phone:      data.parentPhone || '',
+        parent_pin: data.parentPin,
+      }).eq('id', parentId);
+    } else {
+      parentId = `parent_${generateId()}`;
+      const { error: parentErr } = await supabase.from('profiles').insert({
+        id:         parentId,
+        family_id:  fid,
+        name:       data.parentName,
+        emoji:      data.parentEmoji,
+        phone:      data.parentPhone || '',
+        role:       'parent',
+        parent_pin: data.parentPin,
+      });
+      if (parentErr) throw parentErr;
+    }
 
-    // Create kid profiles
-    const kidRows = (data.kids || []).map(k => ({
-      id:        k.id || `kid_${generateId()}`,
-      family_id: fid,
-      name:      k.name,
-      emoji:     k.emoji,
-      color:     k.color,
-      phone:     k.phone || '',
-      role:      'kid',
-    }));
+    // Create kid profiles only if this family doesn't already have kids
+    // (otherwise re-running setup would duplicate them).
+    const { data: existingKids } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('family_id', fid)
+      .eq('role', 'kid');
+    const kidRows = (existingKids && existingKids.length > 0)
+      ? []
+      : (data.kids || []).map(k => ({
+          id:        k.id || `kid_${generateId()}`,
+          family_id: fid,
+          name:      k.name,
+          emoji:     k.emoji,
+          color:     k.color,
+          phone:     k.phone || '',
+          role:      'kid',
+        }));
     if (kidRows.length > 0) {
       const { error: kidsErr } = await supabase.from('profiles').insert(kidRows);
       if (kidsErr) throw kidsErr;
@@ -431,37 +479,40 @@ export function AppProvider({ children }) {
     await secureSave(FAMILY_ID_KEY, fid);
     setFamilyId(fid);
 
-    // Set family state immediately from local data so navigation is never blocked,
-    // then refresh from Supabase to pick up any server-side fields.
-    const localFamilyData = {
-      _supabaseFamilyId: fid,
-      inviteCode,
-      parentName:  data.parentName,
-      parentEmoji: data.parentEmoji,
-      parentPhone: data.parentPhone || '',
-      parentPin:   data.parentPin,
-      parentId,
-      notifyPrefs: { taskCompleted: true, taskApproved: true },
-      kids: kidRows.map(k => ({
-        id:                k.id,
-        name:              k.name,
-        emoji:             k.emoji,
-        color:             k.color,
-        phone:             k.phone || '',
-        goal:              null,
-        streak:            0,
-        lastCompletedDate: null,
-        balance_cents:     0,
-        milestones:        [],
-      })),
-    };
-    setFamily(localFamilyData);
-    await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(localFamilyData));
-
-    // Best-effort refresh from Supabase (won't block navigation if it fails)
-    loadFamilyFromSupabase(fid).catch(e => {
+    // Refresh family/kids/tasks from Supabase (authoritative — covers the
+    // reused-family case where pre-existing kids weren't in the form data).
+    // Fall back to a local snapshot if the refresh fails so navigation isn't
+    // blocked even if the network drops mid-setup.
+    try {
+      await loadFamilyFromSupabase(fid);
+      await loadTasksFromSupabase(fid);
+    } catch (e) {
       if (__DEV__) console.error('Post-setup Supabase refresh failed:', e);
-    });
+      const fallback = {
+        _supabaseFamilyId: fid,
+        inviteCode,
+        parentName:  data.parentName,
+        parentEmoji: data.parentEmoji,
+        parentPhone: data.parentPhone || '',
+        parentPin:   data.parentPin,
+        parentId,
+        notifyPrefs: { taskCompleted: true, taskApproved: true },
+        kids: (kidRows.length ? kidRows : (data.kids || [])).map(k => ({
+          id:                k.id,
+          name:              k.name,
+          emoji:             k.emoji,
+          color:             k.color,
+          phone:             k.phone || '',
+          goal:              null,
+          streak:            0,
+          lastCompletedDate: null,
+          balance_cents:     0,
+          milestones:        [],
+        })),
+      };
+      setFamily(fallback);
+      await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(fallback));
+    }
     subscribeRealtime(fid);
   }
 
@@ -506,24 +557,55 @@ export function AppProvider({ children }) {
     };
 
     if (SUPABASE_READY && familyId && authUser) {
-      // Verify a real session exists before attempting the cloud write —
-      // React state may say authUser is set, but the actual JWT could be
-      // expired/missing, which would cause an RLS violation server-side.
       const session = await ensureSession();
       if (!session) {
         throw new Error('Your session has expired. Please sign in again to add quests.');
       }
-      // Strip camelCase fields — Supabase only knows snake_case columns
-      // created_at must stay as Date.now() (bigint ms) — NOT an ISO string
       const { assignedTo: _a, ...supabaseTask } = newTask;
-      const { error } = await supabase.from('tasks').insert(supabaseTask);
+
+      let { error } = await supabase.from('tasks').insert(supabaseTask);
+
+      // Self-heal RLS violations: if the server thinks our family is
+      // different from what's in React state (e.g. duplicate family rows
+      // from earlier dev runs, stale cache after re-install), refetch the
+      // server's authoritative familyId, sync local state, and retry once.
+      if (error && /row-level security/i.test(error.message || '')) {
+        const correctedId = await fetchAuthoritativeFamilyId(session.user.id);
+        if (correctedId && correctedId !== familyId) {
+          if (__DEV__) console.warn('familyId out of sync — fixing:', { local: familyId, server: correctedId });
+          setFamilyId(correctedId);
+          await secureSave(FAMILY_ID_KEY, correctedId);
+          supabaseTask.family_id = correctedId;
+          newTask.family_id      = correctedId;
+          const retry = await supabase.from('tasks').insert(supabaseTask);
+          error = retry.error;
+        }
+      }
       if (error) throw error;
-      // Optimistic update — don't rely solely on realtime subscription
+
       setTasks(prev => [...prev, supabaseTask]);
     } else {
       await saveTasks([...tasks, newTask]);
     }
     return newTask;
+  }
+
+  // Fetch the most-recent family owned by the given auth user. Used to recover
+  // from any local/server familyId mismatch (e.g. duplicate families created
+  // during dev testing, stale SecureStore cache after re-install).
+  async function fetchAuthoritativeFamilyId(authUserId) {
+    if (!SUPABASE_READY || !authUserId) return null;
+    try {
+      const { data } = await supabase
+        .from('families')
+        .select('id')
+        .eq('parent_auth_id', authUserId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      return data?.[0]?.id || null;
+    } catch {
+      return null;
+    }
   }
 
   async function editTask(taskId, updates) {
