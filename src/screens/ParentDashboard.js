@@ -1067,7 +1067,17 @@ function FamilyTab({ navigation }) {
   function confirmRemove(kid) {
     Alert.alert(t('parentDashboard.removeKid', { name: kid.name }), t('parentDashboard.removeKidConfirm'), [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('parentDashboard.remove'), style: 'destructive', onPress: () => removeKid(kid.id) },
+      {
+        text: t('parentDashboard.remove'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeKid(kid.id);
+          } catch (e) {
+            Alert.alert('Could not remove kid', e?.message || 'Please try again.');
+          }
+        },
+      },
     ]);
   }
 

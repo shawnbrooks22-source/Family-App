@@ -846,11 +846,13 @@ export function AppProvider({ children }) {
 
   async function removeKid(kidId) {
     if (SUPABASE_READY && familyId && authUser) {
-      await Promise.all([
-        supabase.from('profiles').delete().eq('id', kidId),
-        supabase.from('tasks').delete().eq('assigned_to', kidId),
-      ]);
+      // Delete tasks BEFORE the profile — tasks.assigned_to references
+      // profiles.id with no ON DELETE cascade, so a parallel delete
+      // racing the wrong way fails with a FK violation.
+      await supabase.from('tasks').delete().eq('assigned_to', kidId);
+      await supabase.from('profiles').delete().eq('id', kidId);
       setFamily(prev => ({ ...prev, kids: prev.kids.filter(k => k.id !== kidId) }));
+      setTasks(prev => prev.filter(t => (t.assignedTo || t.assigned_to) !== kidId));
     } else {
       const updated = { ...family, kids: family.kids.filter(k => k.id !== kidId) };
       await saveFamily(updated);
