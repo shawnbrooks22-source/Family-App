@@ -690,6 +690,11 @@ export function AppProvider({ children }) {
   }
 
   async function setKidGoal(kidId, goal) {
+    // Optimistic update so the goal bar appears immediately
+    setFamily(prev => prev ? {
+      ...prev,
+      kids: prev.kids.map(k => k.id === kidId ? { ...k, goal } : k),
+    } : prev);
     if (SUPABASE_READY && familyId) {
       await supabase.from('profiles').update({ goal }).eq('id', kidId);
     } else {
@@ -779,7 +784,13 @@ export function AppProvider({ children }) {
       newStreak = 1;
     }
 
-    const streakUpdates = { streak: newStreak, lastCompletedDate: today };
+    // Optimistic update so the streak counter is immediately visible
+    setFamily(prev => prev ? {
+      ...prev,
+      kids: prev.kids.map(k =>
+        k.id === kidId ? { ...k, streak: newStreak, lastCompletedDate: today } : k
+      ),
+    } : prev);
     if (SUPABASE_READY && familyId) {
       await supabase.from('profiles').update({
         streak: newStreak,
@@ -813,6 +824,8 @@ export function AppProvider({ children }) {
       if (processedUpdates.parentEmoji) dbUpdates.emoji      = processedUpdates.parentEmoji;
       if (processedUpdates.parentPhone !== undefined) dbUpdates.phone = processedUpdates.parentPhone;
       if (processedUpdates.parentPin)   dbUpdates.parent_pin = processedUpdates.parentPin;
+      // Optimistic update so UI reflects changes immediately without waiting for realtime
+      setFamily(prev => prev ? { ...prev, ...processedUpdates } : prev);
       await supabase.from('profiles').update(dbUpdates).eq('id', family.parentId);
     } else {
       const updated = { ...family, ...processedUpdates };
@@ -823,6 +836,8 @@ export function AppProvider({ children }) {
   // ── Notification preferences ───────────────────────────────────────────────
   async function updateNotifyPrefs(prefs) {
     const merged = { ...(family?.notifyPrefs || { taskCompleted: true, taskApproved: true }), ...prefs };
+    // Optimistic update so toggle is instant
+    setFamily(prev => prev ? { ...prev, notifyPrefs: merged } : prev);
     if (SUPABASE_READY && familyId && family?.parentId) {
       await supabase.from('profiles').update({ notify_prefs: merged }).eq('id', family.parentId);
     } else {

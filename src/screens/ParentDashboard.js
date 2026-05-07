@@ -1071,6 +1071,12 @@ function FamilyTab({ navigation }) {
     setEditKidColor(kid.color);
   }
 
+  function closeEditKidModal() {
+    setEditingKid(null);
+    setNewMilestoneStars('');
+    setNewMilestoneReward('');
+  }
+
   async function handleSaveKid() {
     if (!editKidName.trim()) { Alert.alert(t('parentDashboard.name')); return; }
     setKidLoading(true);
@@ -1081,7 +1087,7 @@ function FamilyTab({ navigation }) {
         emoji: editKidEmoji,
         color: editKidColor,
       });
-      setEditingKid(null);
+      closeEditKidModal();
     } catch (e) {
       Alert.alert('Failed to save', e?.message || 'Something went wrong. Please try again.');
     } finally {
@@ -1254,11 +1260,11 @@ function FamilyTab({ navigation }) {
         visible={!!editingKid}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setEditingKid(null)}
+        onRequestClose={closeEditKidModal}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.bg }]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-            <TouchableOpacity onPress={() => setEditingKid(null)}>
+            <TouchableOpacity onPress={closeEditKidModal}>
               <Text style={[styles.modalCancelText, { color: colors.text3 }]}>{t('cancel')}</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text1 }]}>{t('parentDashboard.editKid')}</Text>
