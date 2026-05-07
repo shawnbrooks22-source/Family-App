@@ -71,10 +71,10 @@ export function SubscriptionProvider({ children }) {
   useEffect(() => {
     initSubscription();
     return () => {
-      // Clean up IAP connection and listeners on unmount
       purchaseListener.current?.remove?.();
       errorListener.current?.remove?.();
-      IAP?.endConnection?.();
+      // endConnection throws E_IAP_NOT_AVAILABLE in Expo Go — must catch
+      try { IAP?.endConnection?.(); } catch { /* normal in Expo Go */ }
     };
   }, []);
 
