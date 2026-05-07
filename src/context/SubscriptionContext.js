@@ -96,6 +96,7 @@ export function SubscriptionProvider({ children }) {
 
     try {
       await IAP.initConnection();
+      // If we get here, IAP native module is available
       setIapReady(true);
 
       // 3. Listen for incoming purchases (handles async purchase completions)
@@ -121,7 +122,9 @@ export function SubscriptionProvider({ children }) {
       // 5. Silently restore any existing subscription
       await syncWithStore(false);
     } catch (e) {
-      if (__DEV__) console.warn('IAP init failed (normal in simulator):', e);
+      // E_IAP_NOT_AVAILABLE = running in Expo Go which has no native IAP bridge.
+      // Silently degrade — the app works fine, purchases just aren't available.
+      if (__DEV__) console.warn('IAP init failed (normal in Expo Go):', e?.code || e);
     } finally {
       setIsLoaded(true);
     }

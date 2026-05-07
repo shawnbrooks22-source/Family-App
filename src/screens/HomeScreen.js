@@ -128,7 +128,9 @@ function formatLockoutTime(seconds) {
 }
 
 // ─── Kid Profile Card ───────────────────────────────────────────────────────────
-function KidCard({ profile, onPress, stars, colors }) {
+function KidCard({ profile, onPress, stars, colors, cardSize, avatarSize }) {
+  const CARD_SIZE = cardSize;
+  const AVATAR_SIZE = avatarSize;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim  = useRef(new Animated.Value(1)).current;
 
@@ -1260,6 +1262,8 @@ export default function HomeScreen({ navigation }) {
                     stars={stats.stars}
                     onPress={() => navigation.navigate('Kid', { kidId: profile.id })}
                     colors={colors}
+                    cardSize={CARD_SIZE}
+                    avatarSize={AVATAR_SIZE}
                   />
                 )}
               </Animated.View>
