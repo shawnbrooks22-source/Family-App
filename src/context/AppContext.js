@@ -789,6 +789,28 @@ export function AppProvider({ children }) {
           );
         }
       }
+
+      // ── Savings challenge check ────────────────────────────────────────────
+      const savings = kid.goal?.savings;
+      if (savings && !savings.earned) {
+        // tasks closure still reflects pre-approval state; +1 for this approval
+        const prevApproved = tasks.filter(t =>
+          (t.assignedTo || t.assigned_to) === kid.id && t.status === 'approved'
+        ).length;
+        const progress = (prevApproved + 1) - savings.startCount;
+        if (progress >= savings.questsRequired) {
+          try {
+            await setSavingsChallenge(kid.id, { ...savings, earned: true, earnedAt: Date.now() });
+            const amt = `$${(savings.rewardAmountCents / 100).toFixed(2)}`;
+            await sendNotif(
+              '💰 Savings Goal Reached!',
+              `${kid.name} completed ${savings.questsRequired} quests and earned ${amt}! Tap to pay it out.`
+            );
+          } catch (e) {
+            if (__DEV__) console.error('Savings challenge update failed:', e);
+          }
+        }
+      }
     }
   }
 
@@ -893,6 +915,29 @@ export function AppProvider({ children }) {
       };
       await saveFamily(updated);
     }
+  }
+
+  // ── Savings Challenge ──────────────────────────────────────────────────────
+  // Stored inside profiles.goal as goal.savings — fully backward compatible
+  // with the existing { name, stars } star-goal structure.
+
+  async function setSavingsChallenge(kidId, savings) {
+    const kid = family?.kids?.find(k => k.id === kidId);
+    if (!kid) return;
+    const existingGoal = kid.goal || {};
+    let newGoal;
+    if (savings === null) {
+      const { savings: _s, ...rest } = existingGoal;
+      newGoal = Object.keys(rest).length > 0 ? rest : null;
+    } else {
+      newGoal = { ...existingGoal, savings };
+    }
+    await setKidGoal(kidId, newGoal);
+  }
+
+  async function completeSavingsChallenge(kidId) {
+    // Clear the challenge so the parent can optionally start a new round
+    await setSavingsChallenge(kidId, null);
   }
 
   // ── Star Milestones ────────────────────────────────────────────────────────
@@ -1302,6 +1347,8 @@ export function AppProvider({ children }) {
         editKid,
         removeKid,
         setKidGoal,
+        setSavingsChallenge,
+        completeSavingsChallenge,
         addMilestone,
         redeemMilestone,
         deleteMilestone,

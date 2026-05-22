@@ -124,7 +124,8 @@
     "encourageNoneWeek": "Aún no hay misiones terminadas esta semana — ¡es hora de ponerse en marcha! 🚀",
     "encourageStartWeek": "¡Buen comienzo! Sigue construyendo ese impulso 💪",
     "encourageGoodWeek": "¡Buen trabajo esta semana! La familia lo está dando todo 🔥",
-    "encourageIncredibleWeek": "¡SEMANA INCREÍBLE! ¡Tu familia está en llamas! 🏆🔥"
+    "encourageIncredibleWeek": "¡SEMANA INCREÍBLE! ¡Tu familia está en llamas! 🏆🔥",
+    "pinResetFailed": "No se pudo restablecer el PIN. Inténtalo de nuevo."
   },
 
   "parentDashboard": {
@@ -193,7 +194,24 @@
     "delete": "Eliminar",
     "noQuestsFilter": "No hay misiones aquí",
     "cashReward": "Premio en Efectivo 💵 (opcional)",
-    "cashRewardPlaceholder": "ej. 5.00 — se cobra de tu tarjeta al aprobar"
+    "cashRewardPlaceholder": "ej. 5.00 — se cobra de tu tarjeta al aprobar",
+    "savingsGoal": "Meta de Ahorro",
+    "savingsGoalSub": "Paga a {{name}} un bono cuando alcance una meta de misiones.",
+    "savingsWhatFor": "¿Para qué es la meta? (ej. Bicicleta nueva 🚲)",
+    "savingsQuestCount": "¿Cuántas misiones debe completar?",
+    "savingsRewardAmount": "Monto del bono ($)",
+    "savingsRewardPlaceholder": "ej. 10.00",
+    "savingsStartGoal": "Iniciar Meta de Ahorro 💰",
+    "savingsActive": "Meta de Ahorro Activa",
+    "savingsProgress": "{{done}} / {{total}} misiones",
+    "savingsEarned": "🎉 ¡Meta alcanzada — marca como pagada!",
+    "savingsMarkPaid": "✅ Marcar como Pagada",
+    "savingsRemove": "Eliminar Meta",
+    "savingsPayoutTitle": "💰 ¡Meta de Ahorro Alcanzada!",
+    "savingsPayoutSub": "{{name}} completó {{count}} misiones y ganó {{amount}}",
+    "savingsPayoutBtn": "Marcar como Pagada ✅",
+    "savingsEnterCount": "Ingresa cuántas misiones (ej. 5)",
+    "savingsEnterAmount": "Ingresa un monto en dólares"
   },
 
   "kidDashboard": {

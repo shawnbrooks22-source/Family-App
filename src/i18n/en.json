@@ -124,7 +124,8 @@
     "encourageNoneWeek": "No quests finished yet this week — time to get questing! 🚀",
     "encourageStartWeek": "Good start! Keep building that momentum 💪",
     "encourageGoodWeek": "Nice work this week! The family is crushing it 🔥",
-    "encourageIncredibleWeek": "INCREDIBLE week! Your family is on fire! 🏆🔥"
+    "encourageIncredibleWeek": "INCREDIBLE week! Your family is on fire! 🏆🔥",
+    "pinResetFailed": "Could not reset PIN. Please try again."
   },
 
   "parentDashboard": {
@@ -193,7 +194,24 @@
     "delete": "Delete",
     "noQuestsFilter": "No quests here",
     "cashReward": "Cash Reward 💵 (optional)",
-    "cashRewardPlaceholder": "e.g. 5.00 — charged to your card on approval"
+    "cashRewardPlaceholder": "e.g. 5.00 — charged to your card on approval",
+    "savingsGoal": "Savings Goal",
+    "savingsGoalSub": "Pay {{name}} a bonus when they hit a quest target.",
+    "savingsWhatFor": "What's the goal? (e.g. New bike 🚲)",
+    "savingsQuestCount": "Complete how many quests?",
+    "savingsRewardAmount": "Bonus amount ($)",
+    "savingsRewardPlaceholder": "e.g. 10.00",
+    "savingsStartGoal": "Start Savings Goal 💰",
+    "savingsActive": "Active Savings Goal",
+    "savingsProgress": "{{done}} / {{total}} quests",
+    "savingsEarned": "🎉 Goal earned — mark as paid!",
+    "savingsMarkPaid": "✅ Mark as Paid",
+    "savingsRemove": "Remove Goal",
+    "savingsPayoutTitle": "💰 Savings Goal Reached!",
+    "savingsPayoutSub": "{{name}} completed {{count}} quests and earned {{amount}}",
+    "savingsPayoutBtn": "Mark as Paid ✅",
+    "savingsEnterCount": "Enter how many quests (e.g. 5)",
+    "savingsEnterAmount": "Enter a dollar amount"
   },
 
   "kidDashboard": {

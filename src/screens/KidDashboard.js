@@ -342,9 +342,17 @@ export default function KidDashboard({ route, navigation }) {
   // Streak
   const streak = kid?.streak || 0;
 
-  // Goal state
-  const goal = kid?.goal || null; // { name, stars } | null
-  const starGoalProgress = goal ? Math.min(totalStars / goal.stars, 1) : 0;
+  // Goal state — goal may now contain both a star goal AND a savings challenge
+  const goal = kid?.goal || null;
+  const hasStarGoal = !!(goal?.name && goal?.stars > 0);
+  const starGoalProgress = hasStarGoal ? Math.min(totalStars / goal.stars, 1) : 0;
+  const savingsChallenge = goal?.savings || null;
+  const savingsProgress = savingsChallenge
+    ? Math.min(Math.max(0, approvedTasks.length - savingsChallenge.startCount), savingsChallenge.questsRequired)
+    : 0;
+  const savingsProgressFraction = savingsChallenge
+    ? savingsProgress / savingsChallenge.questsRequired
+    : 0;
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalNameInput, setGoalNameInput] = useState('');
   const [goalStarsInput, setGoalStarsInput] = useState('');
@@ -377,6 +385,7 @@ export default function KidDashboard({ route, navigation }) {
   const glowScale     = useRef(new Animated.Value(1)).current;
   const progressAnim  = useRef(new Animated.Value(0)).current;
   const goalAnim      = useRef(new Animated.Value(0)).current;
+  const savingsAnim   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -395,6 +404,13 @@ export default function KidDashboard({ route, navigation }) {
       toValue: starGoalProgress,
       duration: 1200,
       delay: 700,
+      useNativeDriver: false,
+    }).start();
+
+    Animated.timing(savingsAnim, {
+      toValue: savingsProgressFraction,
+      duration: 1200,
+      delay: 800,
       useNativeDriver: false,
     }).start();
 
@@ -517,9 +533,54 @@ export default function KidDashboard({ route, navigation }) {
         {/* ─── Quest Board Content ───────────────────────────────────────────── */}
         <View style={[styles.content, isTablet && { padding: pad }]}>
 
+          {/* ── Savings Challenge Card ─────────────────────────────────────── */}
+          {savingsChallenge && (
+            <View style={[styles.savingsCard, {
+              backgroundColor: savingsChallenge.earned ? '#F0FDF4' : colors.surface,
+              borderColor: savingsChallenge.earned ? '#10B981' : '#10B98140',
+            }]}>
+              <View style={styles.savingsCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.savingsCardTitle, { color: savingsChallenge.earned ? '#065F46' : colors.text1 }]}>
+                    💰 {savingsChallenge.label || 'Savings Goal'}
+                  </Text>
+                  <Text style={[styles.savingsCardSub, { color: savingsChallenge.earned ? '#047857' : colors.text3 }]}>
+                    {`${savingsProgress} / ${savingsChallenge.questsRequired} quests`}
+                  </Text>
+                </View>
+                <Text style={styles.savingsCardAmt}>
+                  ${(savingsChallenge.rewardAmountCents / 100).toFixed(2)}
+                </Text>
+              </View>
+              <View style={[styles.savingsTrack, { backgroundColor: colors.divider }]}>
+                <Animated.View
+                  style={[
+                    styles.savingsFill,
+                    {
+                      backgroundColor: savingsChallenge.earned ? '#10B981' : '#34D399',
+                      width: savingsAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      }),
+                    },
+                  ]}
+                />
+              </View>
+              {savingsChallenge.earned ? (
+                <Text style={styles.savingsEarnedText}>
+                  🎉 You reached your goal! Ask a parent for your reward!
+                </Text>
+              ) : (
+                <Text style={[styles.savingsMotivText, { color: colors.text3 }]}>
+                  {savingsChallenge.questsRequired - savingsProgress} more quest{savingsChallenge.questsRequired - savingsProgress !== 1 ? 's' : ''} to earn ${(savingsChallenge.rewardAmountCents / 100).toFixed(2)}!
+                </Text>
+              )}
+            </View>
+          )}
+
           {/* ── Star Goal Card ─────────────────────────────────────────────── */}
           <View style={[styles.goalCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
-            {goal ? (
+            {hasStarGoal ? (
               /* Goal exists — show progress */
               <>
                 <View style={styles.goalCardHeader}>
@@ -1269,5 +1330,54 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     lineHeight: 22,
+  },
+
+  // ── Savings Challenge Card ─────────────────────────────────────────────────
+  savingsCard: {
+    borderRadius: 18,
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 14,
+  },
+  savingsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  savingsCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  savingsCardSub: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  savingsCardAmt: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#10B981',
+    marginLeft: 8,
+  },
+  savingsTrack: {
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  savingsFill: {
+    height: 10,
+    borderRadius: 5,
+  },
+  savingsEarnedText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065F46',
+    textAlign: 'center',
+  },
+  savingsMotivText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

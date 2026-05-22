@@ -116,7 +116,7 @@ const headerStyles = StyleSheet.create({
 function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const { tasks, family, approveTask, chargeForTask, refreshParentSession } = useApp();
+  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge } = useApp();
   const { isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
@@ -277,6 +277,50 @@ function HomeTab({ navigation }) {
             )}
           </View>
         )}
+
+        {/* Savings goal payout banners */}
+        {family.kids
+          .filter(k => k.goal?.savings?.earned && !k.goal?.savings?.paidOut)
+          .map(kid => {
+            const s = kid.goal.savings;
+            const amt = `$${(s.rewardAmountCents / 100).toFixed(2)}`;
+            return (
+              <View key={kid.id} style={[styles.savingsPayoutCard, { backgroundColor: '#F0FDF4', borderColor: '#10B981' }]}>
+                <View style={[styles.kidAvatar, { backgroundColor: kid.color, marginRight: 12 }]}>
+                  <Text style={{ fontSize: 22 }}>{kid.emoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.savingsPayoutTitle, { color: '#065F46' }]}>
+                    💰 {t('parentDashboard.savingsPayoutTitle')}
+                  </Text>
+                  <Text style={[styles.savingsPayoutSub, { color: '#047857' }]}>
+                    {t('parentDashboard.savingsPayoutSub', { name: kid.name, count: s.questsRequired, amount: amt })}
+                  </Text>
+                  {s.label ? <Text style={[styles.savingsPayoutSub, { color: '#6B7280', marginTop: 2 }]}>🎯 {s.label}</Text> : null}
+                </View>
+                <TouchableOpacity
+                  style={[styles.savingsPayBtn, { backgroundColor: '#10B981' }]}
+                  onPress={() => {
+                    Alert.alert(
+                      `Pay ${amt} to ${kid.name}?`,
+                      `This will mark the savings goal "${s.label || 'Savings Goal'}" as paid and reset it for a new round.`,
+                      [
+                        { text: 'Not yet', style: 'cancel' },
+                        { text: `Pay ${amt} ✅`, onPress: async () => {
+                          try { await completeSavingsChallenge(kid.id); } catch (e) {
+                            Alert.alert('Error', e?.message || 'Could not mark as paid.');
+                          }
+                        }},
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.savingsPayBtnText}>{t('parentDashboard.savingsMarkPaid')}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
 
         {/* Needs approval */}
         <SectionHeader
@@ -1030,7 +1074,7 @@ function AddTaskTab() {
 function FamilyTab({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { family, addKid, removeKid, editKid, refreshParentSession, addMilestone, redeemMilestone, deleteMilestone } = useApp();
+  const { family, tasks, addKid, removeKid, editKid, refreshParentSession, addMilestone, redeemMilestone, deleteMilestone, setSavingsChallenge, completeSavingsChallenge } = useApp();
   const { canAddKid, isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const [showAdd, setShowAdd] = useState(false);
@@ -1051,6 +1095,12 @@ function FamilyTab({ navigation }) {
   const [newMilestoneStars,  setNewMilestoneStars]  = useState('');
   const [newMilestoneReward, setNewMilestoneReward] = useState('');
   const [milestoneLoading,   setMilestoneLoading]   = useState(false);
+
+  // Savings challenge state (in edit kid modal)
+  const [savingsLabel,      setSavingsLabel]      = useState('');
+  const [savingsQuestCount, setSavingsQuestCount] = useState('5');
+  const [savingsDollars,    setSavingsDollars]    = useState('');
+  const [savingsLoading,    setSavingsLoading]    = useState(false);
 
   async function handleAddKid() {
     refreshParentSession?.();
@@ -1097,6 +1147,9 @@ function FamilyTab({ navigation }) {
     setEditingKid(null);
     setNewMilestoneStars('');
     setNewMilestoneReward('');
+    setSavingsLabel('');
+    setSavingsQuestCount('5');
+    setSavingsDollars('');
   }
 
   async function handleSaveKid() {
@@ -1481,6 +1534,189 @@ function FamilyTab({ navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* ── Savings Goal ─────────────────────────────────────────────── */}
+            {(() => {
+              const currentKidData = editingKid
+                ? (family?.kids?.find(k => k.id === editingKid.id))
+                : null;
+              const activeSavings = currentKidData?.goal?.savings || null;
+              const kidApproved = editingKid
+                ? tasks.filter(t => (t.assignedTo || t.assigned_to) === editingKid.id && t.status === 'approved').length
+                : 0;
+              const progress = activeSavings
+                ? Math.min(kidApproved - activeSavings.startCount, activeSavings.questsRequired)
+                : 0;
+
+              return (
+                <View style={[styles.milestoneSection, { borderTopColor: colors.divider, marginTop: 8 }]}>
+                  <Text style={[styles.milestoneSectionTitle, { color: colors.text1 }]}>💰 {t('parentDashboard.savingsGoal')}</Text>
+                  <Text style={[styles.milestoneSectionSub, { color: colors.text3 }]}>
+                    {t('parentDashboard.savingsGoalSub', { name: editingKid?.name || 'your kid' })}
+                  </Text>
+
+                  {activeSavings ? (
+                    /* Active challenge card */
+                    <View style={[styles.savingsActiveCard, { backgroundColor: '#F0FDF4', borderColor: '#10B981' }]}>
+                      <View style={styles.savingsActiveHeader}>
+                        <Text style={[styles.savingsActiveTitle, { color: '#065F46' }]}>
+                          🎯 {activeSavings.label || t('parentDashboard.savingsGoal')}
+                        </Text>
+                        <Text style={[styles.savingsActiveAmt, { color: '#10B981' }]}>
+                          ${(activeSavings.rewardAmountCents / 100).toFixed(2)}
+                        </Text>
+                      </View>
+
+                      {/* Progress bar */}
+                      <View style={styles.savingsProgressRow}>
+                        <Text style={[styles.savingsProgressText, { color: '#047857' }]}>
+                          {t('parentDashboard.savingsProgress', { done: Math.max(0, progress), total: activeSavings.questsRequired })}
+                        </Text>
+                        {activeSavings.earned && (
+                          <Text style={[styles.savingsEarnedBadge, { color: '#065F46', backgroundColor: '#BBF7D0' }]}>
+                            🎉 Earned!
+                          </Text>
+                        )}
+                      </View>
+                      <View style={[styles.savingsTrack, { backgroundColor: '#D1FAE5' }]}>
+                        <View style={[styles.savingsFill, {
+                          width: `${Math.min((Math.max(0, progress) / activeSavings.questsRequired) * 100, 100)}%`,
+                          backgroundColor: '#10B981',
+                        }]} />
+                      </View>
+
+                      {activeSavings.earned ? (
+                        <TouchableOpacity
+                          style={[styles.assignBtn, { marginTop: 14, backgroundColor: '#10B981' }]}
+                          onPress={() => {
+                            Alert.alert(
+                              t('parentDashboard.savingsMarkPaid'),
+                              `Pay $${(activeSavings.rewardAmountCents / 100).toFixed(2)} to ${editingKid?.name} and reset for the next round?`,
+                              [
+                                { text: t('cancel'), style: 'cancel' },
+                                { text: t('parentDashboard.savingsMarkPaid'), onPress: async () => {
+                                  try {
+                                    await completeSavingsChallenge(editingKid.id);
+                                  } catch (e) {
+                                    Alert.alert('Error', e?.message || 'Please try again.');
+                                  }
+                                }},
+                              ]
+                            );
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                          <Text style={styles.assignBtnText}>{t('parentDashboard.savingsMarkPaid')}</Text>
+                        </TouchableOpacity>
+                      ) : null}
+
+                      <TouchableOpacity
+                        style={{ marginTop: 12, alignSelf: 'center' }}
+                        onPress={() => {
+                          Alert.alert(
+                            t('parentDashboard.savingsRemove'),
+                            'This will delete the current savings goal. The kid\'s quest progress is kept.',
+                            [
+                              { text: t('cancel'), style: 'cancel' },
+                              { text: 'Remove', style: 'destructive', onPress: async () => {
+                                try { await setSavingsChallenge(editingKid.id, null); } catch (e) {
+                                  Alert.alert('Error', e?.message || 'Please try again.');
+                                }
+                              }},
+                            ]
+                          );
+                        }}
+                      >
+                        <Text style={[styles.savingsRemoveText, { color: colors.text3 }]}>{t('parentDashboard.savingsRemove')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    /* Create new challenge form */
+                    <View style={[styles.milestoneAddRow, { flexDirection: 'column', gap: 10, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <TextInput
+                        style={[styles.formInput, { borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+                        value={savingsLabel}
+                        onChangeText={setSavingsLabel}
+                        placeholder={t('parentDashboard.savingsWhatFor')}
+                        placeholderTextColor={colors.text3}
+                        maxLength={60}
+                      />
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TextInput
+                          style={[styles.formInput, { flex: 1, borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+                          value={savingsQuestCount}
+                          onChangeText={v => setSavingsQuestCount(v.replace(/[^0-9]/g, ''))}
+                          placeholder={t('parentDashboard.savingsQuestCount')}
+                          placeholderTextColor={colors.text3}
+                          keyboardType="number-pad"
+                          maxLength={3}
+                        />
+                        <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
+                          <View style={[styles.dollarSign, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Text style={{ fontSize: 17, color: colors.text2, fontWeight: '700' }}>$</Text>
+                          </View>
+                          <TextInput
+                            style={[styles.formInput, { flex: 1, borderLeftWidth: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderColor: colors.border, color: colors.text1, backgroundColor: colors.bg }]}
+                            value={savingsDollars}
+                            onChangeText={v => setSavingsDollars(v.replace(/[^0-9.]/g, ''))}
+                            placeholder={t('parentDashboard.savingsRewardPlaceholder')}
+                            placeholderTextColor={colors.text3}
+                            keyboardType="decimal-pad"
+                            maxLength={8}
+                          />
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.assignBtn, { backgroundColor: savingsLoading ? colors.text3 : '#10B981', marginBottom: 4 }]}
+                        disabled={savingsLoading}
+                        onPress={async () => {
+                          const count = parseInt(savingsQuestCount, 10);
+                          if (!count || count < 1) { Alert.alert(t('parentDashboard.savingsEnterCount')); return; }
+                          const cents = Math.round(parseFloat(savingsDollars) * 100);
+                          if (!savingsDollars.trim() || isNaN(cents) || cents < 1) {
+                            Alert.alert(t('parentDashboard.savingsEnterAmount'));
+                            return;
+                          }
+                          setSavingsLoading(true);
+                          try {
+                            const startCount = tasks.filter(t =>
+                              (t.assignedTo || t.assigned_to) === editingKid.id && t.status === 'approved'
+                            ).length;
+                            await setSavingsChallenge(editingKid.id, {
+                              label:              savingsLabel.trim() || t('parentDashboard.savingsGoal'),
+                              questsRequired:     count,
+                              rewardAmountCents:  cents,
+                              startCount,
+                              earned:             false,
+                              earnedAt:           null,
+                              paidOut:            false,
+                            });
+                            setSavingsLabel('');
+                            setSavingsQuestCount('5');
+                            setSavingsDollars('');
+                          } catch (e) {
+                            Alert.alert('Error', e?.message || 'Could not save savings goal. Please try again.');
+                          } finally {
+                            setSavingsLoading(false);
+                          }
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        {savingsLoading
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <Text style={{ fontSize: 16 }}>💰</Text>
+                        }
+                        <Text style={styles.assignBtnText}>
+                          {savingsLoading ? 'Saving…' : t('parentDashboard.savingsStartGoal')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+
           </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -2910,5 +3146,88 @@ const styles = StyleSheet.create({
   },
   toggleThumbOn: {
     alignSelf: 'flex-end',
+  },
+
+  // ── Savings Goal styles ──────────────────────────────────────────────────────
+  savingsPayoutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 14,
+  },
+  savingsPayoutTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  savingsPayoutSub: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  savingsPayBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 8,
+  },
+  savingsPayBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  savingsActiveCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 14,
+    marginTop: 12,
+  },
+  savingsActiveHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  savingsActiveTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+  },
+  savingsActiveAmt: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+  savingsProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  savingsProgressText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  savingsEarnedBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  savingsTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  savingsFill: {
+    height: 8,
+    borderRadius: 4,
+  },
+  savingsRemoveText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });
