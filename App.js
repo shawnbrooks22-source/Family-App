@@ -22,6 +22,7 @@ import AIScreen           from './src/screens/AIScreen';
 import PaymentsScreen     from './src/screens/PaymentsScreen';
 import UpgradeScreen                  from './src/screens/UpgradeScreen';
 import NotificationsPermissionScreen  from './src/screens/NotificationsPermissionScreen';
+import OnboardingScreen               from './src/screens/OnboardingScreen';
 
 // ─── Sentry (crash reporting) ──────────────────────────────────────────────────
 // Set EXPO_PUBLIC_SENTRY_DSN in your .env to enable.
@@ -49,7 +50,7 @@ const linking = {
 };
 
 function AppNavigator() {
-  const { isLoaded, family, notificationsAsked } = useApp();
+  const { isLoaded, family, notificationsAsked, onboardingDone } = useApp();
   const { colors } = useTheme();
 
   if (!isLoaded) {
@@ -77,6 +78,14 @@ function AppNavigator() {
       ) : (
         // ── Main app ───────────────────────────────────────────────────────
         <>
+          {/* Show onboarding walkthrough once for new users */}
+          {!onboardingDone && (
+            <Stack.Screen
+              name="Onboarding"
+              component={OnboardingScreen}
+              options={{ animation: 'fade' }}
+            />
+          )}
           {/* Show notification permission screen once, right after onboarding */}
           {!notificationsAsked && (
             <Stack.Screen

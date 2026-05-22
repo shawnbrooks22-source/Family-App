@@ -66,7 +66,8 @@ const FAMILY_KEY      = '@kindo_family';
 const TASKS_KEY       = '@kindo_tasks';
 const FAMILY_ID_KEY   = 'kindo_family_id';    // stored in SecureStore
 const PARENT_PIN_KEY  = 'kindo_parent_pin';   // stored in SecureStore (hashed)
-const NOTIF_ASKED_KEY = '@kindo_notif_asked'; // true once user has seen the permission screen
+const NOTIF_ASKED_KEY    = '@kindo_notif_asked';    // true once user has seen the permission screen
+const ONBOARDING_KEY     = '@kindo_onboarding_done'; // true once user has completed the walkthrough
 
 async function sendNotif(title, body) {
   try {
@@ -99,6 +100,7 @@ export function AppProvider({ children }) {
   const [familyId,          setFamilyId]          = useState(null); // Supabase families.id
   const [authUser,          setAuthUser]          = useState(null);  // Supabase auth user
   const [notificationsAsked, setNotificationsAsked] = useState(false); // shown permission screen?
+  const [onboardingDone,     setOnboardingDone]     = useState(false); // completed walkthrough?
   const realtimeSub = useRef(null);
 
   useEffect(() => {
@@ -163,6 +165,12 @@ export function AppProvider({ children }) {
       .subscribe();
   }
 
+  // ── Mark that the user has completed the onboarding walkthrough ─────────────
+  async function markOnboardingDone() {
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    setOnboardingDone(true);
+  }
+
   // ── Mark that the user has seen the notification permission screen ───────────
   async function markNotificationsAsked() {
     await AsyncStorage.setItem(NOTIF_ASKED_KEY, 'true');
@@ -172,6 +180,10 @@ export function AppProvider({ children }) {
   // ── Load family data ───────────────────────────────────────────────────────
   async function loadData() {
     try {
+      // Check if user has already completed the onboarding walkthrough
+      const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);
+      if (onboarded === 'true') setOnboardingDone(true);
+
       // Check if user has already seen the notification permission screen
       const notifAsked = await AsyncStorage.getItem(NOTIF_ASKED_KEY);
       if (notifAsked === 'true') setNotificationsAsked(true);
@@ -1328,6 +1340,8 @@ export function AppProvider({ children }) {
         authUser,
         notificationsAsked,
         markNotificationsAsked,
+        onboardingDone,
+        markOnboardingDone,
         isCloudEnabled: SUPABASE_READY,
         // Auth
         authSignIn,
