@@ -616,7 +616,8 @@ export function AppProvider({ children }) {
     if (SUPABASE_READY && familyId && authUser) {
       // Strip camelCase fields — Supabase only has snake_case columns
       const { assignedTo: _a, ...supabaseUpdates } = updates;
-      await supabase.from('tasks').update(supabaseUpdates).eq('id', taskId);
+      const { error } = await supabase.from('tasks').update(supabaseUpdates).eq('id', taskId);
+      if (error) throw error;
       // Optimistic update with full updates (assignedTo kept for local state filtering)
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
     } else {
@@ -669,7 +670,8 @@ export function AppProvider({ children }) {
     };
 
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('tasks').update(updates).eq('id', taskId);
+      const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
+      if (error) throw error;
       // Optimistic update so UI reflects the change immediately (don't wait for realtime)
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
     } else {
@@ -695,7 +697,8 @@ export function AppProvider({ children }) {
     const updates = { status: 'approved', celebrated: false, approved_at: Date.now() };
 
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('tasks').update(updates).eq('id', taskId);
+      const { error: approveErr } = await supabase.from('tasks').update(updates).eq('id', taskId);
+      if (approveErr) throw approveErr;
       // Optimistic update so UI reflects the approval immediately (don't wait for realtime)
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
       // Auto-respawn recurring tasks
@@ -796,7 +799,8 @@ export function AppProvider({ children }) {
 
   async function deleteTask(taskId) {
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('tasks').delete().eq('id', taskId);
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      if (error) throw error;
       setTasks(prev => prev.filter(t => t.id !== taskId));
     } else {
       await saveTasks(tasks.filter(t => t.id !== taskId));
@@ -807,7 +811,7 @@ export function AppProvider({ children }) {
   async function addKid(kid) {
     const newKid = { ...kid, id: generateId(), goal: null, streak: 0, milestones: [] };
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('profiles').insert({
+      const { error } = await supabase.from('profiles').insert({
         id:        newKid.id,
         family_id: familyId,
         name:      newKid.name,
@@ -816,6 +820,7 @@ export function AppProvider({ children }) {
         phone:     newKid.phone || '',
         role:      'kid',
       });
+      if (error) throw error;
       setFamily(prev => ({ ...prev, kids: [...(prev.kids || []), newKid] }));
     } else {
       const updated = { ...family, kids: [...family.kids, newKid] };
@@ -830,7 +835,8 @@ export function AppProvider({ children }) {
       if (updates.emoji) dbUpdates.emoji = updates.emoji;
       if (updates.color) dbUpdates.color = updates.color;
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-      await supabase.from('profiles').update(dbUpdates).eq('id', kidId);
+      const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', kidId);
+      if (error) throw error;
       setFamily(prev => ({
         ...prev,
         kids: prev.kids.map(k => k.id === kidId ? { ...k, ...updates } : k),
@@ -867,7 +873,8 @@ export function AppProvider({ children }) {
       kids: prev.kids.map(k => k.id === kidId ? { ...k, goal } : k),
     } : prev);
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('profiles').update({ goal }).eq('id', kidId);
+      const { error } = await supabase.from('profiles').update({ goal }).eq('id', kidId);
+      if (error) throw error;
     } else {
       const updated = {
         ...family,
@@ -891,7 +898,8 @@ export function AppProvider({ children }) {
       return updated;
     });
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('profiles').update({ milestones }).eq('id', kidId);
+      const { error } = await supabase.from('profiles').update({ milestones }).eq('id', kidId);
+      if (error) throw error;
     } else if (savedData) {
       await saveFamily(savedData);
     }

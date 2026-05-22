@@ -352,15 +352,23 @@ export default function KidDashboard({ route, navigation }) {
   async function handleSaveGoal() {
     const stars = parseInt(goalStarsInput, 10);
     if (!goalNameInput.trim() || isNaN(stars) || stars < 1) return;
-    await setKidGoal(kidId, { name: goalNameInput.trim(), stars });
-    setShowGoalForm(false);
-    setGoalNameInput('');
-    setGoalStarsInput('');
+    try {
+      await setKidGoal(kidId, { name: goalNameInput.trim(), stars });
+      setShowGoalForm(false);
+      setGoalNameInput('');
+      setGoalStarsInput('');
+    } catch (e) {
+      Alert.alert('Could not save goal', e?.message || 'Please try again.');
+    }
   }
 
   async function handleClearGoal() {
-    await setKidGoal(kidId, null);
-    setShowGoalForm(false);
+    try {
+      await setKidGoal(kidId, null);
+      setShowGoalForm(false);
+    } catch (e) {
+      Alert.alert('Could not clear goal', e?.message || 'Please try again.');
+    }
   }
 
   // Header animations

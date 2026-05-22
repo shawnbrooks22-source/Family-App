@@ -436,7 +436,11 @@ function TasksTab() {
   function confirmDelete(task) {
     Alert.alert(t('parentDashboard.deleteQuest'), t('parentDashboard.removeQuest', { title: task.title }), [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('parentDashboard.delete'), style: 'destructive', onPress: () => deleteTask(task.id) },
+      { text: t('parentDashboard.delete'), style: 'destructive', onPress: async () => {
+        try { await deleteTask(task.id); } catch (e) {
+          Alert.alert('Could not delete quest', e?.message || 'Please try again.');
+        }
+      }},
     ]);
   }
 
@@ -1404,8 +1408,12 @@ function FamilyTab({ navigation }) {
                             [
                               { text: 'Not yet', style: 'cancel' },
                               { text: 'Yes, given!', onPress: async () => {
-                                await redeemMilestone(editingKid.id, m.id);
-                                setEditingKid({ ...editingKid });
+                                try {
+                                  await redeemMilestone(editingKid.id, m.id);
+                                  setEditingKid({ ...editingKid });
+                                } catch (e) {
+                                  Alert.alert('Could not save', e?.message || 'Please try again.');
+                                }
                               }},
                             ]
                           );
@@ -1417,7 +1425,11 @@ function FamilyTab({ navigation }) {
                     <TouchableOpacity
                       onPress={() => Alert.alert('Delete milestone?', `Remove "${m.reward}"?`, [
                         { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: () => deleteMilestone(editingKid.id, m.id) },
+                        { text: 'Delete', style: 'destructive', onPress: async () => {
+                          try { await deleteMilestone(editingKid.id, m.id); } catch (e) {
+                            Alert.alert('Could not delete', e?.message || 'Please try again.');
+                          }
+                        }},
                       ])}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -1454,10 +1466,15 @@ function FamilyTab({ navigation }) {
                     if (!stars || stars < 1) { Alert.alert('Enter a star count (e.g. 5)'); return; }
                     if (!newMilestoneReward.trim()) { Alert.alert('Enter a reward description'); return; }
                     setMilestoneLoading(true);
-                    await addMilestone(editingKid.id, { stars_required: stars, reward: newMilestoneReward });
-                    setNewMilestoneStars('');
-                    setNewMilestoneReward('');
-                    setMilestoneLoading(false);
+                    try {
+                      await addMilestone(editingKid.id, { stars_required: stars, reward: newMilestoneReward });
+                      setNewMilestoneStars('');
+                      setNewMilestoneReward('');
+                    } catch (e) {
+                      Alert.alert('Could not add milestone', e?.message || 'Please try again.');
+                    } finally {
+                      setMilestoneLoading(false);
+                    }
                   }}
                 >
                   <Ionicons name="add" size={20} color="#fff" />
@@ -1571,37 +1588,44 @@ function SettingsTab({ navigation }) {
 
   async function handleSaveProfile() {
     if (!editName.trim()) { Alert.alert(t('settings.enterName')); return; }
-    await updateParentProfile({
-      parentName:  editName.trim(),
-      parentPhone: editPhone.trim(),
-      parentEmoji: editEmoji,
-    });
-    setProfileSaved(true);
-    setTimeout(() => setProfileSaved(false), 2000);
+    try {
+      await updateParentProfile({
+        parentName:  editName.trim(),
+        parentPhone: editPhone.trim(),
+        parentEmoji: editEmoji,
+      });
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2000);
+    } catch (e) {
+      Alert.alert('Could not save profile', e?.message || 'Something went wrong. Please try again.');
+    }
   }
 
   async function handleChangePin() {
     setPinMsg(null);
-    // ✅ FIXED: verifyPin is async — must await it
-    const pinOk = await verifyPin(currentPin);
-    if (!pinOk) {
-      setPinMsg({ text: t('settings.pinIncorrect'), ok: false });
-      return;
+    try {
+      const pinOk = await verifyPin(currentPin);
+      if (!pinOk) {
+        setPinMsg({ text: t('settings.pinIncorrect'), ok: false });
+        return;
+      }
+      if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+        setPinMsg({ text: t('settings.pinMustBe4'), ok: false });
+        return;
+      }
+      if (newPin !== confirmPin) {
+        setPinMsg({ text: t('settings.pinsDontMatch'), ok: false });
+        return;
+      }
+      await updateParentProfile({ parentPin: newPin });
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+      setPinMsg({ text: t('settings.pinUpdated'), ok: true });
+      setTimeout(() => setPinMsg(null), 3000);
+    } catch (e) {
+      setPinMsg({ text: e?.message || 'Could not update PIN. Please try again.', ok: false });
     }
-    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-      setPinMsg({ text: t('settings.pinMustBe4'), ok: false });
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setPinMsg({ text: t('settings.pinsDontMatch'), ok: false });
-      return;
-    }
-    await updateParentProfile({ parentPin: newPin });
-    setCurrentPin('');
-    setNewPin('');
-    setConfirmPin('');
-    setPinMsg({ text: t('settings.pinUpdated'), ok: true });
-    setTimeout(() => setPinMsg(null), 3000);
   }
 
   async function toggleNotif(type, value) {
