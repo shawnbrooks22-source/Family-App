@@ -573,30 +573,29 @@ export function AppProvider({ children }) {
       }
       const { assignedTo: _a, ...supabaseTask } = newTask;
 
-      let { error } = await supabase.from('tasks').insert(supabaseTask);
-
-      // Self-heal RLS violations by asking the server what family_id it would
-      // use in the RLS check (my_family_id()). Supabase never throws — must
-      // check error field rather than catch block, otherwise the self-heal
-      // silently no-ops when the RPC itself fails.
-      if (error && /row-level security/i.test(error.message || '')) {
-        const { data: serverFamId, error: selfHealRpcErr } = await supabase.rpc('my_family_id');
-        if (!selfHealRpcErr && serverFamId && serverFamId !== supabaseTask.family_id) {
-          if (__DEV__) console.warn('RLS mismatch — switching to server family:', { tried: supabaseTask.family_id, server: serverFamId });
-          setFamilyId(serverFamId);
-          await secureSave(FAMILY_ID_KEY, serverFamId);
-          supabaseTask.family_id = serverFamId;
-          newTask.family_id      = serverFamId;
-          // Reload family + tasks from the server's canonical family so the
-          // UI stays consistent with the family_id we're now writing to.
-          await Promise.all([
-            loadFamilyFromSupabase(serverFamId),
-            loadTasksFromSupabase(serverFamId),
-          ]);
-          const retry = await supabase.from('tasks').insert(supabaseTask);
-          error = retry.error;
-        }
+      // Pre-flight: ask the server which family_id the RLS policy will use.
+      // Doing this BEFORE the insert guarantees the INSERT always sends the
+      // exact same value that my_family_id() returns — eliminating all RLS
+      // mismatch errors regardless of what's cached locally.
+      const { data: serverFamId, error: rpcErr } = await supabase.rpc('my_family_id');
+      if (rpcErr || !serverFamId) {
+        throw new Error(
+          'Could not verify your family. Please sign out from Settings and sign in again, then try assigning the quest.'
+        );
       }
+      if (serverFamId !== supabaseTask.family_id) {
+        if (__DEV__) console.warn('Pre-flight family_id correction:', { local: supabaseTask.family_id, server: serverFamId });
+        setFamilyId(serverFamId);
+        await secureSave(FAMILY_ID_KEY, serverFamId);
+        supabaseTask.family_id = serverFamId;
+        newTask.family_id      = serverFamId;
+        await Promise.all([
+          loadFamilyFromSupabase(serverFamId),
+          loadTasksFromSupabase(serverFamId),
+        ]);
+      }
+
+      const { error } = await supabase.from('tasks').insert(supabaseTask);
       if (error) throw error;
 
       setTasks(prev => [...prev, supabaseTask]);
