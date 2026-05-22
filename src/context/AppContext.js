@@ -183,18 +183,22 @@ export function AppProvider({ children }) {
         if (session?.user) {
           hasSession = true;
           setAuthUser(session.user);
-          // Find the family owned by this auth user. Use limit(1) +
-          // order desc so this never errors on legacy duplicate rows
-          // and always agrees with the server's my_family_id() function.
-          const { data: famRows } = await supabase
-            .from('families')
-            .select('id')
-            .eq('parent_auth_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          const famRow = famRows?.[0];
+          // Use the server's my_family_id() RPC — this returns the EXACT same
+          // value that RLS policies evaluate, so local state always matches the
+          // server. Falls back to a direct query if the RPC is unavailable.
+          let fid = null;
+          try {
+            const { data: rpcId } = await supabase.rpc('my_family_id');
+            fid = rpcId || null;
+          } catch {
+            const { data: famRows } = await supabase
+              .from('families').select('id')
+              .eq('parent_auth_id', session.user.id)
+              .order('created_at', { ascending: false }).limit(1);
+            fid = famRows?.[0]?.id || null;
+          }
+          const famRow = fid ? { id: fid } : null;
           if (famRow) {
-            const fid = famRow.id;
             setFamilyId(fid);
             await secureSave(FAMILY_ID_KEY, fid);
             await Promise.all([
@@ -569,21 +573,29 @@ export function AppProvider({ children }) {
 
       let { error } = await supabase.from('tasks').insert(supabaseTask);
 
-      // Self-heal RLS violations: if the server thinks our family is
-      // different from what's in React state (e.g. duplicate family rows
-      // from earlier dev runs, stale cache after re-install), refetch the
-      // server's authoritative familyId, sync local state, and retry once.
+      // Self-heal RLS violations by asking the server what family_id it would
+      // use in the RLS check (my_family_id()). The previous approach compared
+      // two client-side ORDER BY queries which always agreed — this calls the
+      // *exact* server function that RLS evaluates, so the retry always matches.
       if (error && /row-level security/i.test(error.message || '')) {
-        const correctedId = await fetchAuthoritativeFamilyId(session.user.id);
-        if (correctedId && correctedId !== familyId) {
-          if (__DEV__) console.warn('familyId out of sync — fixing:', { local: familyId, server: correctedId });
-          setFamilyId(correctedId);
-          await secureSave(FAMILY_ID_KEY, correctedId);
-          supabaseTask.family_id = correctedId;
-          newTask.family_id      = correctedId;
-          const retry = await supabase.from('tasks').insert(supabaseTask);
-          error = retry.error;
-        }
+        try {
+          const { data: serverFamId } = await supabase.rpc('my_family_id');
+          if (serverFamId && serverFamId !== supabaseTask.family_id) {
+            if (__DEV__) console.warn('RLS mismatch — switching to server family:', { tried: supabaseTask.family_id, server: serverFamId });
+            setFamilyId(serverFamId);
+            await secureSave(FAMILY_ID_KEY, serverFamId);
+            supabaseTask.family_id = serverFamId;
+            newTask.family_id      = serverFamId;
+            // Reload family + tasks from the server's canonical family so the
+            // UI stays consistent with the family_id we're now writing to.
+            await Promise.all([
+              loadFamilyFromSupabase(serverFamId),
+              loadTasksFromSupabase(serverFamId),
+            ]);
+            const retry = await supabase.from('tasks').insert(supabaseTask);
+            error = retry.error;
+          }
+        } catch { /* rpc unavailable — fall through and throw original error */ }
       }
       if (error) throw error;
 
@@ -1102,21 +1114,24 @@ export function AppProvider({ children }) {
     if (error) throw error;
     setAuthUser(data.user);
 
-    // Load family owned by this auth user. limit(1) + order desc so legacy
-    // duplicate rows don't error out and we agree with my_family_id().
-    const { data: famRows, error: famErr } = await supabase
-      .from('families')
-      .select('id')
-      .eq('parent_auth_id', data.user.id)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    const famRow = famRows?.[0];
-    if (famErr || !famRow) {
+    // Use my_family_id() RPC so the family we load is guaranteed to be the
+    // same one that RLS policies will evaluate — preventing mismatch on inserts.
+    let fid = null;
+    try {
+      const { data: rpcId } = await supabase.rpc('my_family_id');
+      fid = rpcId || null;
+    } catch {
+      const { data: famRows } = await supabase
+        .from('families').select('id')
+        .eq('parent_auth_id', data.user.id)
+        .order('created_at', { ascending: false }).limit(1);
+      fid = famRows?.[0]?.id || null;
+    }
+    if (!fid) {
       await supabase.auth.signOut();
       setAuthUser(null);
       throw new Error('No family found for this account. Please set up a new family.');
     }
-    const fid = famRow.id;
     setFamilyId(fid);
     await secureSave(FAMILY_ID_KEY, fid);
     await Promise.all([
