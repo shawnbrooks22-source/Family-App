@@ -124,10 +124,11 @@ const headerStyles = StyleSheet.create({
 function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge, setKidGoal, redeemMilestone } = useApp();
+  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge, setKidGoal, redeemMilestone, approveQuestRequest, declineQuestRequest } = useApp();
   const { isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
+  const requestedTasks = tasks.filter(t => t.status === 'requested');
 
   const totalTasks   = tasks.length;
   const doneTasks    = tasks.filter(t => t.status === 'approved').length;
@@ -408,6 +409,74 @@ function HomeTab({ navigation }) {
             </TouchableOpacity>
           </View>
         ))}
+
+        {/* ── Quest Requests from Kids ──────────────────────────────────── */}
+        {requestedTasks.length > 0 && (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={[styles.sectionLabel, { color: colors.text1, fontSize: 15, fontWeight: '800', textTransform: 'none', letterSpacing: 0 }]}>
+              📋 Quest Requests ({requestedTasks.length})
+            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.text3, marginBottom: 12, textTransform: 'none', letterSpacing: 0, fontSize: 13, fontWeight: '500' }]}>
+              Your kids want to do these quests — approve to add them!
+            </Text>
+            {requestedTasks.map(task => {
+              const kid = family?.kids?.find(k => k.id === (task.assignedTo || task.assigned_to));
+              return (
+                <View
+                  key={task.id}
+                  style={[styles.approvalCard, { backgroundColor: colors.surface, borderLeftColor: '#7C3AED', borderLeftWidth: 4 }]}
+                >
+                  <View style={styles.approvalKidRow}>
+                    <Text style={{ fontSize: 28, marginRight: 12 }}>{kid?.emoji || '🌟'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.approvalKidName, { color: colors.text1 }]}>
+                        {kid?.name || 'Unknown'} wants to do:
+                      </Text>
+                      <Text style={[styles.approvalTaskTitle, { color: colors.text1, fontSize: 16, marginTop: 2 }]}>
+                        {task.title}
+                      </Text>
+                      {task.reward ? (
+                        <Text style={[styles.approvalKidLabel, { color: colors.text3, marginTop: 2 }]}>
+                          🎁 Requested reward: {task.reward}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.approveBtn, { backgroundColor: colors.success || '#10B981', flex: 1, marginTop: 0 }]}
+                      onPress={async () => {
+                        try {
+                          await approveQuestRequest(task.id);
+                        } catch (e) {
+                          Alert.alert('Error', e?.message || 'Could not approve quest.');
+                        }
+                      }}
+                    >
+                      <Text style={styles.approveBtnText}>✅ Add Quest</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.approveBtn, { flex: 1, marginTop: 0, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.error }]}
+                      onPress={() => Alert.alert(
+                        'Decline Quest Request',
+                        `Decline ${kid?.name || 'your kid'}'s request to do "${task.title}"?`,
+                        [
+                          { text: 'Keep it', style: 'cancel' },
+                          { text: 'Decline', style: 'destructive', onPress: async () => {
+                            try { await declineQuestRequest(task.id); }
+                            catch (e) { Alert.alert('Error', e?.message || 'Could not decline.'); }
+                          }},
+                        ]
+                      )}
+                    >
+                      <Text style={[styles.approveBtnText, { color: colors.error }]}>❌ Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Needs approval */}
         <SectionHeader
@@ -1351,7 +1420,7 @@ function AddTaskTab() {
 function FamilyTab({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { family, tasks, addKid, removeKid, editKid, refreshParentSession, addMilestone, redeemMilestone, deleteMilestone, setSavingsChallenge, completeSavingsChallenge } = useApp();
+  const { family, tasks, addKid, removeKid, editKid, refreshParentSession, addMilestone, redeemMilestone, deleteMilestone, setSavingsChallenge, completeSavingsChallenge, updateParentProfile } = useApp();
   const { canAddKid, isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const [showAdd, setShowAdd] = useState(false);
@@ -1378,6 +1447,11 @@ function FamilyTab({ navigation }) {
   const [savingsQuestCount, setSavingsQuestCount] = useState('5');
   const [savingsDollars,    setSavingsDollars]    = useState('');
   const [savingsLoading,    setSavingsLoading]    = useState(false);
+
+  // Star Store state
+  const [newStoreName,  setNewStoreName]  = useState('');
+  const [newStoreEmoji, setNewStoreEmoji] = useState('🎮');
+  const [newStoreCost,  setNewStoreCost]  = useState('5');
 
   async function handleAddKid() {
     refreshParentSession?.();
@@ -1444,6 +1518,40 @@ function FamilyTab({ navigation }) {
       Alert.alert('Failed to save', e?.message || 'Something went wrong. Please try again.');
     } finally {
       setKidLoading(false);
+    }
+  }
+
+  // ── Star Store helpers ──────────────────────────────────────────────────────
+  async function handleAddStoreItem() {
+    if (!newStoreName.trim()) return;
+    const cost = parseInt(newStoreCost, 10);
+    if (isNaN(cost) || cost < 1) { Alert.alert('Star cost must be at least 1'); return; }
+
+    const newItem = {
+      id:       Date.now().toString(),
+      name:     newStoreName.trim(),
+      emoji:    newStoreEmoji || '🎁',
+      starCost: cost,
+      active:   true,
+    };
+
+    const updatedItems = [...(family?.storeItems || []), newItem];
+    try {
+      await updateParentProfile({ storeItems: updatedItems });
+      setNewStoreName('');
+      setNewStoreEmoji('🎮');
+      setNewStoreCost('5');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save store item. Please try again.');
+    }
+  }
+
+  async function handleRemoveStoreItem(itemId) {
+    const updatedItems = (family?.storeItems || []).filter(i => i.id !== itemId);
+    try {
+      await updateParentProfile({ storeItems: updatedItems });
+    } catch (e) {
+      Alert.alert('Error', 'Could not remove store item.');
     }
   }
 
