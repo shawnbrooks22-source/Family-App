@@ -185,12 +185,14 @@ export function AppProvider({ children }) {
           setAuthUser(session.user);
           // Use the server's my_family_id() RPC — this returns the EXACT same
           // value that RLS policies evaluate, so local state always matches the
-          // server. Falls back to a direct query if the RPC is unavailable.
+          // server. Supabase never throws — it returns { data, error } — so we
+          // must check the error field rather than relying on a catch block.
           let fid = null;
-          try {
-            const { data: rpcId } = await supabase.rpc('my_family_id');
-            fid = rpcId || null;
-          } catch {
+          const { data: rpcId, error: rpcErr } = await supabase.rpc('my_family_id');
+          if (!rpcErr && rpcId) {
+            fid = rpcId;
+          } else {
+            // RPC unavailable or returned an error — fall back to direct query
             const { data: famRows } = await supabase
               .from('families').select('id')
               .eq('parent_auth_id', session.user.id)
@@ -574,28 +576,26 @@ export function AppProvider({ children }) {
       let { error } = await supabase.from('tasks').insert(supabaseTask);
 
       // Self-heal RLS violations by asking the server what family_id it would
-      // use in the RLS check (my_family_id()). The previous approach compared
-      // two client-side ORDER BY queries which always agreed — this calls the
-      // *exact* server function that RLS evaluates, so the retry always matches.
+      // use in the RLS check (my_family_id()). Supabase never throws — must
+      // check error field rather than catch block, otherwise the self-heal
+      // silently no-ops when the RPC itself fails.
       if (error && /row-level security/i.test(error.message || '')) {
-        try {
-          const { data: serverFamId } = await supabase.rpc('my_family_id');
-          if (serverFamId && serverFamId !== supabaseTask.family_id) {
-            if (__DEV__) console.warn('RLS mismatch — switching to server family:', { tried: supabaseTask.family_id, server: serverFamId });
-            setFamilyId(serverFamId);
-            await secureSave(FAMILY_ID_KEY, serverFamId);
-            supabaseTask.family_id = serverFamId;
-            newTask.family_id      = serverFamId;
-            // Reload family + tasks from the server's canonical family so the
-            // UI stays consistent with the family_id we're now writing to.
-            await Promise.all([
-              loadFamilyFromSupabase(serverFamId),
-              loadTasksFromSupabase(serverFamId),
-            ]);
-            const retry = await supabase.from('tasks').insert(supabaseTask);
-            error = retry.error;
-          }
-        } catch { /* rpc unavailable — fall through and throw original error */ }
+        const { data: serverFamId, error: selfHealRpcErr } = await supabase.rpc('my_family_id');
+        if (!selfHealRpcErr && serverFamId && serverFamId !== supabaseTask.family_id) {
+          if (__DEV__) console.warn('RLS mismatch — switching to server family:', { tried: supabaseTask.family_id, server: serverFamId });
+          setFamilyId(serverFamId);
+          await secureSave(FAMILY_ID_KEY, serverFamId);
+          supabaseTask.family_id = serverFamId;
+          newTask.family_id      = serverFamId;
+          // Reload family + tasks from the server's canonical family so the
+          // UI stays consistent with the family_id we're now writing to.
+          await Promise.all([
+            loadFamilyFromSupabase(serverFamId),
+            loadTasksFromSupabase(serverFamId),
+          ]);
+          const retry = await supabase.from('tasks').insert(supabaseTask);
+          error = retry.error;
+        }
       }
       if (error) throw error;
 
@@ -1116,11 +1116,12 @@ export function AppProvider({ children }) {
 
     // Use my_family_id() RPC so the family we load is guaranteed to be the
     // same one that RLS policies will evaluate — preventing mismatch on inserts.
+    // Supabase never throws — must check error field, not catch block.
     let fid = null;
-    try {
-      const { data: rpcId } = await supabase.rpc('my_family_id');
-      fid = rpcId || null;
-    } catch {
+    const { data: rpcId, error: rpcErr } = await supabase.rpc('my_family_id');
+    if (!rpcErr && rpcId) {
+      fid = rpcId;
+    } else {
       const { data: famRows } = await supabase
         .from('families').select('id')
         .eq('parent_auth_id', data.user.id)
