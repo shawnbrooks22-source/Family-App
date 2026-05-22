@@ -184,15 +184,19 @@ export default function AIScreen({ navigation }) {
       Alert.alert(t('ai.selectKid'), t('ai.chooseKid'));
       return;
     }
-    await addTask({
-      title:      s.title,
-      emoji:      s.emoji,
-      reward:     s.reward,
-      assignedTo: selectedKid,
-      recurrence: 'none',
-      notes:      '',
-    });
-    setAddedIds(prev => new Set(prev).add(s.title));
+    try {
+      await addTask({
+        title:      s.title,
+        emoji:      s.emoji,
+        reward:     s.reward,
+        assignedTo: selectedKid,
+        recurrence: 'none',
+        notes:      '',
+      });
+      setAddedIds(prev => new Set(prev).add(s.title));
+    } catch (e) {
+      Alert.alert('Could not add quest', e?.message || 'Please try again.');
+    }
   }
 
   const styles = StyleSheet.create({
