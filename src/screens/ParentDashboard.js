@@ -2040,7 +2040,7 @@ function getLocalSettingsAiResponse(question) {
 function SettingsTab({ navigation }) {
   const { colors, isDark, toggleDark } = useTheme();
   const { t, i18n } = useTranslation();
-  const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled } = useApp();
+  const { family, updateParentProfile, updateNotifyPrefs, clearAllData, verifyPin, isCloudEnabled, resetOnboarding } = useApp();
   const { isPremium, premiumPriceString, restorePurchases, purchasing } = useSubscription();
   const { isTablet, pad } = useDevice();
   const [restoringPurchases, setRestoringPurchases] = useState(false);
@@ -2516,6 +2516,37 @@ function SettingsTab({ navigation }) {
             </View>
           </>
         )}
+
+        {/* ── Replay Onboarding ──────────────────────────────────────────── */}
+        <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.text2 }]}>🎓 App Walkthrough</Text>
+        <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.dangerText, { color: colors.text2 }]}>
+            Watch the intro walkthrough again — great for showing new family members how Kindo works.
+          </Text>
+          <TouchableOpacity
+            style={[styles.assignBtn, { backgroundColor: '#7C3AED', marginTop: 14 }]}
+            onPress={() => {
+              Alert.alert(
+                '🎓 Replay Walkthrough?',
+                'This will show the intro walkthrough the next time you return to the app.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Replay Intro',
+                    onPress: async () => {
+                      await resetOnboarding();
+                      Alert.alert('✅ Done!', 'Close the app and reopen it to see the walkthrough.');
+                    },
+                  },
+                ]
+              );
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="play-circle-outline" size={20} color="#fff" />
+            <Text style={styles.assignBtnText}>Replay Intro Walkthrough</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* ── Danger Zone ─────────────────────────────────────────────────── */}
         <Text style={[styles.settingsSectionLabel, { marginTop: 28, color: colors.error }]}>{t('settings.dangerZone')}</Text>

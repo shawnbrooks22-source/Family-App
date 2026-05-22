@@ -171,6 +171,13 @@ export function AppProvider({ children }) {
     setOnboardingDone(true);
   }
 
+  // ── Reset onboarding so the walkthrough plays again on next app open ─────────
+  async function resetOnboarding() {
+    await AsyncStorage.multiRemove([ONBOARDING_KEY, NOTIF_ASKED_KEY]);
+    setOnboardingDone(false);
+    setNotificationsAsked(false);
+  }
+
   // ── Schedule streak-at-risk notifications for kids who haven't completed today ─
   async function scheduleStreakNotifications(currentFamily) {
     const fam = currentFamily || family;
@@ -1418,6 +1425,7 @@ export function AppProvider({ children }) {
         markNotificationsAsked,
         onboardingDone,
         markOnboardingDone,
+        resetOnboarding,
         scheduleStreakNotifications,
         isCloudEnabled: SUPABASE_READY,
         // Auth
