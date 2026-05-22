@@ -171,6 +171,53 @@ export function AppProvider({ children }) {
     setOnboardingDone(true);
   }
 
+  // ── Schedule streak-at-risk notifications for kids who haven't completed today ─
+  async function scheduleStreakNotifications(currentFamily) {
+    const fam = currentFamily || family;
+    if (!fam?.kids?.length) return;
+    const today = localDateString();
+    const now = new Date();
+
+    // Schedule for 6 PM local time
+    const sixPM = new Date();
+    sixPM.setHours(18, 0, 0, 0);
+
+    // Already past 6 PM — nothing to schedule today
+    if (now >= sixPM) return;
+
+    for (const kid of fam.kids) {
+      const streakNotifKey = `@kindo_streak_notif_${kid.id}`;
+
+      // Cancel any previously scheduled notification for this kid
+      try {
+        const existingId = await AsyncStorage.getItem(streakNotifKey);
+        if (existingId) {
+          await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => {});
+          await AsyncStorage.removeItem(streakNotifKey);
+        }
+      } catch {}
+
+      // Only schedule if kid has an active streak AND hasn't completed a quest today
+      if (!kid.streak || kid.streak < 1) continue;
+      if (kid.lastCompletedDate === today) continue;
+
+      try {
+        const notifId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `🔥 ${kid.name}'s Streak is at Risk!`,
+            body: `${kid.streak}-day streak ends at midnight! Assign a quest now to keep it alive! 💪`,
+            data: { type: 'streak_risk', kidId: kid.id },
+            sound: true,
+          },
+          trigger: { date: sixPM },
+        });
+        await AsyncStorage.setItem(streakNotifKey, notifId);
+      } catch (e) {
+        if (__DEV__) console.warn('Failed to schedule streak notification:', e);
+      }
+    }
+  }
+
   // ── Mark that the user has seen the notification permission screen ───────────
   async function markNotificationsAsked() {
     await AsyncStorage.setItem(NOTIF_ASKED_KEY, 'true');
@@ -256,6 +303,8 @@ export function AppProvider({ children }) {
       if (__DEV__) console.error('Failed to load data:', e);
     } finally {
       setIsLoaded(true);
+      // Schedule streak notifications after family data is loaded
+      scheduleStreakNotifications().catch(() => {});
     }
   }
 
@@ -705,6 +754,17 @@ export function AppProvider({ children }) {
     const kidId = task?.assignedTo || task?.assigned_to;
     if (kidId) await updateStreak(kidId);
 
+    // Cancel streak-at-risk notification since kid just completed a quest
+    if (kidId) {
+      try {
+        const notifId = await AsyncStorage.getItem(`@kindo_streak_notif_${kidId}`);
+        if (notifId) {
+          await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
+          await AsyncStorage.removeItem(`@kindo_streak_notif_${kidId}`);
+        }
+      } catch {}
+    }
+
     // Notify the parent so they can approve quickly
     const kid = family?.kids?.find(k => k.id === kidId);
     if (family?.notifyPrefs?.taskCompleted !== false) {
@@ -799,6 +859,22 @@ export function AppProvider({ children }) {
             '🏆 Milestone Reached!',
             `${kid.name} hit ${m.stars_required} ⭐ and earned: "${m.reward}"! Tap to give the reward.`
           );
+        }
+      }
+
+      // ── Star goal completion check ────────────────────────────────────────
+      const starGoal = kid.goal;
+      if (starGoal?.name && (starGoal.stars || 0) > 0 && !starGoal.reached) {
+        if (newStarCount >= starGoal.stars) {
+          try {
+            await setKidGoal(kid.id, { ...starGoal, reached: true, reachedAt: Date.now() });
+            await sendNotif(
+              '🌟 Star Goal Complete!',
+              `${kid.name} earned all ${starGoal.stars} ⭐ and unlocked "${starGoal.name}"! Tap to give the reward! 🎉`
+            );
+          } catch (e) {
+            if (__DEV__) console.error('Star goal completion failed:', e);
+          }
         }
       }
 
@@ -1342,6 +1418,7 @@ export function AppProvider({ children }) {
         markNotificationsAsked,
         onboardingDone,
         markOnboardingDone,
+        scheduleStreakNotifications,
         isCloudEnabled: SUPABASE_READY,
         // Auth
         authSignIn,

@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../i18n/index';
 import { kidColors, shadows } from '../theme/index';
 import useDevice from '../hooks/useDevice';
+import { QUEST_CATEGORIES, ALL_QUESTS, searchQuests } from '../data/questTemplates';
 
 const Tab = createBottomTabNavigator();
 
@@ -116,7 +117,7 @@ const headerStyles = StyleSheet.create({
 function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge } = useApp();
+  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge, setKidGoal, redeemMilestone } = useApp();
   const { isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
@@ -321,6 +322,81 @@ function HomeTab({ navigation }) {
               </View>
             );
           })}
+
+        {/* ── Star goal reached banners ───────────────────────────────────── */}
+        {family.kids
+          .filter(k => k.goal?.name && k.goal?.stars > 0 && k.goal?.reached && !k.goal?.rewarded)
+          .map(kid => (
+            <View key={kid.id} style={styles.goalReachedCard}>
+              <View style={styles.goalReachedGlow} />
+              <Text style={styles.goalReachedCrown}>🏆</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.goalReachedTitle}>
+                  {kid.name} reached their goal!
+                </Text>
+                <Text style={styles.goalReachedSub}>
+                  ⭐ {kid.goal.stars} stars earned · Unlock: <Text style={{ fontWeight: '800' }}>"{kid.goal.name}"</Text>
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.goalRewardBtn}
+                activeOpacity={0.85}
+                onPress={() => Alert.alert(
+                  `Give reward to ${kid.name}? 🎉`,
+                  `They earned "${kid.goal.name}" by reaching ${kid.goal.stars} ⭐! Mark it as given when you hand it over.`,
+                  [
+                    { text: 'Not Yet', style: 'cancel' },
+                    { text: 'Give Reward ✅', onPress: async () => {
+                      try {
+                        await setKidGoal(kid.id, { ...kid.goal, rewarded: true, rewardedAt: Date.now() });
+                      } catch (e) {
+                        Alert.alert('Error', e?.message || 'Could not update goal.');
+                      }
+                    }},
+                  ]
+                )}
+              >
+                <Text style={styles.goalRewardBtnText}>Give Reward</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+        {/* ── Milestone reached banners (achieved but not redeemed) ───────── */}
+        {family.kids.flatMap(kid =>
+          (kid.milestones || [])
+            .filter(m => m.achieved && !m.redeemed)
+            .map(m => ({ kid, milestone: m }))
+        ).map(({ kid, milestone }) => (
+          <View key={`${kid.id}-${milestone.id}`} style={[styles.goalReachedCard, { borderColor: '#F59E0B' }]}>
+            <Text style={styles.goalReachedCrown}>🎖️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.goalReachedTitle}>{kid.name} hit a milestone!</Text>
+              <Text style={styles.goalReachedSub}>
+                ⭐ {milestone.stars_required} stars · Reward: <Text style={{ fontWeight: '800' }}>"{milestone.reward}"</Text>
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.goalRewardBtn, { backgroundColor: '#F59E0B' }]}
+              activeOpacity={0.85}
+              onPress={() => Alert.alert(
+                `Milestone reward for ${kid.name}! 🎖️`,
+                `They earned "${milestone.reward}" by reaching ${milestone.stars_required} ⭐!`,
+                [
+                  { text: 'Not Yet', style: 'cancel' },
+                  { text: 'Redeem ✅', onPress: async () => {
+                    try {
+                      await redeemMilestone(kid.id, milestone.id);
+                    } catch (e) {
+                      Alert.alert('Error', e?.message || 'Could not redeem milestone.');
+                    }
+                  }},
+                ]
+              )}
+            >
+              <Text style={styles.goalRewardBtnText}>Redeem</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
 
         {/* Needs approval */}
         <SectionHeader
@@ -809,6 +885,159 @@ function TasksTab() {
 
 // ─── Add Task Tab ──────────────────────────────────────────────────────────────
 
+// ─── Quest Template Browser Modal ─────────────────────────────────────────────
+
+function QuestTemplatesBrowser({ visible, onClose, onSelect }) {
+  const { colors } = useTheme();
+  const [selectedCatId, setSelectedCatId] = useState(null);
+  const [searchText,    setSearchText]    = useState('');
+
+  const quests = searchText.trim()
+    ? searchQuests(searchText)
+    : selectedCatId
+      ? QUEST_CATEGORIES.find(c => c.id === selectedCatId)?.quests.map(q => ({
+          ...q,
+          categoryColor: QUEST_CATEGORIES.find(c => c.id === selectedCatId)?.color,
+        })) || []
+      : ALL_QUESTS;
+
+  function handleClose() {
+    setSelectedCatId(null);
+    setSearchText('');
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
+      <View style={{ flex: 1, backgroundColor: '#5B21B6' }}>
+        {/* Header */}
+        <SafeAreaView>
+          <View style={tplStyles.header}>
+            <TouchableOpacity onPress={handleClose} style={tplStyles.closeBtn} activeOpacity={0.7}>
+              <Ionicons name="close" size={22} color="#fff" />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={tplStyles.headerTitle}>⚡ Mission Library</Text>
+              <Text style={tplStyles.headerSub}>{ALL_QUESTS.length} quests ready to assign</Text>
+            </View>
+          </View>
+
+          {/* Search */}
+          <View style={tplStyles.searchWrap}>
+            <Ionicons name="search" size={16} color="rgba(255,255,255,0.6)" style={{ marginRight: 8 }} />
+            <TextInput
+              style={tplStyles.searchInput}
+              placeholder="Search missions…"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText('')} activeOpacity={0.7}>
+                <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Category chips */}
+          {!searchText && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tplStyles.catRow}>
+              <TouchableOpacity
+                style={[tplStyles.catChip, !selectedCatId && tplStyles.catChipActive]}
+                onPress={() => setSelectedCatId(null)} activeOpacity={0.75}
+              >
+                <Text style={[tplStyles.catChipText, !selectedCatId && tplStyles.catChipTextActive]}>🌟 All</Text>
+              </TouchableOpacity>
+              {QUEST_CATEGORIES.map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[tplStyles.catChip, selectedCatId === cat.id && tplStyles.catChipActive]}
+                  onPress={() => setSelectedCatId(selectedCatId === cat.id ? null : cat.id)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[tplStyles.catChipText, selectedCatId === cat.id && tplStyles.catChipTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </SafeAreaView>
+
+        {/* Quest list */}
+        <ScrollView
+          style={{ flex: 1, backgroundColor: '#F5F3FF' }}
+          contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {quests.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingTop: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 12 }}>🔍</Text>
+              <Text style={{ color: '#6B7280', fontSize: 16, fontWeight: '600' }}>No missions found</Text>
+            </View>
+          ) : quests.map((quest, i) => {
+            const diffColor  = quest.difficulty === 'easy' ? '#059669' : quest.difficulty === 'medium' ? '#D97706' : '#DC2626';
+            const diffBg     = quest.difficulty === 'easy' ? '#D1FAE5' : quest.difficulty === 'medium' ? '#FEF3C7' : '#FEE2E2';
+            const diffLabel  = quest.difficulty === 'easy' ? '⭐ Easy' : quest.difficulty === 'medium' ? '⭐⭐ Medium' : '⭐⭐⭐ Hard';
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[tplStyles.questCard, { borderLeftColor: quest.categoryColor || '#7C3AED' }]}
+                onPress={() => { onSelect(quest); handleClose(); }}
+                activeOpacity={0.75}
+              >
+                <Text style={tplStyles.questEmoji}>{quest.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={tplStyles.questTitle}>{quest.title}</Text>
+                  <Text style={tplStyles.questNotes} numberOfLines={1}>{quest.notes}</Text>
+                  <View style={tplStyles.questBadgeRow}>
+                    <View style={[tplStyles.diffBadge, { backgroundColor: diffBg }]}>
+                      <Text style={[tplStyles.diffBadgeText, { color: diffColor }]}>{diffLabel}</Text>
+                    </View>
+                    <View style={tplStyles.ageBadge}>
+                      <Text style={tplStyles.ageBadgeText}>Age {quest.ageMin}+</Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={[tplStyles.addBtn, { backgroundColor: quest.categoryColor || '#7C3AED' }]}>
+                  <Ionicons name="add" size={20} color="#fff" />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const tplStyles = StyleSheet.create({
+  header:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 12 },
+  closeBtn:        { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle:     { fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+  headerSub:       { fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: '500', marginTop: 1 },
+  searchWrap:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
+  searchInput:     { flex: 1, color: '#fff', fontSize: 15, fontWeight: '500' },
+  catRow:          { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
+  catChip:         { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' },
+  catChipActive:   { backgroundColor: '#fff', borderColor: '#fff' },
+  catChipText:     { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  catChipTextActive: { color: '#5B21B6' },
+  questCard:       { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderLeftWidth: 4, ...shadows.sm },
+  questEmoji:      { fontSize: 30, width: 40, textAlign: 'center' },
+  questTitle:      { fontSize: 15, fontWeight: '800', color: '#1F2937', marginBottom: 3 },
+  questNotes:      { fontSize: 12, color: '#6B7280', marginBottom: 6 },
+  questBadgeRow:   { flexDirection: 'row', gap: 6 },
+  diffBadge:       { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  diffBadgeText:   { fontSize: 11, fontWeight: '700' },
+  ageBadge:        { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#EDE9FE' },
+  ageBadgeText:    { fontSize: 11, fontWeight: '600', color: '#7C3AED' },
+  addBtn:          { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+});
+
+// ─── Add Task / Quest Tab ──────────────────────────────────────────────────────
+
 function AddTaskTab() {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -821,9 +1050,10 @@ function AddTaskTab() {
   const [selectedEmoji, setSelectedEmoji] = useState('🧹');
   const [recurrence, setRecurrence] = useState('none');
   const [dueDate,    setDueDate]    = useState('');
-  const [cashAmount, setCashAmount] = useState(''); // optional dollar reward e.g. "5.00"
-  const [success,    setSuccess]    = useState(false);
-  const [loading,    setLoading]    = useState(false);
+  const [cashAmount,     setCashAmount]     = useState(''); // optional dollar reward e.g. "5.00"
+  const [success,        setSuccess]        = useState(false);
+  const [loading,        setLoading]        = useState(false);
+  const [showTemplates,  setShowTemplates]  = useState(false);
 
   async function handleAdd() {
     refreshParentSession?.();
@@ -869,9 +1099,23 @@ function AddTaskTab() {
     }
   }
 
+  function handleTemplateSelect(quest) {
+    setTitle(quest.title);
+    setSelectedEmoji(quest.emoji);
+    setReward(quest.reward || '');
+    setNotes(quest.notes || '');
+  }
+
   return (
     <View style={[styles.tabWrapper, { backgroundColor: colors.bg }]}>
       <ScreenHeader title={t('parentDashboard.newQuest')} subtitle={t('parentDashboard.assignChoreReward')} />
+
+      {/* Quest Template Browser Modal */}
+      <QuestTemplatesBrowser
+        visible={showTemplates}
+        onClose={() => setShowTemplates(false)}
+        onSelect={handleTemplateSelect}
+      />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -887,6 +1131,20 @@ function AddTaskTab() {
             <Text style={[styles.successBannerText, { color: colors.success }]}>{t('parentDashboard.questAssigned')}</Text>
           </View>
         )}
+
+        {/* Mission template browser — big dopamine button at the top */}
+        <TouchableOpacity
+          style={styles.templateBrowseBtn}
+          onPress={() => setShowTemplates(true)}
+          activeOpacity={0.82}
+        >
+          <Text style={styles.templateBrowseBtnEmoji}>⚡</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.templateBrowseBtnTitle}>Browse Mission Templates</Text>
+            <Text style={styles.templateBrowseBtnSub}>53 ready-to-go quests — one tap to assign</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+        </TouchableOpacity>
 
         {/* Assign to — shown FIRST so parents never miss it */}
         <FormLabel label={t('parentDashboard.assignTo')} />
@@ -3229,5 +3487,83 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     textDecorationLine: 'underline',
+  },
+
+  // ── Template browse button ──────────────────────────────────────────────────
+  templateBrowseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#EDE9FE',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#7C3AED30',
+    padding: 14,
+    marginBottom: 20,
+  },
+  templateBrowseBtnEmoji: {
+    fontSize: 26,
+    width: 36,
+    textAlign: 'center',
+  },
+  templateBrowseBtnTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#5B21B6',
+    marginBottom: 2,
+  },
+  templateBrowseBtnSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#7C3AED',
+  },
+
+  // ── Goal reached / milestone banners ───────────────────────────────────────
+  goalReachedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+    padding: 14,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  goalReachedGlow: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#7C3AED20',
+  },
+  goalReachedCrown: {
+    fontSize: 32,
+  },
+  goalReachedTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#4C1D95',
+    marginBottom: 3,
+  },
+  goalReachedSub: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6D28D9',
+  },
+  goalRewardBtn: {
+    backgroundColor: '#7C3AED',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  goalRewardBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 12,
   },
 });
