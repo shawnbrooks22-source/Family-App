@@ -1711,6 +1711,85 @@ function FamilyTab({ navigation }) {
             </View>
           </View>
         )}
+
+        {/* ── Star Store ──────────────────────────────────────────────────── */}
+        <View style={{ marginTop: 28 }}>
+          <Text style={[styles.sectionLabel, { color: colors.text3 }]}>⭐ STAR STORE</Text>
+          <View style={[styles.addKidForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.addKidFormTitle, { color: colors.text1, marginBottom: 2 }]}>⭐ Star Store</Text>
+            <Text style={[styles.memberPhone, { color: colors.text3, marginBottom: 12 }]}>
+              Rewards kids can spend stars on
+            </Text>
+
+            {/* Existing store items */}
+            {(family?.storeItems || []).map(item => (
+              <View key={item.id} style={[styles.storeItemRow, { borderBottomColor: colors.divider }]}>
+                <Text style={styles.storeItemEmoji}>{item.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.storeItemName, { color: colors.text1 }]}>{item.name}</Text>
+                  <Text style={[styles.storeItemCost, { color: colors.text3 }]}>⭐ {item.starCost} stars</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => Alert.alert('Remove Item', `Remove "${item.name}" from the store?`, [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Remove', style: 'destructive', onPress: () => handleRemoveStoreItem(item.id) },
+                  ])}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {(family?.storeItems || []).length === 0 && (
+              <Text style={[styles.emptyHint, { color: colors.text3 }]}>
+                No store items yet. Add rewards kids can spend their stars on!
+              </Text>
+            )}
+
+            {/* Add new item form */}
+            <View style={{ marginTop: 16 }}>
+              <Text style={[styles.formLabel, { color: colors.text2, marginTop: 0 }]}>Add a store item</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <TextInput
+                  style={[styles.formInput, { width: 56, textAlign: 'center', color: colors.text1, backgroundColor: colors.bg, borderColor: colors.border, padding: 10 }]}
+                  value={newStoreEmoji}
+                  onChangeText={setNewStoreEmoji}
+                  maxLength={2}
+                  placeholder="🎮"
+                  placeholderTextColor={colors.text3}
+                />
+                <TextInput
+                  style={[styles.formInput, { flex: 1, color: colors.text1, backgroundColor: colors.bg, borderColor: colors.border, padding: 10 }]}
+                  value={newStoreName}
+                  onChangeText={setNewStoreName}
+                  placeholder="e.g. 30 min screen time"
+                  placeholderTextColor={colors.text3}
+                  maxLength={50}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TextInput
+                  style={[styles.formInput, { width: 72, textAlign: 'center', color: colors.text1, backgroundColor: colors.bg, borderColor: colors.border, padding: 10 }]}
+                  value={newStoreCost}
+                  onChangeText={setNewStoreCost}
+                  placeholder="Stars"
+                  placeholderTextColor={colors.text3}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                />
+                <Text style={[{ color: colors.text3, fontSize: 14 }]}>stars</Text>
+                <TouchableOpacity
+                  onPress={handleAddStoreItem}
+                  style={[styles.assignBtn, { backgroundColor: colors.primary, flex: 1, marginTop: 0, paddingVertical: 12 }]}
+                >
+                  <Text style={styles.assignBtnText}>+ Add to Store</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+
         </TabContent>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -3751,5 +3830,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '800',
     fontSize: 12,
+  },
+
+  // ── Star Store ──────────────────────────────────────────────────────────────
+  storeItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  storeItemEmoji: {
+    fontSize: 24,
+    width: 32,
+    textAlign: 'center',
+  },
+  storeItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  storeItemCost: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  emptyHint: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 12,
   },
 });
