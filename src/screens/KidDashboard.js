@@ -57,7 +57,14 @@ function formatQuestDueDate(dateStr) {
 
 function isDueToday(dateStr) {
   if (!dateStr) return false;
-  return dateStr <= new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  return dateStr === today; // Only today, not overdue
+}
+
+function isOverdue(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return dateStr < today; // Strictly past
 }
 
 // ─── Star rank ─────────────────────────────────────────────────────────────────
@@ -147,13 +154,15 @@ function QuestCard({ task, index, onDone, kidColor }) {
     ]).start();
 
     // Heartbeat pulse on DO IT button — keeps kids' eyes on it
-    Animated.loop(
+    const heartbeat = Animated.loop(
       Animated.sequence([
         Animated.timing(btnScale, { toValue: 1.05, duration: 600, useNativeDriver: true }),
         Animated.timing(btnScale, { toValue: 1, duration: 600, useNativeDriver: true }),
         Animated.delay(800),
       ])
-    ).start();
+    );
+    heartbeat.start();
+    return () => heartbeat.stop();
   }, []);
 
   function handlePress() {
@@ -236,7 +245,7 @@ function QuestCard({ task, index, onDone, kidColor }) {
               </Text>
             </View>
             {task.due_date ? (
-              <Text style={[styles.questDueDate, isDueToday(task.due_date) && styles.questDueDateUrgent]}>
+              <Text style={[styles.questDueDate, (isDueToday(task.due_date) || isOverdue(task.due_date)) && styles.questDueDateUrgent]}>
                 📅 Due {formatQuestDueDate(task.due_date)}
               </Text>
             ) : null}
@@ -268,12 +277,14 @@ function WaitingCard({ task }) {
   const dotOpacity = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const blink = Animated.loop(
       Animated.sequence([
         Animated.timing(dotOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
         Animated.timing(dotOpacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    blink.start();
+    return () => blink.stop();
   }, []);
 
   return (
@@ -325,14 +336,14 @@ export default function KidDashboard({ route, navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { isTablet, pad, fs } = useDevice();
-  const kid = family.kids.find(k => k.id === kidId);
+  const kid = family?.kids?.find(k => k.id === kidId);
 
   // Normalize both field naming conventions (local = assignedTo, Supabase = assigned_to)
   const kidTasks = tasks.filter(t => t.assignedTo === kidId || t.assigned_to === kidId);
   const pendingTasks = kidTasks.filter(t => t.status === 'pending');
   const waitingTasks = kidTasks.filter(t => t.status === 'completed');
   const approvedTasks = kidTasks.filter(t => t.status === 'approved');
-  const celebratedTasks = approvedTasks.filter(t => t.celebrated);
+  const celebratedTasks = approvedTasks; // Show all approved tasks, not just celebrated ones
 
   const totalStars = approvedTasks.length;
   const completedCount = waitingTasks.length + approvedTasks.length;
@@ -415,13 +426,15 @@ export default function KidDashboard({ route, navigation }) {
     }).start();
 
     // Pulsing glow ring behind avatar
-    Animated.loop(
+    const glowPulse = Animated.loop(
       Animated.sequence([
         Animated.timing(glowScale, { toValue: 1.18, duration: 1400, useNativeDriver: true }),
         Animated.timing(glowScale, { toValue: 1, duration: 1400, useNativeDriver: true }),
       ])
-    ).start();
-  }, []);
+    );
+    glowPulse.start();
+    return () => glowPulse.stop();
+  }, [kid?.goal, kid?.milestones]);
 
   // Guard flag — prevents stacking multiple navigation calls at once
   const isCelebrating = useRef(false);
@@ -448,6 +461,7 @@ export default function KidDashboard({ route, navigation }) {
     return unsubscribe;
   }, [navigation]);
 
+  // Guard after all hooks — React rules require hooks to be called unconditionally
   if (!kid) return null;
 
   const gradient = getGradient(kid.color);

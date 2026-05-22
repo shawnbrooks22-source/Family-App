@@ -308,7 +308,11 @@ function HomeTab({ navigation }) {
                       [
                         { text: 'Not yet', style: 'cancel' },
                         { text: `Pay ${amt} ✅`, onPress: async () => {
-                          try { await completeSavingsChallenge(kid.id); } catch (e) {
+                          try {
+                            // completeSavingsChallenge sets paidOut:true on the current round
+                            // and then clears the challenge so a new one can be started.
+                            await completeSavingsChallenge(kid.id);
+                          } catch (e) {
                             Alert.alert('Error', e?.message || 'Could not mark as paid.');
                           }
                         }},
@@ -714,8 +718,10 @@ function TasksTab() {
               <Text style={[styles.modalCancelText, { color: colors.text3 }]}>{t('cancel')}</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text1 }]}>{t('parentDashboard.editQuest')}</Text>
-            <TouchableOpacity onPress={handleSaveEdit}>
-              <Text style={[styles.modalSaveText, { color: colors.primary }]}>{t('save')}</Text>
+            <TouchableOpacity onPress={handleSaveEdit} disabled={editLoading}>
+              <Text style={[styles.modalSaveText, { color: editLoading ? colors.text3 : colors.primary }]}>
+                {t('save')}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -1087,6 +1093,7 @@ function AddTaskTab() {
       setReward('');
       setNotes('');
       setSelectedKid(null);
+      setSelectedEmoji('🧹');
       setRecurrence('none');
       setDueDate('');
       setCashAmount('');
@@ -1141,7 +1148,7 @@ function AddTaskTab() {
           <Text style={styles.templateBrowseBtnEmoji}>⚡</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.templateBrowseBtnTitle}>Browse Mission Templates</Text>
-            <Text style={styles.templateBrowseBtnSub}>53 ready-to-go quests — one tap to assign</Text>
+            <Text style={styles.templateBrowseBtnSub}>{ALL_QUESTS.length} ready-to-go quests — one tap to assign</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
         </TouchableOpacity>
@@ -1854,6 +1861,8 @@ function FamilyTab({ navigation }) {
                                 { text: t('cancel'), style: 'cancel' },
                                 { text: t('parentDashboard.savingsMarkPaid'), onPress: async () => {
                                   try {
+                                    // completeSavingsChallenge sets paidOut:true on the current round
+                                    // and then clears the challenge so a new one can be started.
                                     await completeSavingsChallenge(editingKid.id);
                                   } catch (e) {
                                     Alert.alert('Error', e?.message || 'Please try again.');
@@ -2079,6 +2088,12 @@ function SettingsTab({ navigation }) {
   const notifyPrefs = family?.notifyPrefs || defaultPrefs;
   const [notifTaskCompleted, setNotifTaskCompleted] = useState(notifyPrefs.taskCompleted !== false);
   const [notifTaskApproved,  setNotifTaskApproved]  = useState(notifyPrefs.taskApproved  !== false);
+
+  // Sync notification toggles when family.notifyPrefs changes externally
+  useEffect(() => {
+    setNotifTaskCompleted(family?.notifyPrefs?.taskCompleted !== false);
+    setNotifTaskApproved(family?.notifyPrefs?.taskApproved !== false);
+  }, [family?.notifyPrefs?.taskCompleted, family?.notifyPrefs?.taskApproved]);
 
   async function handleSaveProfile() {
     if (!editName.trim()) { Alert.alert(t('settings.enterName')); return; }
@@ -2386,7 +2401,7 @@ function SettingsTab({ navigation }) {
             onPress={() => navigation.navigate('Upgrade')}
             activeOpacity={0.85}
           >
-            <View style={[styles.aiCardIcon, { backgroundColor: '#EDE9FE' }]}>
+            <View style={[styles.aiIconBox, { backgroundColor: '#EDE9FE' }]}>
               <Text style={{ fontSize: 26 }}>👑</Text>
             </View>
             <View style={{ flex: 1 }}>
@@ -2661,6 +2676,7 @@ export default function ParentDashboard({ navigation }) {
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }} onTouchStart={onUserInteraction}>
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -2718,6 +2734,7 @@ export default function ParentDashboard({ navigation }) {
         {props => <SettingsTab {...props} navigation={navigation} />}
       </Tab.Screen>
     </Tab.Navigator>
+    </View>
   );
 }
 
