@@ -67,7 +67,14 @@ function formatDueDate(dateStr) {
 function isDueSoon(dateStr) {
   if (!dateStr) return false;
   const today = new Date().toISOString().split('T')[0];
-  return dateStr <= today;
+  // Returns true only for today — use isOverdue() to distinguish past dates
+  return dateStr === today;
+}
+
+function isOverdue(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return dateStr < today;
 }
 
 function getDueDateSuggestions() {
@@ -668,8 +675,13 @@ function TasksTab() {
                     {kid ? `${kid.emoji} ${kid.name}` : 'Unknown'}
                   </Text>
                   {task.due_date ? (
-                    <Text style={[styles.taskRowNotes, { color: colors.text3 }, isDueSoon(task.due_date) && { color: colors.error }]}>
-                      📅 Due {formatDueDate(task.due_date)}
+                    <Text style={[
+                      styles.taskRowNotes,
+                      { color: colors.text3 },
+                      isDueSoon(task.due_date) && { color: colors.warning },
+                      isOverdue(task.due_date) && { color: colors.error },
+                    ]}>
+                      {isOverdue(task.due_date) ? '⚠️ OVERDUE' : isDueSoon(task.due_date) ? '📅 TODAY' : `📅 Due ${formatDueDate(task.due_date)}`}
                     </Text>
                   ) : null}
                   {task.notes ? (
@@ -988,7 +1000,7 @@ function QuestTemplatesBrowser({ visible, onClose, onSelect }) {
             const diffLabel  = quest.difficulty === 'easy' ? '⭐ Easy' : quest.difficulty === 'medium' ? '⭐⭐ Medium' : '⭐⭐⭐ Hard';
             return (
               <TouchableOpacity
-                key={i}
+                key={`${quest.categoryId || 'all'}-${quest.title}`}
                 style={[tplStyles.questCard, { borderLeftColor: quest.categoryColor || '#7C3AED' }]}
                 onPress={() => { onSelect(quest); handleClose(); }}
                 activeOpacity={0.75}
@@ -2065,6 +2077,8 @@ function SettingsTab({ navigation }) {
   const [newPin,     setNewPin]     = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinMsg, setPinMsg] = useState(null); // { text, ok }
+  const [pinAttempts,   setPinAttempts]   = useState(0);
+  const [pinLockedUntil, setPinLockedUntil] = useState(0);
 
   // AI Assistant state
   const [aiInput,    setAiInput]    = useState('');
@@ -2111,13 +2125,29 @@ function SettingsTab({ navigation }) {
   }
 
   async function handleChangePin() {
+    // Rate limiting: check if currently locked out
+    if (Date.now() < pinLockedUntil) {
+      const secs = Math.ceil((pinLockedUntil - Date.now()) / 1000);
+      setPinMsg({ text: `Too many attempts. Try again in ${secs}s.`, ok: false });
+      return;
+    }
     setPinMsg(null);
     try {
       const pinOk = await verifyPin(currentPin);
       if (!pinOk) {
+        const newAttempts = pinAttempts + 1;
+        setPinAttempts(newAttempts);
+        if (newAttempts >= 5) {
+          setPinLockedUntil(Date.now() + 30000);
+          setPinAttempts(0);
+          setPinMsg({ text: 'Too many incorrect attempts. Locked for 30 seconds.', ok: false });
+          return;
+        }
         setPinMsg({ text: t('settings.pinIncorrect'), ok: false });
         return;
       }
+      // Successful verify — reset attempt counter
+      setPinAttempts(0);
       if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
         setPinMsg({ text: t('settings.pinMustBe4'), ok: false });
         return;
