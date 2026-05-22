@@ -63,12 +63,19 @@ export default function NotificationsPermissionScreen({ navigation }) {
 
       if (status === 'granted') {
         // Register for push token in the background — not blocking navigation
-        Notifications.getExpoPushTokenAsync()
-          .then(({ data }) => {
-            // TODO: save push token to Supabase profiles row for the parent
-            console.log('[Notifications] Push token:', data);
+        Notifications.getExpoPushTokenAsync({
+          projectId: '4efaab0a-a411-4528-a7b1-b83160f7ac1f', // from app.json extra.eas.projectId
+        })
+          .then(async ({ data: pushToken }) => {
+            if (pushToken) {
+              // Save push token to AsyncStorage for use in notifications
+              try {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                await AsyncStorage.setItem('@kindo_push_token', pushToken);
+              } catch {/* non-critical */}
+            }
           })
-          .catch(() => {/* non-critical */});
+          .catch(() => {/* non-critical — Expo Go or simulator won't have a real token */});
       }
     } catch (_) {
       // Permission request failed — silently continue

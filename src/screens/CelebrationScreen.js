@@ -39,8 +39,15 @@ export default function CelebrationScreen({ route, navigation }) {
 
   // Mark celebrated right away so KidDashboard won't re-trigger navigation
   useEffect(() => {
-    if (taskId) markCelebrated(taskId);
+    if (!taskId) {
+      // No task params — navigate back to prevent data corruption
+      navigation.goBack();
+      return;
+    }
+    markCelebrated(taskId);
   }, []);
+
+  const revealTimeoutRef = useRef(null);
 
   // ─── Suspense anims ──────────────────────────────────────────────────────────
   const giftPulse = useRef(new Animated.Value(1)).current;
@@ -126,6 +133,13 @@ export default function CelebrationScreen({ route, navigation }) {
     });
   }, []);
 
+  // Cleanup: cancel any pending reveal timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
+    };
+  }, []);
+
   // ─── Tap to reveal ───────────────────────────────────────────────────────────
   function handleReveal() {
     setPhase('revealing');
@@ -148,7 +162,7 @@ export default function CelebrationScreen({ route, navigation }) {
     Animated.timing(giftRevealScale, { toValue: 3.4, duration: 520, useNativeDriver: true }).start();
 
     // Blinding white flash → revealed phase
-    setTimeout(() => {
+    revealTimeoutRef.current = setTimeout(() => {
       Animated.timing(flashOpacity, { toValue: 1, duration: 140, useNativeDriver: true }).start(() => {
         setPhase('revealed');
         playRevealedAnims();
@@ -368,7 +382,7 @@ export default function CelebrationScreen({ route, navigation }) {
         <Animated.View style={{ opacity: backOpacity, width: '100%' }}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.navigate('Home')}
             activeOpacity={0.85}
           >
             <Text style={styles.backBtnText}>{t('celebration.backToQuests')}</Text>

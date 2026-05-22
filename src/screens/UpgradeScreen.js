@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -32,7 +32,12 @@ export default function UpgradeScreen({ navigation }) {
 
   // Navigate away when purchase completes — purchasePremium() only opens the native sheet;
   // the actual success arrives asynchronously via purchaseUpdatedListener → isPremium flipping true.
+  const justMounted = useRef(true);
   useEffect(() => {
+    if (justMounted.current) {
+      justMounted.current = false;
+      return; // Don't fire on initial mount
+    }
     if (isPremium) {
       Alert.alert('Welcome to Premium! 🎉', 'All features are now unlocked for your family.');
       navigation.goBack();

@@ -26,7 +26,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Alert } from 'react-native';
+import { Alert } from 'react-native';
 
 const SUB_KEY = '@kindo_subscription';
 
@@ -101,7 +101,8 @@ export function SubscriptionProvider({ children }) {
 
       // 3. Listen for incoming purchases (handles async purchase completions)
       purchaseListener.current = IAP.purchaseUpdatedListener(async (purchase) => {
-        if (purchase?.transactionReceipt || purchase?.purchaseToken) {
+        if ((purchase?.transactionReceipt || purchase?.purchaseToken) &&
+            purchase?.productId === PRODUCT_ID) {
           await handleSuccessfulPurchase(purchase);
         }
       });
@@ -133,6 +134,8 @@ export function SubscriptionProvider({ children }) {
   /** Check the store for active subscriptions and sync local plan state. */
   async function syncWithStore(showFeedback = true) {
     if (!IAP || !iapReady) return false;
+    // Only downgrade to free if store responded successfully with empty purchases
+    // (don't downgrade on network failure / timeout)
     try {
       const purchases = await IAP.getAvailablePurchases();
       const hasPremium = purchases?.some(p => p.productId === PRODUCT_ID);
@@ -140,24 +143,27 @@ export function SubscriptionProvider({ children }) {
         await persistPlan('premium');
         return true;
       } else {
-        // No active subscription found — downgrade if currently premium
+        // Store responded and confirmed no active subscription
         await persistPlan('free');
         return false;
       }
     } catch (e) {
-      if (__DEV__) console.warn('IAP sync failed:', e);
-      return false;
+      // Network failure or store unavailable — don't change existing plan
+      if (__DEV__) console.warn('[IAP] syncWithStore failed, keeping current plan:', e.message);
+      return isPremium; // Keep current state
     }
   }
 
   /** Called by the purchase listener when a transaction comes in. */
   async function handleSuccessfulPurchase(purchase) {
     try {
-      // Acknowledge the purchase (required — otherwise it refunds after 3 days on Android)
+      // Acknowledge the purchase FIRST (required — otherwise it refunds after 3 days on Android)
       await IAP.finishTransaction({ purchase, isConsumable: false });
+      // Only upgrade after transaction is successfully acknowledged
       await persistPlan('premium');
     } catch (e) {
-      if (__DEV__) console.warn('Failed to finish transaction:', e);
+      if (__DEV__) console.warn('[IAP] Failed to finish transaction:', e);
+      // Do NOT upgrade if finishTransaction failed
     } finally {
       setPurchasing(false);
     }
@@ -184,11 +190,7 @@ export function SubscriptionProvider({ children }) {
 
     setPurchasing(true);
     try {
-      if (Platform.OS === 'android') {
-        await IAP.requestSubscription({ sku: PRODUCT_ID });
-      } else {
-        await IAP.requestSubscription({ sku: PRODUCT_ID });
-      }
+      await IAP.requestSubscription({ sku: PRODUCT_ID });
       // Result comes via purchaseUpdatedListener — don't await here
     } catch (e) {
       setPurchasing(false);

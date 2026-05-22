@@ -123,6 +123,13 @@ export function AppProvider({ children }) {
     };
   }, []);
 
+  // Schedule streak notifications whenever family data loads/updates
+  useEffect(() => {
+    if (family?.kids?.length) {
+      scheduleStreakNotifications(family).catch(() => {});
+    }
+  }, [family?.kids?.length]);
+
   // Returns a valid session or null. Forces a refresh attempt if the access
   // token is missing/expired so writes don't go out without a JWT.
   async function ensureSession() {
@@ -310,17 +317,17 @@ export function AppProvider({ children }) {
       if (__DEV__) console.error('Failed to load data:', e);
     } finally {
       setIsLoaded(true);
-      // Schedule streak notifications after family data is loaded
-      scheduleStreakNotifications().catch(() => {});
     }
   }
 
   async function loadFamilyFromSupabase(fid) {
     try {
-      const [{ data: famRow }, { data: profiles }] = await Promise.all([
+      const [{ data: famRow, error: famErr }, { data: profiles, error: profilesErr }] = await Promise.all([
         supabase.from('families').select('*').eq('id', fid).single(),
         supabase.from('profiles').select('*').eq('family_id', fid),
       ]);
+      if (famErr) { console.warn('[load] families query failed:', famErr.message); return; }
+      if (profilesErr) { console.warn('[load] profiles query failed:', profilesErr.message); return; }
       if (!famRow) return;
       const parent = profiles?.find(p => p.role === 'parent');
       const kids   = profiles?.filter(p => p.role === 'kid') || [];
@@ -359,11 +366,12 @@ export function AppProvider({ children }) {
 
   async function loadTasksFromSupabase(fid) {
     try {
-      const { data } = await supabase
+      const { data, error: tasksErr } = await supabase
         .from('tasks')
         .select('*')
         .eq('family_id', fid)
         .order('created_at', { ascending: true });
+      if (tasksErr) { console.warn('[load] tasks query failed:', tasksErr.message); return; }
       if (data) {
         setTasks(data);
         await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(data));
@@ -736,6 +744,7 @@ export function AppProvider({ children }) {
 
   async function completeTask(taskId, photoUri) {
     const task = tasks.find(t => t.id === taskId);
+    if (!task) throw new Error('Quest not found — it may have been deleted. Please refresh.');
 
     // Upload photo to Supabase Storage so it's accessible on all devices
     const resolvedPhotoUri = photoUri
@@ -806,7 +815,8 @@ export function AppProvider({ children }) {
           completed_at: null,
           approved_at:  null,
         };
-        await supabase.from('tasks').insert(respawnedTask);
+        const { error: respawnErr } = await supabase.from('tasks').insert(respawnedTask);
+        if (respawnErr) console.warn('[approveTask] Recurring task respawn failed:', respawnErr.message);
         // Add respawned task to local state optimistically
         setTasks(prev => [...prev, { ...respawnedTask, assignedTo: kidId }]);
       }
@@ -842,10 +852,10 @@ export function AppProvider({ children }) {
 
     // Check star milestones — count stars after this approval
     if (kid) {
-      const newStarCount = tasks.filter(t =>
-        (t.assignedTo || t.assigned_to) === kid.id &&
-        (t.status === 'approved' || t.id === taskId)
+      const approvedCount = tasks.filter(t =>
+        (t.assignedTo || t.assigned_to) === kid.id && t.status === 'approved'
       ).length;
+      const newStarCount = approvedCount + 1; // +1 for the task being approved right now
 
       const milestones = kid.milestones || [];
       const newlyAchieved = milestones.filter(m =>
@@ -983,8 +993,10 @@ export function AppProvider({ children }) {
       // Delete tasks BEFORE the profile — tasks.assigned_to references
       // profiles.id with no ON DELETE cascade, so a parallel delete
       // racing the wrong way fails with a FK violation.
-      await supabase.from('tasks').delete().eq('assigned_to', kidId);
-      await supabase.from('profiles').delete().eq('id', kidId);
+      const { error: taskDelErr } = await supabase.from('tasks').delete().eq('assigned_to', kidId);
+      if (taskDelErr) throw taskDelErr;
+      const { error: profileDelErr } = await supabase.from('profiles').delete().eq('id', kidId);
+      if (profileDelErr) throw profileDelErr;
       setFamily(prev => ({ ...prev, kids: prev.kids.filter(k => k.id !== kidId) }));
       setTasks(prev => prev.filter(t => (t.assignedTo || t.assigned_to) !== kidId));
     } else {
@@ -1100,12 +1112,20 @@ export function AppProvider({ children }) {
 
   async function updateStreak(kidId) {
     if (!kidId) return;
+    // NOTE: `family` here is from the React state closure. In most call sites
+    // this is the most recent committed state (completeTask is called after a
+    // successful task update, so the family state should be current). If this
+    // ever becomes stale, callers should pass the current family as an arg.
     const kid = family?.kids?.find(k => k.id === kidId);
     if (!kid) return;
 
     const today = localDateString();
     const last  = kid.lastCompletedDate || null;
-    const yesterday = localDateString(new Date(Date.now() - 86400000));
+    const yesterday = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().split('T')[0];
+    })();
 
     let newStreak = kid.streak || 0;
     if (last === today) {
@@ -1127,10 +1147,11 @@ export function AppProvider({ children }) {
       ),
     } : prev);
     if (SUPABASE_READY && familyId && authUser) {
-      await supabase.from('profiles').update({
+      const { error: streakErr } = await supabase.from('profiles').update({
         streak: newStreak,
         last_completed_date: today,
       }).eq('id', kidId);
+      if (streakErr) console.warn('[updateStreak] Failed to persist streak:', streakErr.message);
     } else {
       const updated = {
         ...family,
@@ -1203,7 +1224,7 @@ export function AppProvider({ children }) {
         try { await supabase.from('families').delete().eq('id', familyId); } catch { /* ignore */ }
       }
 
-      await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY]);
+      await AsyncStorage.multiRemove([FAMILY_KEY, TASKS_KEY, ONBOARDING_KEY, NOTIF_ASKED_KEY]);
       await secureDelete(FAMILY_ID_KEY);
       await endParentSession();
       if (SUPABASE_READY) await supabase.auth.signOut().catch(() => {});
@@ -1212,6 +1233,8 @@ export function AppProvider({ children }) {
       setFamily(null);
       setFamilyId(null);
       setAuthUser(null);
+      setOnboardingDone(false);
+      setNotificationsAsked(false);
     } catch (e) {
       if (__DEV__) console.error('Failed to clear data:', e);
     }
@@ -1351,7 +1374,8 @@ export function AppProvider({ children }) {
         familyId,
       }),
     });
-    const data = await res.json();
+    let data = {};
+    try { data = await res.json(); } catch { /* non-JSON body, e.g. 502 HTML */ }
     if (!res.ok) throw new Error(data.error || 'Payment failed');
 
     // Refresh family data to get updated kid balance
@@ -1367,14 +1391,17 @@ export function AppProvider({ children }) {
 
     const newBalance = Math.max(0, (kid.balance_cents || 0) - amountCents);
 
-    await supabase.from('profiles').update({ balance_cents: newBalance }).eq('id', kidId);
-    await supabase.from('transactions').insert({
+    const { error: balErr } = await supabase.from('profiles')
+      .update({ balance_cents: newBalance }).eq('id', kidId);
+    if (balErr) throw balErr;
+    const { error: txErr } = await supabase.from('transactions').insert({
       family_id:    familyId,
       kid_id:       kidId,
       amount_cents: amountCents,
       type:         'payout',
       note:         'Manual payout recorded by parent',
     });
+    if (txErr) throw txErr;
 
     await loadFamilyFromSupabase(familyId);
     await loadTransactions();
