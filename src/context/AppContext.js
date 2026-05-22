@@ -127,6 +127,8 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (family?.kids?.length) {
       scheduleStreakNotifications(family).catch(() => {});
+      scheduleWeeklyLeaderboardNotification(family).catch(() => {});
+      scheduleQuestOfTheDayNotification(family).catch(() => {});
     }
   }, [family?.kids?.length]);
 
@@ -841,6 +843,13 @@ export function AppProvider({ children }) {
       await saveTasks(updated);
     }
 
+    // Notify kid immediately — they'll see it when they pick up the device
+    const kidName = family?.kids?.find(k => k.id === (task?.assignedTo || task?.assigned_to))?.name || 'Someone';
+    await sendNotif(
+      `🎉 Quest approved, ${kidName}!`,
+      `${task?.title} — tap to claim your reward 🎁`
+    );
+
     // Notify task approved
     const kid = family?.kids?.find(k => k.id === (task?.assignedTo || task?.assigned_to));
     if (kid && family?.notifyPrefs?.taskApproved !== false) {
@@ -854,8 +863,15 @@ export function AppProvider({ children }) {
     if (kid) {
       const approvedCount = tasks.filter(t =>
         (t.assignedTo || t.assigned_to) === kid.id && t.status === 'approved'
-      ).length;
-      const newStarCount = approvedCount + 1; // +1 for the task being approved right now
+      ).reduce((sum, t) => {
+        const mult = t.difficulty === 'hard' ? 3 : t.difficulty === 'medium' ? 2 : 1;
+        return sum + mult;
+      }, 0);
+      // Star multiplier based on difficulty
+      const difficultyMultiplier =
+        task.difficulty === 'hard'   ? 3 :
+        task.difficulty === 'medium' ? 2 : 1;
+      const newStarCount = approvedCount + difficultyMultiplier;
 
       const milestones = kid.milestones || [];
       const newlyAchieved = milestones.filter(m =>
@@ -1440,6 +1456,184 @@ export function AppProvider({ children }) {
     await touchParentSession();
   }
 
+  // ── Feature 3: Sunday Evening Family Leaderboard Push ─────────────────────
+  async function scheduleWeeklyLeaderboardNotification(currentFamily) {
+    const fam = currentFamily || family;
+    if (!fam?.kids?.length) return;
+
+    // Cancel previous Sunday notification
+    const sundayNotifKey = '@kindo_sunday_notif_id';
+    try {
+      const existingId = await AsyncStorage.getItem(sundayNotifKey);
+      if (existingId) {
+        await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => {});
+      }
+    } catch {}
+
+    // Compute next Sunday at 6 PM
+    const now = new Date();
+    const nextSunday = new Date(now);
+    const daysUntilSunday = (7 - now.getDay()) % 7 || 7; // days until next Sunday (always future)
+    nextSunday.setDate(now.getDate() + daysUntilSunday);
+    nextSunday.setHours(18, 0, 0, 0);
+    if (nextSunday <= now) nextSunday.setDate(nextSunday.getDate() + 7);
+
+    // Calculate this week's stars per kid (Mon 00:00 → now)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Monday
+    weekStart.setHours(0, 0, 0, 0);
+    const weekStartMs = weekStart.getTime();
+
+    const kidStats = fam.kids.map(kid => {
+      const weekTasks = tasks.filter(t =>
+        (t.assignedTo || t.assigned_to) === kid.id &&
+        t.status === 'approved' &&
+        Number(t.approvedAt || t.approved_at || 0) >= weekStartMs
+      );
+      const weekStars = weekTasks.reduce((sum, t) => {
+        const mult = t.difficulty === 'hard' ? 3 : t.difficulty === 'medium' ? 2 : 1;
+        return sum + mult;
+      }, 0);
+      return { name: kid.name, stars: weekStars };
+    }).sort((a, b) => b.stars - a.stars);
+
+    const statLine = kidStats.map(k => `${k.name}: ${k.stars} ⭐`).join(' | ');
+    const topKid = kidStats[0];
+
+    const notifBody = kidStats.length > 1
+      ? `${statLine} — Great week, family! 🏆`
+      : `${topKid?.name} earned ${topKid?.stars} ⭐ this week — amazing! 🏆`;
+
+    try {
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📊 This week\'s family results!',
+          body: notifBody,
+          sound: true,
+        },
+        trigger: { date: nextSunday },
+      });
+      await AsyncStorage.setItem(sundayNotifKey, notifId);
+    } catch {}
+  }
+
+  // ── Feature 4: "Quest of the Day" Morning Notification ────────────────────
+  async function scheduleQuestOfTheDayNotification(currentFamily) {
+    const fam = currentFamily || family;
+    if (!fam?.kids?.length) return;
+
+    // Import quest templates (dynamic require to avoid circular deps)
+    let allQuests = [];
+    try {
+      const { ALL_QUESTS } = require('../data/questTemplates');
+      allQuests = ALL_QUESTS;
+    } catch {}
+    if (!allQuests.length) return;
+
+    // Cancel any previously scheduled Quest of the Day notification
+    const qotdKey = '@kindo_qotd_notif_id';
+    try {
+      const existingId = await AsyncStorage.getItem(qotdKey);
+      if (existingId) {
+        await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => {});
+      }
+    } catch {}
+
+    // Pick a random quest from the template library
+    const randomQuest = allQuests[Math.floor(Math.random() * allQuests.length)];
+
+    // Schedule for 7:30 AM tomorrow (or today if before 7:30 AM)
+    const now = new Date();
+    const trigger = new Date(now);
+    trigger.setHours(7, 30, 0, 0);
+    if (trigger <= now) {
+      trigger.setDate(trigger.getDate() + 1); // push to tomorrow
+    }
+
+    try {
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `☀️ Quest of the Day for your family!`,
+          body: `Try: "${randomQuest.title}" ${randomQuest.emoji || '⭐'} — open Kindo to assign it in one tap!`,
+          sound: true,
+        },
+        trigger: { date: trigger },
+      });
+      await AsyncStorage.setItem(qotdKey, notifId);
+    } catch {}
+  }
+
+  // ── Feature 5: Kid-initiated Quest Requests ────────────────────────────────
+  async function requestQuest({ assignedTo, title, reward, notes }) {
+    if (!title?.trim()) throw new Error('Quest title is required');
+
+    const newTask = {
+      id:           generateId(),
+      title:        sanitize(title),
+      reward:       sanitize(reward || ''),
+      notes:        sanitize(notes || ''),
+      assignedTo,
+      assigned_to:  assignedTo,
+      status:       'requested', // new status — parent must approve to activate
+      requestedAt:  Date.now(),
+      requested_at: Date.now(),
+      recurrence:   'none',
+      emoji:        '🌟',
+      difficulty:   'easy',
+      family_id:    familyId || undefined,
+    };
+
+    // Optimistic update
+    setTasks(prev => [...prev, newTask]);
+
+    if (SUPABASE_READY && familyId && authUser) {
+      const { error } = await supabase.from('tasks').insert({
+        ...newTask,
+        assigned_to: assignedTo,
+        family_id:   familyId,
+      });
+      if (error) {
+        // Rollback optimistic update
+        setTasks(prev => prev.filter(t => t.id !== newTask.id));
+        throw error;
+      }
+    } else {
+      // Local mode
+      const updated = [...tasks, newTask];
+      await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(updated));
+    }
+
+    // Notify parent
+    await sendNotif(
+      '📋 New Quest Request!',
+      `${family?.kids?.find(k => k.id === assignedTo)?.name || 'Your kid'} wants to do: "${sanitize(title)}" — check the Parent Hub!`
+    );
+  }
+
+  async function approveQuestRequest(taskId) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'pending' } : t));
+    if (SUPABASE_READY && familyId) {
+      const { error } = await supabase.from('tasks').update({ status: 'pending' }).eq('id', taskId);
+      if (error) {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'requested' } : t));
+        throw error;
+      }
+    } else {
+      const updated = tasks.map(t => t.id === taskId ? { ...t, status: 'pending' } : t);
+      await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(updated));
+    }
+  }
+
+  async function declineQuestRequest(taskId) {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    if (SUPABASE_READY && familyId) {
+      await supabase.from('tasks').delete().eq('id', taskId);
+    } else {
+      const updated = tasks.filter(t => t.id !== taskId);
+      await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(updated));
+    }
+  }
+
   return (
     <AppContext.Provider
       value={{
@@ -1454,6 +1648,8 @@ export function AppProvider({ children }) {
         markOnboardingDone,
         resetOnboarding,
         scheduleStreakNotifications,
+        scheduleWeeklyLeaderboardNotification,
+        scheduleQuestOfTheDayNotification,
         isCloudEnabled: SUPABASE_READY,
         // Auth
         authSignIn,
@@ -1468,6 +1664,10 @@ export function AppProvider({ children }) {
         approveTask,
         markCelebrated,
         deleteTask,
+        // Quest requests (kid-initiated)
+        requestQuest,
+        approveQuestRequest,
+        declineQuestRequest,
         // Kid CRUD
         addKid,
         editKid,

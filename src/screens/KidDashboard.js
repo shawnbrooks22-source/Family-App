@@ -12,6 +12,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -123,6 +125,113 @@ function BadgesSection({ stars, streak, kidTasks, colors }) {
     </View>
   );
 }
+
+// ─── Streak Calendar Strip ─────────────────────────────────────────────────────
+function StreakCalendar({ kidId, tasks }) {
+  // Build last 7 days array (today at index 6, 6 days ago at index 0)
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  });
+
+  // Get day of week for the first day in our 7-day window
+  const firstDay = new Date();
+  firstDay.setDate(firstDay.getDate() - 6);
+  const startDayOfWeek = firstDay.getDay(); // 0=Sun, 1=Mon...
+
+  // Which days have approved tasks for this kid?
+  const completedDays = new Set(
+    tasks
+      .filter(t =>
+        (t.assignedTo || t.assigned_to) === kidId &&
+        t.status === 'approved'
+      )
+      .map(t => {
+        const ts = t.approvedAt || t.approved_at;
+        if (!ts) return null;
+        return new Date(Number(ts)).toISOString().split('T')[0];
+      })
+      .filter(Boolean)
+  );
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  return (
+    <View style={calStyles.container}>
+      {days.map((dayStr, i) => {
+        const isCompleted = completedDays.has(dayStr);
+        const isToday = dayStr === todayStr;
+        // Day label: Sun=S, Mon=M, etc.
+        const dayOfWeek = (startDayOfWeek + i) % 7;
+        const label = ['S','M','T','W','T','F','S'][dayOfWeek];
+
+        return (
+          <View key={dayStr} style={calStyles.dayCol}>
+            <Text style={calStyles.dayLabel}>{label}</Text>
+            <View style={[
+              calStyles.dayCircle,
+              isCompleted && calStyles.dayCircleCompleted,
+              isToday && !isCompleted && calStyles.dayCircleToday,
+            ]}>
+              {isCompleted ? (
+                <Text style={calStyles.checkmark}>⭐</Text>
+              ) : isToday ? (
+                <Text style={calStyles.todayDot}>·</Text>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const calStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  dayCol: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  dayLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 0.5,
+  },
+  dayCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCircleCompleted: {
+    backgroundColor: '#FFE000',
+    borderColor: '#FFE000',
+  },
+  dayCircleToday: {
+    borderColor: 'rgba(255,255,255,0.8)',
+    borderWidth: 2,
+  },
+  checkmark: {
+    fontSize: 14,
+  },
+  todayDot: {
+    fontSize: 24,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 24,
+  },
+});
 
 // ─── Stat chip ─────────────────────────────────────────────────────────────────
 function StatChip({ emoji, value, label }) {
@@ -329,10 +438,116 @@ function DoneCard({ task }) {
   );
 }
 
+// ─── Request Quest Modal ───────────────────────────────────────────────────────
+function RequestQuestModal({ visible, onClose, kidId }) {
+  const { requestQuest, family } = useApp();
+  const [title, setTitle] = useState('');
+  const [reward, setReward] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit() {
+    if (!title.trim()) return;
+    setLoading(true);
+    try {
+      await requestQuest({ assignedTo: kidId, title: title.trim(), reward: reward.trim() });
+      setTitle('');
+      setReward('');
+      onClose();
+      Alert.alert('🌟 Request Sent!', 'Your parent will review your quest request!');
+    } catch (e) {
+      Alert.alert('Oops!', e?.message || 'Could not send request. Try again!');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#0D0020' }}>
+        <LinearGradient colors={['#3B0764', '#7C3AED']} style={{ padding: 24, paddingTop: 48 }}>
+          <Text style={{ fontSize: 28, fontWeight: '900', color: '#fff', marginBottom: 4 }}>
+            📋 Request a Quest
+          </Text>
+          <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)' }}>
+            Suggest a chore — your parent will review it!
+          </Text>
+        </LinearGradient>
+
+        <View style={{ flex: 1, padding: 24 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '700', marginBottom: 8, letterSpacing: 1 }}>
+            QUEST NAME *
+          </Text>
+          <TextInput
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              borderRadius: 12,
+              padding: 16,
+              color: '#fff',
+              fontSize: 16,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.2)',
+            }}
+            placeholder="e.g. Clean my room, Walk the dog..."
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            value={title}
+            onChangeText={setTitle}
+            maxLength={80}
+            autoFocus
+          />
+
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '700', marginBottom: 8, letterSpacing: 1 }}>
+            WHAT REWARD DO YOU WANT? (optional)
+          </Text>
+          <TextInput
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              borderRadius: 12,
+              padding: 16,
+              color: '#fff',
+              fontSize: 16,
+              marginBottom: 32,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.2)',
+            }}
+            placeholder="e.g. 30 min screen time, Pizza night..."
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            value={reward}
+            onChangeText={setReward}
+            maxLength={60}
+          />
+
+          <TouchableOpacity
+            onPress={handleSubmit}
+            disabled={loading || !title.trim()}
+            style={{
+              backgroundColor: loading || !title.trim() ? 'rgba(124,58,237,0.4)' : '#7C3AED',
+              borderRadius: 16,
+              padding: 18,
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+            activeOpacity={0.85}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>Send Request 🚀</Text>
+            }
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onClose} style={{ alignItems: 'center', padding: 12 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15 }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function KidDashboard({ route, navigation }) {
   const { kidId } = route.params;
-  const { family, tasks, completeTask, setKidGoal } = useApp();
+  const { family, tasks, completeTask, setKidGoal, requestQuest } = useApp();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { isTablet, pad, fs } = useDevice();
@@ -367,6 +582,7 @@ export default function KidDashboard({ route, navigation }) {
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalNameInput, setGoalNameInput] = useState('');
   const [goalStarsInput, setGoalStarsInput] = useState('');
+  const [showRequestModal, setShowRequestModal] = useState(false);
 
   async function handleSaveGoal() {
     const stars = parseInt(goalStarsInput, 10);
@@ -541,6 +757,9 @@ export default function KidDashboard({ route, navigation }) {
                 </View>
               </View>
             )}
+
+            {/* 7-Day Streak Calendar */}
+            <StreakCalendar kidId={kidId} tasks={tasks} />
           </Animated.View>
         </LinearGradient>
 
@@ -818,6 +1037,35 @@ export default function KidDashboard({ route, navigation }) {
               ))}
             </View>
           )}
+
+          {/* Request a Quest button */}
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: 'rgba(124,58,237,0.15)',
+              borderWidth: 1.5,
+              borderColor: 'rgba(124,58,237,0.4)',
+              borderStyle: 'dashed',
+              borderRadius: 16,
+              padding: 16,
+              marginTop: 12,
+              marginBottom: 24,
+            }}
+            onPress={() => setShowRequestModal(true)}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize: 20 }}>📋</Text>
+            <Text style={{ color: '#A78BFA', fontSize: 15, fontWeight: '700' }}>Request a Quest</Text>
+          </TouchableOpacity>
+
+          <RequestQuestModal
+            visible={showRequestModal}
+            onClose={() => setShowRequestModal(false)}
+            kidId={kid.id}
+          />
         </View>
         </View>
       </ScrollView>
