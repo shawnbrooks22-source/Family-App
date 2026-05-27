@@ -19,7 +19,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kindo.app",
+      "bundleIdentifier": "com.shawnbrooks.kindo",
       "buildNumber": "1",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -35,7 +35,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#7C3AED"
       },
-      "package": "com.kindo.app",
+      "package": "com.shawnbrooks.kindo",
       "versionCode": 1,
       "permissions": [
         "android.permission.INTERNET",
