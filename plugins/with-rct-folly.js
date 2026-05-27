@@ -1,30 +1,40 @@
 /**
- * Config plugin that adds RCT-Folly pod to the iOS Podfile.
- * Required because react-native-iap still depends on RCT-Folly,
- * which is no longer a standalone CocoaPod in React Native 0.76+
- * (it's now bundled in the ReactNativeDependencies prebuilt tarball).
+ * Config plugin that patches react-native-iap's podspec to remove the
+ * RCT-Folly dependency. In React Native 0.76+, Folly is bundled inside
+ * the ReactNativeDependencies prebuilt tarball — it is no longer published
+ * as a standalone CocoaPod, so react-native-iap's explicit dependency on it
+ * causes pod install to fail. Removing the declaration is safe: the Folly
+ * headers are still available at compile time through React-Core-prebuilt.
  */
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
-module.exports = function withRCTFolly(config) {
+module.exports = function withRNIapFollyPatch(config) {
   return withDangerousMod(config, [
     'ios',
     async (config) => {
-      const podfilePath = path.join(config.modRequest.platformProjectRoot, 'Podfile');
-      let podfile = fs.readFileSync(podfilePath, 'utf8');
+      const podspecPath = path.join(
+        config.modRequest.projectRoot,
+        'node_modules',
+        'react-native-iap',
+        'RNIap.podspec'
+      );
 
-      const follyLine = "  pod 'RCT-Folly', :podspec => '../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec'";
+      if (!fs.existsSync(podspecPath)) {
+        console.warn('[withRNIapFollyPatch] RNIap.podspec not found — skipping patch');
+        return config;
+      }
 
-      if (!podfile.includes("RCT-Folly")) {
-        // Insert just before use_expo_modules! so it's in the right target block
-        podfile = podfile.replace(
-          /(\s+use_expo_modules!)/,
-          `\n${follyLine}\n$1`
-        );
-        fs.writeFileSync(podfilePath, podfile);
-        console.log('[withRCTFolly] Added RCT-Folly pod to Podfile');
+      let podspec = fs.readFileSync(podspecPath, 'utf8');
+
+      if (podspec.includes("RCT-Folly")) {
+        // Remove the RCT-Folly dependency line(s)
+        podspec = podspec.replace(/[ \t]*s\.dependency\s+['"]RCT-Folly['"][^\n]*\n?/g, '');
+        fs.writeFileSync(podspecPath, podspec);
+        console.log('[withRNIapFollyPatch] Removed RCT-Folly from RNIap.podspec');
+      } else {
+        console.log('[withRNIapFollyPatch] RCT-Folly not found in podspec — no patch needed');
       }
 
       return config;
