@@ -8,7 +8,10 @@
     "description": "Kindo helps families manage kids' chores and rewards. Assign quests, track progress, and pay real money — all in one place.",
     "privacyPolicyUrl": "https://kindo.app/privacy",
     "scheme": "kindo",
+    "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#7C3AED"
     },
     "assetBundlePatterns": [
@@ -29,6 +32,7 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#7C3AED"
       },
       "package": "com.kindo.app",
