@@ -980,6 +980,40 @@ export function AppProvider({ children }) {
       const updated = { ...family, kids: [...family.kids, newKid] };
       await saveFamily(updated);
     }
+
+    // Auto-create a tutorial task for the new kid
+    const tutorialTask = {
+      id: generateId(),
+      title: 'Your First Quest!',
+      emoji: '🌟',
+      reward: 'Earn your first stars!',
+      status: 'pending',
+      assignedTo: newKid.id,
+      assigned_to: newKid.id,
+      recurrence: 'none',
+      notes: 'Welcome to Kindo! Complete this quest to earn your first stars. Show your parent when you\'re done!',
+      difficulty: 'easy',
+      created_at: Date.now(),
+      completed_at: null,
+      approved_at: null,
+      celebrated: false,
+      is_tutorial: true,
+    };
+
+    if (SUPABASE_READY && familyId && authUser) {
+      const { assignedTo: _a, ...supabaseTutorialTask } = tutorialTask;
+      supabaseTutorialTask.family_id = familyId;
+      const { error: tutorialErr } = await supabase.from('tasks').insert(supabaseTutorialTask);
+      if (!tutorialErr) {
+        setTasks(prev => [...prev, supabaseTutorialTask]);
+      }
+    } else {
+      const updatedTasks = [...tasks, tutorialTask];
+      await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(updatedTasks));
+      setTasks(updatedTasks);
+    }
+
+    await sendNotif('🌟 First Quest Ready!', `${newKid.name} has their first quest waiting — tap to get started!`);
   }
 
   async function editKid(kidId, updates) {
@@ -1173,6 +1207,79 @@ export function AppProvider({ children }) {
         ...family,
         kids: family.kids.map(k =>
           k.id === kidId ? { ...k, streak: newStreak, lastCompletedDate: today } : k
+        ),
+      };
+      await saveFamily(updated);
+    }
+
+    // Award streak freezes at milestone streaks (3 and 7 days)
+    if (newStreak === 3 || newStreak === 7) {
+      const currentKid = family?.kids?.find(k => k.id === kidId);
+      const currentFreezes = currentKid?.streakFreezes || 0;
+      const newFreezeCount = currentFreezes + 1;
+      setFamily(prev => prev ? {
+        ...prev,
+        kids: prev.kids.map(k =>
+          k.id === kidId ? { ...k, streakFreezes: newFreezeCount } : k
+        ),
+      } : prev);
+      if (SUPABASE_READY && familyId && authUser) {
+        const { error: freezeErr } = await supabase.from('profiles').update({
+          streak_freezes: newFreezeCount,
+        }).eq('id', kidId);
+        if (freezeErr) console.warn('[updateStreak] Failed to persist streak freeze award:', freezeErr.message);
+      } else {
+        const updatedWithFreeze = {
+          ...family,
+          kids: family.kids.map(k =>
+            k.id === kidId ? { ...k, streakFreezes: newFreezeCount } : k
+          ),
+        };
+        await saveFamily(updatedWithFreeze);
+      }
+    }
+  }
+
+  // ── Streak Freeze ("Shield") mechanic ─────────────────────────────────────
+  async function useStreakFreeze(kidId) {
+    const kid = family?.kids?.find(k => k.id === kidId);
+    if (!kid) throw new Error('Kid not found');
+    if ((kid.streakFreezes || 0) < 1) throw new Error('No streak shields available!');
+
+    const yesterday = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    })();
+
+    const newFreezeCount = (kid.streakFreezes || 0) - 1;
+
+    // Optimistic update
+    setFamily(prev => prev ? {
+      ...prev,
+      kids: prev.kids.map(k =>
+        k.id === kidId
+          ? { ...k, lastCompletedDate: yesterday, streakFreezes: newFreezeCount }
+          : k
+      ),
+    } : prev);
+
+    if (SUPABASE_READY && familyId && authUser) {
+      const { error } = await supabase.from('profiles').update({
+        last_completed_date: yesterday,
+        streak_freezes: newFreezeCount,
+      }).eq('id', kidId);
+      if (error) throw error;
+    } else {
+      const updated = {
+        ...family,
+        kids: family.kids.map(k =>
+          k.id === kidId
+            ? { ...k, lastCompletedDate: yesterday, streakFreezes: newFreezeCount }
+            : k
         ),
       };
       await saveFamily(updated);
@@ -1678,6 +1785,8 @@ export function AppProvider({ children }) {
         addMilestone,
         redeemMilestone,
         deleteMilestone,
+        // Streak freeze
+        useStreakFreeze,
         // Profile
         updateParentProfile,
         updateNotifyPrefs,
