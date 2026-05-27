@@ -533,6 +533,7 @@ function StatCard({ label, value, color, icon }) {
 function ApprovalCard({ task, kid, onApprove }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const [photoFullscreen, setPhotoFullscreen] = useState(null);
   return (
     <View style={[styles.approvalCard, { backgroundColor: colors.surface }]}>
       {/* Kid info */}
@@ -574,12 +575,30 @@ function ApprovalCard({ task, kid, onApprove }) {
       {/* Photo proof thumbnail */}
       {task.photo_proof_uri ? (
         <View style={{ marginBottom: 12 }}>
-          <Text style={[styles.approvalNotes, { color: colors.text3, marginBottom: 6 }]}>📸 Photo Proof</Text>
-          <Image
-            source={{ uri: task.photo_proof_uri }}
-            style={{ width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.divider }}
-            resizeMode="cover"
-          />
+          <Text style={[styles.approvalNotes, { color: colors.text3, marginBottom: 6 }]}>
+            📸 Photo Proof  <Text style={{ color: colors.primary, fontSize: 12 }}>(tap to expand)</Text>
+          </Text>
+          <TouchableOpacity onPress={() => setPhotoFullscreen(task.photo_proof_uri)} activeOpacity={0.9}>
+            <Image
+              source={{ uri: task.photo_proof_uri }}
+              style={{ width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.divider }}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+          <Modal visible={!!photoFullscreen} transparent animationType="fade" onRequestClose={() => setPhotoFullscreen(null)}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => setPhotoFullscreen(null)}
+              activeOpacity={1}
+            >
+              <Image
+                source={{ uri: photoFullscreen }}
+                style={{ width: '95%', height: '70%', borderRadius: 16 }}
+                resizeMode="contain"
+              />
+              <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 16, fontSize: 14 }}>Tap anywhere to close</Text>
+            </TouchableOpacity>
+          </Modal>
         </View>
       ) : null}
 
@@ -1522,15 +1541,17 @@ function FamilyTab({ navigation }) {
   }
 
   // ── Star Store helpers ──────────────────────────────────────────────────────
-  async function handleAddStoreItem() {
-    if (!newStoreName.trim()) return;
-    const cost = parseInt(newStoreCost, 10);
+  async function handleAddStoreItem(quickEmoji, quickName, quickCost) {
+    const emoji = quickEmoji || newStoreEmoji;
+    const name  = (quickName || newStoreName).trim();
+    const cost  = quickCost || parseInt(newStoreCost, 10);
+    if (!name) return;
     if (isNaN(cost) || cost < 1) { Alert.alert('Star cost must be at least 1'); return; }
 
     const newItem = {
       id:       Date.now().toString(),
-      name:     newStoreName.trim(),
-      emoji:    newStoreEmoji || '🎁',
+      name,
+      emoji:    emoji || '🎁',
       starCost: cost,
       active:   true,
     };
@@ -1594,6 +1615,11 @@ function FamilyTab({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={[styles.memberName, { color: colors.text1 }]}>{kid.name}</Text>
               {kid.phone ? <Text style={[styles.memberPhone, { color: colors.text3 }]}>{kid.phone}</Text> : null}
+              {(kid.streakFreezes || kid.streak_freezes || 0) > 0 && (
+                <Text style={{ fontSize: 12, color: colors.text3, marginTop: 2 }}>
+                  🛡️ {kid.streakFreezes || kid.streak_freezes || 0} streak shield{(kid.streakFreezes || kid.streak_freezes) !== 1 ? 's' : ''}
+                </Text>
+              )}
             </View>
             <TouchableOpacity
               onPress={() => openEditKid(kid)}
@@ -1746,6 +1772,44 @@ function FamilyTab({ navigation }) {
                 No store items yet. Add rewards kids can spend their stars on!
               </Text>
             )}
+
+            {/* Quick-add chips for common screen time rewards */}
+            <Text style={[styles.formLabel, { color: colors.text3, marginTop: 8, marginBottom: 6 }]}>
+              Quick add popular rewards:
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 2 }}>
+                {[
+                  { emoji: '📱', name: '30 min Screen Time', cost: 5 },
+                  { emoji: '📱', name: '1 hr Screen Time', cost: 10 },
+                  { emoji: '🎮', name: '1 hr Gaming', cost: 8 },
+                  { emoji: '🍕', name: 'Pizza Night Pick', cost: 15 },
+                  { emoji: '🎬', name: 'Movie Night Pick', cost: 12 },
+                  { emoji: '🛍️', name: '$5 Treat Budget', cost: 20 },
+                ].map(item => (
+                  <TouchableOpacity
+                    key={item.name}
+                    style={{
+                      backgroundColor: colors.primaryLight,
+                      borderRadius: 20,
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      borderWidth: 1,
+                      borderColor: colors.primary + '30',
+                    }}
+                    onPress={() => handleAddStoreItem(item.emoji, item.name, item.cost)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 14 }}>{item.emoji}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, maxWidth: 90 }} numberOfLines={1}>{item.name}</Text>
+                    <Text style={{ fontSize: 11, color: colors.text3 }}>({item.cost}⭐)</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
 
             {/* Add new item form */}
             <View style={{ marginTop: 16 }}>
