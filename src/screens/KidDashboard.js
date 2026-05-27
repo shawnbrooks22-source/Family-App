@@ -547,7 +547,7 @@ function RequestQuestModal({ visible, onClose, kidId }) {
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function KidDashboard({ route, navigation }) {
   const { kidId } = route.params;
-  const { family, tasks, completeTask, setKidGoal, requestQuest } = useApp();
+  const { family, tasks, completeTask, setKidGoal, requestQuest, useStreakFreeze } = useApp();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { isTablet, pad, fs } = useDevice();
@@ -567,6 +567,11 @@ export default function KidDashboard({ route, navigation }) {
 
   // Streak
   const streak = kid?.streak || 0;
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })();
+  const lastCompleted = kid?.lastCompletedDate || kid?.last_completed_date || null;
+  const streakAtRisk = streak > 0 && lastCompleted !== today && lastCompleted !== yesterday;
+  const streakFreezes = kid?.streakFreezes || kid?.streak_freezes || 0;
 
   // Goal state — goal may now contain both a star goal AND a savings challenge
   const goal = kid?.goal || null;
@@ -733,7 +738,47 @@ export default function KidDashboard({ route, navigation }) {
               <StatChip emoji="✅" value={completedCount} label={t('kidDashboard.done')} />
               <View style={styles.statDivider} />
               <StatChip emoji="🔥" value={streak} label={streak === 1 ? t('kidDashboard.day') : t('kidDashboard.streak')} />
+              {streakFreezes > 0 && (
+                <>
+                  <View style={styles.statDivider} />
+                  <StatChip emoji="🛡️" value={streakFreezes} label="shields" />
+                </>
+              )}
             </View>
+
+            {streakAtRisk && streak > 0 && (
+              <View style={styles.streakDangerBanner}>
+                <Text style={styles.streakDangerText}>🔥 Streak at risk! Complete a quest today!</Text>
+                {streakFreezes > 0 && (
+                  <TouchableOpacity
+                    style={styles.shieldBtn}
+                    onPress={async () => {
+                      Alert.alert(
+                        '🛡️ Use Streak Shield?',
+                        `You have ${streakFreezes} shield${streakFreezes > 1 ? 's' : ''}. Using one will protect your ${streak}-day streak!`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Use Shield 🛡️',
+                            onPress: async () => {
+                              try {
+                                await useStreakFreeze(kidId);
+                                Alert.alert('🛡️ Streak Protected!', 'Your shield saved your streak! Keep it up tomorrow!');
+                              } catch (e) {
+                                Alert.alert('Oops!', e?.message || 'Could not use shield.');
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.shieldBtnText}>🛡️ Use Shield ({streakFreezes})</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             {/* Today's goal bar */}
             {totalCount > 0 && (
@@ -766,31 +811,27 @@ export default function KidDashboard({ route, navigation }) {
         {/* ─── Quest Board Content ───────────────────────────────────────────── */}
         <View style={[styles.content, isTablet && { padding: pad }]}>
 
-          {/* ── Savings Challenge Card ─────────────────────────────────────── */}
-          {savingsChallenge && (
-            <View style={[styles.savingsCard, {
-              backgroundColor: savingsChallenge.earned ? '#F0FDF4' : colors.surface,
-              borderColor: savingsChallenge.earned ? '#10B981' : '#10B98140',
-            }]}>
-              <View style={styles.savingsCardHeader}>
+          {/* ── Savings Challenge Hero Card ────────────────────────────────── */}
+          {savingsChallenge && !savingsChallenge.earned && (
+            <View style={[styles.savingsHeroCard, { backgroundColor: colors.surface }]}>
+              <View style={styles.savingsHeroHeader}>
+                <Text style={styles.savingsHeroEmoji}>💰</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.savingsCardTitle, { color: savingsChallenge.earned ? '#065F46' : colors.text1 }]}>
-                    💰 {savingsChallenge.label || 'Savings Goal'}
-                  </Text>
-                  <Text style={[styles.savingsCardSub, { color: savingsChallenge.earned ? '#047857' : colors.text3 }]}>
-                    {`${savingsProgress} / ${savingsChallenge.questsRequired} quests`}
+                  <Text style={[styles.savingsHeroLabel, { color: colors.text3 }]}>SAVINGS GOAL</Text>
+                  <Text style={[styles.savingsHeroTitle, { color: colors.text1 }]} numberOfLines={1}>
+                    {savingsChallenge.name || 'Savings Goal'}
                   </Text>
                 </View>
-                <Text style={styles.savingsCardAmt}>
+                <Text style={[styles.savingsHeroAmount, { color: colors.success }]}>
                   ${(savingsChallenge.rewardAmountCents / 100).toFixed(2)}
                 </Text>
               </View>
-              <View style={[styles.savingsTrack, { backgroundColor: colors.divider }]}>
+              {/* Jar fill bar */}
+              <View style={styles.savingsJarTrack}>
                 <Animated.View
                   style={[
-                    styles.savingsFill,
+                    styles.savingsJarFill,
                     {
-                      backgroundColor: savingsChallenge.earned ? '#10B981' : '#34D399',
                       width: savingsAnim.interpolate({
                         inputRange: [0, 1],
                         outputRange: ['0%', '100%'],
@@ -799,15 +840,30 @@ export default function KidDashboard({ route, navigation }) {
                   ]}
                 />
               </View>
-              {savingsChallenge.earned ? (
-                <Text style={styles.savingsEarnedText}>
-                  🎉 You reached your goal! Ask a parent for your reward!
+              <View style={styles.savingsJarLabels}>
+                <Text style={[styles.savingsJarCount, { color: colors.text2 }]}>
+                  {savingsProgress} / {savingsChallenge.questsRequired} quests
                 </Text>
-              ) : (
-                <Text style={[styles.savingsMotivText, { color: colors.text3 }]}>
-                  {savingsChallenge.questsRequired - savingsProgress} more quest{savingsChallenge.questsRequired - savingsProgress !== 1 ? 's' : ''} to earn ${(savingsChallenge.rewardAmountCents / 100).toFixed(2)}!
+                <Text style={[styles.savingsJarPct, { color: colors.success }]}>
+                  {Math.round(savingsProgressFraction * 100)}%
                 </Text>
+              </View>
+              {savingsProgressFraction >= 1 && (
+                <View style={styles.savingsCompleteRow}>
+                  <Text style={styles.savingsCompleteText}>🎉 Goal Complete! Tell a parent to pay it out!</Text>
+                </View>
               )}
+            </View>
+          )}
+          {savingsChallenge?.earned && (
+            <View style={[styles.savingsHeroCard, { backgroundColor: '#D1FAE5' }]}>
+              <Text style={{ fontSize: 28, marginBottom: 4 }}>💰🎉</Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#065F46', textAlign: 'center' }}>
+                Savings Goal Complete!
+              </Text>
+              <Text style={{ fontSize: 14, color: '#047857', textAlign: 'center', marginTop: 4 }}>
+                ${(savingsChallenge.rewardAmountCents / 100).toFixed(2)} earned — ask a parent to pay it out!
+              </Text>
             </View>
           )}
 
@@ -1642,4 +1698,84 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
+
+  // ── Streak Shield UI ──────────────────────────────────────────────────────
+  streakDangerBanner: {
+    backgroundColor: 'rgba(255,100,0,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,150,0,0.4)',
+  },
+  streakDangerText: {
+    color: '#FFE000',
+    fontWeight: '800',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  shieldBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  shieldBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+
+  // ── Savings Hero Card ─────────────────────────────────────────────────────
+  savingsHeroCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    alignItems: 'stretch',
+  },
+  savingsHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  savingsHeroEmoji: { fontSize: 28 },
+  savingsHeroLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  savingsHeroTitle: { fontSize: 16, fontWeight: '800' },
+  savingsHeroAmount: { fontSize: 22, fontWeight: '900' },
+  savingsJarTrack: {
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  savingsJarFill: {
+    height: '100%',
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+  },
+  savingsJarLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  savingsJarCount: { fontSize: 13, fontWeight: '600' },
+  savingsJarPct: { fontSize: 13, fontWeight: '800' },
+  savingsCompleteRow: {
+    marginTop: 10,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+  },
+  savingsCompleteText: { fontSize: 14, fontWeight: '700', color: '#065F46', textAlign: 'center' },
 });
