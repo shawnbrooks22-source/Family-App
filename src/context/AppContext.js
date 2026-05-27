@@ -1001,7 +1001,7 @@ export function AppProvider({ children }) {
     };
 
     if (SUPABASE_READY && familyId && authUser) {
-      const { assignedTo: _a, ...supabaseTutorialTask } = tutorialTask;
+      const { assignedTo: _a, is_tutorial: _b, ...supabaseTutorialTask } = tutorialTask;
       supabaseTutorialTask.family_id = familyId;
       const { error: tutorialErr } = await supabase.from('tasks').insert(supabaseTutorialTask);
       if (!tutorialErr) {
