@@ -67,13 +67,6 @@
           "photosPermission": "Kindo uses your photos to attach proof to completed quests.",
           "cameraPermission": "Kindo uses the camera to take a photo proving a quest is done."
         }
-      ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "kindo",
-          "project": "kindo-app"
-        }
       ]
     ],
     "extra": {

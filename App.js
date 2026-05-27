@@ -1,6 +1,5 @@
 // Polyfill URL for Supabase (must be first import)
 import 'react-native-url-polyfill/auto';
-import * as Sentry from '@sentry/react-native';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -24,16 +23,6 @@ import UpgradeScreen                  from './src/screens/UpgradeScreen';
 import NotificationsPermissionScreen  from './src/screens/NotificationsPermissionScreen';
 import OnboardingScreen               from './src/screens/OnboardingScreen';
 
-// ─── Sentry (crash reporting) ──────────────────────────────────────────────────
-// Set EXPO_PUBLIC_SENTRY_DSN in your .env to enable.
-const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
-if (SENTRY_DSN) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    tracesSampleRate: 0.2,   // 20% of sessions captured for performance
-    environment: __DEV__ ? 'development' : 'production',
-  });
-}
 
 const Stack = createNativeStackNavigator();
 
@@ -139,5 +128,4 @@ function AppRoot() {
   );
 }
 
-// Wrap with Sentry error boundary in production
-export default SENTRY_DSN ? Sentry.wrap(AppRoot) : AppRoot;
+export default AppRoot;
