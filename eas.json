@@ -20,13 +20,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "YOUR_APPLE_ID@email.com",
-        "ascAppId": "YOUR_ASC_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
-        "track": "production"
+        "appleId": "shawnbrooks22@gmail.com",
+        "appleTeamId": "8168524088",
+        "language": "en-US"
       }
     }
   }
