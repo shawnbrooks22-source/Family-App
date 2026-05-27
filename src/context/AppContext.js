@@ -324,15 +324,18 @@ export function AppProvider({ children }) {
 
   async function loadFamilyFromSupabase(fid) {
     try {
-      const [{ data: famRow, error: famErr }, { data: profiles, error: profilesErr }] = await Promise.all([
+      const [{ data: famRow, error: famErr }, { data: profiles, error: profilesErr }, cachedRaw] = await Promise.all([
         supabase.from('families').select('*').eq('id', fid).single(),
         supabase.from('profiles').select('*').eq('family_id', fid),
+        AsyncStorage.getItem(FAMILY_KEY),
       ]);
       if (famErr) { console.warn('[load] families query failed:', famErr.message); return; }
       if (profilesErr) { console.warn('[load] profiles query failed:', profilesErr.message); return; }
       if (!famRow) return;
       const parent = profiles?.find(p => p.role === 'parent');
       const kids   = profiles?.filter(p => p.role === 'kid') || [];
+      // Preserve locally-cached fields that have no Supabase column (e.g. storeItems)
+      const localCache = cachedRaw ? (() => { try { return JSON.parse(cachedRaw); } catch { return {}; } })() : {};
       const familyData = {
         _supabaseFamilyId: fid,
         inviteCode:   famRow.invite_code,
@@ -345,6 +348,8 @@ export function AppProvider({ children }) {
         // Payment fields (parent)
         stripeCardLast4: parent?.stripe_card_last4 || null,
         stripeCardBrand: parent?.stripe_card_brand || null,
+        // Local-only fields — survive reload by merging from AsyncStorage cache
+        storeItems:   localCache.storeItems   || [],
         kids: kids.map(k => ({
           id:            k.id,
           name:          k.name,
@@ -354,6 +359,7 @@ export function AppProvider({ children }) {
           goal:          k.goal || null,
           streak:        k.streak || 0,
           lastCompletedDate: k.last_completed_date || null,
+          streakFreezes: k.streak_freezes || 0,
           balance_cents: k.balance_cents || 0,
           milestones:    k.milestones || [],
         })),
@@ -1297,15 +1303,25 @@ export function AppProvider({ children }) {
     if (updates.parentName)  processedUpdates.parentName  = sanitize(updates.parentName, 60);
     if (updates.parentPhone) processedUpdates.parentPhone = sanitize(updates.parentPhone, 20);
 
+    // Always apply optimistic update to state immediately
+    setFamily(prev => prev ? { ...prev, ...processedUpdates } : prev);
+
     if (SUPABASE_READY && familyId && authUser && family?.parentId) {
       const dbUpdates = {};
       if (processedUpdates.parentName)  dbUpdates.name       = processedUpdates.parentName;
       if (processedUpdates.parentEmoji) dbUpdates.emoji      = processedUpdates.parentEmoji;
       if (processedUpdates.parentPhone !== undefined) dbUpdates.phone = processedUpdates.parentPhone;
       if (processedUpdates.parentPin)   dbUpdates.parent_pin = processedUpdates.parentPin;
-      // Optimistic update so UI reflects changes immediately without waiting for realtime
-      setFamily(prev => prev ? { ...prev, ...processedUpdates } : prev);
-      await supabase.from('profiles').update(dbUpdates).eq('id', family.parentId);
+
+      // Only call Supabase if there are actual DB-mapped fields to update
+      if (Object.keys(dbUpdates).length > 0) {
+        await supabase.from('profiles').update(dbUpdates).eq('id', family.parentId);
+      }
+
+      // Fields with no Supabase column (storeItems, etc.) are persisted locally
+      // so they survive app restarts even in cloud mode.
+      const familyCache = { ...(family || {}), ...processedUpdates };
+      await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(familyCache));
     } else {
       const updated = { ...family, ...processedUpdates };
       await saveFamily(updated);
