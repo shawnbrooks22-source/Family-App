@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "description": "Kindo helps families manage kids' chores and rewards. Assign quests, track progress, and pay real money — all in one place.",
-    "privacyPolicyUrl": "https://kindo.app/privacy",
     "scheme": "kindo",
     "icon": "./assets/icon.png",
     "splash": {
@@ -52,6 +51,7 @@
     },
     "web": {},
     "plugins": [
+      "./plugins/with-rct-folly",
       "react-native-iap",
       [
         "expo-notifications",
