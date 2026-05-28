@@ -210,7 +210,7 @@ export function SubscriptionProvider({ children }) {
   }
 
   const isPremium   = plan === 'premium';
-  const currentPlan = PLANS[plan];
+  const currentPlan = PLANS[plan] || PLANS.free;
 
   // The live price string from the store (e.g. "$4.99/month"), or fallback
   const premiumPriceString = products[0]?.localizedPrice

@@ -114,7 +114,8 @@ export function AppProvider({ children }) {
   const [authUser,          setAuthUser]          = useState(null);  // Supabase auth user
   const [notificationsAsked, setNotificationsAsked] = useState(false); // shown permission screen?
   const [onboardingDone,     setOnboardingDone]     = useState(false); // completed walkthrough?
-  const realtimeSub = useRef(null);
+  const realtimeSub        = useRef(null);
+  const completingTaskIds  = useRef(new Set()); // guard against double-submission
 
   useEffect(() => {
     loadData();
@@ -812,7 +813,10 @@ export function AppProvider({ children }) {
   async function completeTask(taskId, photoUri) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) throw new Error('Quest not found — it may have been deleted. Please refresh.');
+    if (completingTaskIds.current.has(taskId)) return; // prevent double-submission
+    completingTaskIds.current.add(taskId);
 
+    try {
     // Upload photo to Supabase Storage so it's accessible on all devices
     const resolvedPhotoUri = photoUri
       ? await uploadTaskPhoto(photoUri, taskId)
@@ -856,6 +860,9 @@ export function AppProvider({ children }) {
       await sendNotif(notifTitle, notifBody);
       // Remote push to parent's device if they're on a different phone
       sendRemotePush(family?.parentDeviceToken, notifTitle, notifBody);
+    }
+    } finally {
+      completingTaskIds.current.delete(taskId);
     }
   }
 
@@ -1099,6 +1106,7 @@ export function AppProvider({ children }) {
         kids: prev.kids.map(k => k.id === kidId ? { ...k, ...updates } : k),
       }));
     } else {
+      if (!family) throw new Error('Family not loaded');
       const updated = {
         ...family,
         kids: family.kids.map(k => k.id === kidId ? { ...k, ...updates } : k),
@@ -1119,6 +1127,7 @@ export function AppProvider({ children }) {
       setFamily(prev => ({ ...prev, kids: prev.kids.filter(k => k.id !== kidId) }));
       setTasks(prev => prev.filter(t => (t.assignedTo || t.assigned_to) !== kidId));
     } else {
+      if (!family) throw new Error('Family not loaded');
       const updated = { ...family, kids: family.kids.filter(k => k.id !== kidId) };
       await saveFamily(updated);
       await saveTasks(tasks.filter(t => t.assignedTo !== kidId && t.assigned_to !== kidId));
@@ -1240,11 +1249,10 @@ export function AppProvider({ children }) {
 
     const today = localDateString();
     const last  = kid.lastCompletedDate || null;
-    const yesterday = (() => {
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
-    })();
+    // Use the same local-time helper as `today` — toISOString() returns UTC
+    // which disagrees with localDateString() for users in UTC-offset timezones
+    // near midnight, breaking streak continuity.
+    const yesterday = localDateString(new Date(Date.now() - 86400000));
 
     let newStreak = kid.streak || 0;
     if (last === today) {

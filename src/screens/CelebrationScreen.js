@@ -47,7 +47,8 @@ export default function CelebrationScreen({ route, navigation }) {
     markCelebrated(taskId);
   }, []);
 
-  const revealTimeoutRef = useRef(null);
+  const revealTimeoutRef    = useRef(null);
+  const particleTimeoutRef  = useRef(null);
 
   // ─── Suspense anims ──────────────────────────────────────────────────────────
   const giftPulse = useRef(new Animated.Value(1)).current;
@@ -133,10 +134,11 @@ export default function CelebrationScreen({ route, navigation }) {
     });
   }, []);
 
-  // Cleanup: cancel any pending reveal timeout on unmount
+  // Cleanup: cancel any pending timeouts on unmount
   useEffect(() => {
     return () => {
-      if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
+      if (revealTimeoutRef.current)   clearTimeout(revealTimeoutRef.current);
+      if (particleTimeoutRef.current) clearTimeout(particleTimeoutRef.current);
     };
   }, []);
 
@@ -217,7 +219,7 @@ export default function CelebrationScreen({ route, navigation }) {
       Animated.spring(p.anim, { toValue: 1, friction: 4, tension: 65, useNativeDriver: true })
     )).start();
 
-    setTimeout(() => {
+    particleTimeoutRef.current = setTimeout(() => {
       Animated.stagger(20, outerParticles.map(p =>
         Animated.spring(p.anim, { toValue: 1, friction: 5, tension: 55, useNativeDriver: true })
       )).start();
