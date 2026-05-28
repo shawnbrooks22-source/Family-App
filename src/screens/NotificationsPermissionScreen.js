@@ -36,7 +36,7 @@ const NOTIFICATION_BENEFITS = [
 ];
 
 export default function NotificationsPermissionScreen({ navigation }) {
-  const { markNotificationsAsked } = useApp();
+  const { markNotificationsAsked, registerDevicePushToken } = useApp();
   const { colors } = useTheme();
 
   // Entrance animation
@@ -68,10 +68,11 @@ export default function NotificationsPermissionScreen({ navigation }) {
         })
           .then(async ({ data: pushToken }) => {
             if (pushToken) {
-              // Save push token to AsyncStorage for use in notifications
               try {
                 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
                 await AsyncStorage.setItem('@kindo_push_token', pushToken);
+                // Register with Supabase so other family devices can reach this one
+                await registerDevicePushToken();
               } catch {/* non-critical */}
             }
           })

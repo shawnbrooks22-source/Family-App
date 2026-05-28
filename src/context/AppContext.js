@@ -80,6 +80,19 @@ async function sendNotif(title, body) {
   }
 }
 
+// Send a real push notification to a different device via Expo's Push API.
+// Fire-and-forget — never throws; non-critical path.
+async function sendRemotePush(expoPushToken, title, body) {
+  if (!expoPushToken || !expoPushToken.startsWith('ExponentPushToken')) return;
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: expoPushToken, sound: 'default', title, body }),
+    });
+  } catch { /* non-critical — best-effort delivery */ }
+}
+
 // Generate a human-friendly invite code like "KINDO-LION-384729"
 // Entropy: 20 words × 900,000 numbers = 18,000,000 combinations
 function generateInviteCode() {
@@ -235,6 +248,31 @@ export function AppProvider({ children }) {
   }
 
   // ── Mark that the user has seen the notification permission screen ───────────
+  // Store this device's Expo push token in Supabase so other family members
+  // can send it remote push notifications.
+  // • Parent devices (authUser set) → stored in families.parent_device_token
+  // • Kid devices (joined via invite code, no authUser) → appended to
+  //   families.kid_device_tokens via a SECURITY DEFINER RPC that bypasses RLS
+  async function registerDevicePushToken(fid) {
+    const resolvedFid = fid || familyId;
+    if (!SUPABASE_READY || !resolvedFid) return;
+    try {
+      const token = await AsyncStorage.getItem('@kindo_push_token');
+      if (!token) return;
+      if (authUser) {
+        await supabase
+          .from('families')
+          .update({ parent_device_token: token })
+          .eq('id', resolvedFid);
+      } else {
+        await supabase.rpc('add_kid_device_token', {
+          p_family_id: resolvedFid,
+          p_token:     token,
+        });
+      }
+    } catch { /* non-critical */ }
+  }
+
   async function markNotificationsAsked() {
     await AsyncStorage.setItem(NOTIF_ASKED_KEY, 'true');
     setNotificationsAsked(true);
@@ -283,6 +321,7 @@ export function AppProvider({ children }) {
               loadTasksFromSupabase(fid),
             ]);
             subscribeRealtime(fid);
+            registerDevicePushToken(fid).catch(() => {});
             return;
           }
           // Authed but no family owned — clear any stale cached family id
@@ -348,6 +387,9 @@ export function AppProvider({ children }) {
         // Payment fields (parent)
         stripeCardLast4: parent?.stripe_card_last4 || null,
         stripeCardBrand: parent?.stripe_card_brand || null,
+        // Push tokens for cross-device remote notifications
+        parentDeviceToken: famRow.parent_device_token || null,
+        kidDeviceTokens:   famRow.kid_device_tokens   || [],
         // Local-only fields — survive reload by merging from AsyncStorage cache
         storeItems:   localCache.storeItems   || [],
         kids: kids.map(k => ({
@@ -573,6 +615,19 @@ export function AppProvider({ children }) {
     await secureSave(FAMILY_ID_KEY, fid);
     setFamilyId(fid);
 
+    // Seed default Star Store items so new parents immediately see the store
+    // is functional. They can edit/delete these at any time.
+    const existingCache = await AsyncStorage.getItem(FAMILY_KEY).catch(() => null);
+    const parsedCache   = existingCache ? (() => { try { return JSON.parse(existingCache); } catch { return {}; } })() : {};
+    if (!parsedCache.storeItems || parsedCache.storeItems.length === 0) {
+      const defaultStore = [
+        { id: generateId(), emoji: '📱', name: '30 min screen time', cost: 5 },
+        { id: generateId(), emoji: '🍦', name: 'Ice cream treat',    cost: 8 },
+        { id: generateId(), emoji: '🎮', name: '30 min video games', cost: 6 },
+      ];
+      await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify({ ...parsedCache, storeItems: defaultStore }));
+    }
+
     // Refresh family/kids/tasks from Supabase (authoritative — covers the
     // reused-family case where pre-existing kids weren't in the form data).
     // Fall back to a local snapshot if the refresh fails so navigation isn't
@@ -580,6 +635,8 @@ export function AppProvider({ children }) {
     try {
       await loadFamilyFromSupabase(fid);
       await loadTasksFromSupabase(fid);
+      // Register this device as the parent device for cross-device push
+      registerDevicePushToken(fid).catch(() => {});
     } catch (e) {
       if (__DEV__) console.error('Post-setup Supabase refresh failed:', e);
       const fallback = {
@@ -627,6 +684,8 @@ export function AppProvider({ children }) {
       loadTasksFromSupabase(fid),
     ]);
     subscribeRealtime(fid);
+    // Register this device as a kid device for cross-device push notifications
+    registerDevicePushToken(fid).catch(() => {});
     return fid;
   }
 
@@ -792,10 +851,11 @@ export function AppProvider({ children }) {
     // Notify the parent so they can approve quickly
     const kid = family?.kids?.find(k => k.id === kidId);
     if (family?.notifyPrefs?.taskCompleted !== false) {
-      await sendNotif(
-        '⚡ Quest Complete — Review Needed!',
-        `${kid?.name || 'Your kid'} finished "${task?.emoji || ''} ${task?.title || 'a quest'}" and is waiting for your approval! 🎉`
-      );
+      const notifTitle = '⚡ Quest Complete — Review Needed!';
+      const notifBody  = `${kid?.name || 'Your kid'} finished "${task?.emoji || ''} ${task?.title || 'a quest'}" and is waiting for your approval! 🎉`;
+      await sendNotif(notifTitle, notifBody);
+      // Remote push to parent's device if they're on a different phone
+      sendRemotePush(family?.parentDeviceToken, notifTitle, notifBody);
     }
   }
 
@@ -851,10 +911,13 @@ export function AppProvider({ children }) {
 
     // Notify kid immediately — they'll see it when they pick up the device
     const kidName = family?.kids?.find(k => k.id === (task?.assignedTo || task?.assigned_to))?.name || 'Someone';
-    await sendNotif(
-      `🎉 Quest approved, ${kidName}!`,
-      `${task?.title} — tap to claim your reward 🎁`
-    );
+    const approvalTitle = `🎉 Quest approved, ${kidName}!`;
+    const approvalBody  = `${task?.title} — tap to claim your reward 🎁`;
+    await sendNotif(approvalTitle, approvalBody);
+    // Remote push to all kid devices (girlfriend's phone, iPad, etc.)
+    for (const kidToken of (family?.kidDeviceTokens || [])) {
+      sendRemotePush(kidToken, approvalTitle, approvalBody);
+    }
 
     // Notify task approved
     const kid = family?.kids?.find(k => k.id === (task?.assignedTo || task?.assigned_to));
@@ -1780,6 +1843,7 @@ export function AppProvider({ children }) {
         // Family setup & join
         setupFamily,
         joinFamilyByCode,
+        registerDevicePushToken,
         // Task CRUD
         addTask,
         editTask,
