@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest --watchAll=false",
-    "test:watch": "jest --watchAll"
+    "test:watch": "jest --watchAll",
+    "postinstall": "node scripts/patch-otel.js"
   },
   "jest": {
     "preset": "jest-expo",
