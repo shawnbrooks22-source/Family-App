@@ -26,7 +26,12 @@
         "NSCameraUsageDescription": "Take a photo to prove your quest is done.",
         "NSPhotoLibraryUsageDescription": "Choose a photo from your library to prove your quest is done.",
         "NSFaceIDUsageDescription": "Use Face ID to unlock the Parent Zone quickly.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["kindo"]
+          }
+        ]
       }
     },
     "android": {

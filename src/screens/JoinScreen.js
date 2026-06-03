@@ -23,12 +23,12 @@ import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import useDevice from '../hooks/useDevice';
 
-export default function JoinScreen({ navigation }) {
+export default function JoinScreen({ navigation, route }) {
   const { joinFamilyByCode } = useApp();
   const { colors, shadows } = useTheme();
   const { t } = useTranslation();
   const { isTablet, pad } = useDevice();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(route?.params?.code || '');
   const [loading, setLoading] = useState(false);
 
   function formatCode(raw) {

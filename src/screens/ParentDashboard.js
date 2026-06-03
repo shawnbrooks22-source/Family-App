@@ -1549,11 +1549,11 @@ function FamilyTab({ navigation }) {
     if (isNaN(cost) || cost < 1) { Alert.alert('Star cost must be at least 1'); return; }
 
     const newItem = {
-      id:       Date.now().toString(),
+      id:     Date.now().toString(),
       name,
-      emoji:    emoji || '🎁',
-      starCost: cost,
-      active:   true,
+      emoji:  emoji || '🎁',
+      cost,
+      active: true,
     };
 
     const updatedItems = [...(family?.storeItems || []), newItem];
@@ -1753,7 +1753,7 @@ function FamilyTab({ navigation }) {
                 <Text style={styles.storeItemEmoji}>{item.emoji}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.storeItemName, { color: colors.text1 }]}>{item.name}</Text>
-                  <Text style={[styles.storeItemCost, { color: colors.text3 }]}>⭐ {item.starCost} stars</Text>
+                  <Text style={[styles.storeItemCost, { color: colors.text3 }]}>⭐ {item.cost ?? item.starCost} stars</Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => Alert.alert('Remove Item', `Remove "${item.name}" from the store?`, [

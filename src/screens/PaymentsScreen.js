@@ -45,6 +45,7 @@ function buildCardHTML(publishableKey) {
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://js.stripe.com; style-src 'unsafe-inline'; connect-src https://api.stripe.com; frame-src https://js.stripe.com; img-src 'self' data:;">
   <script src="https://js.stripe.com/v3/"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -353,14 +354,22 @@ export default function PaymentsScreen({ navigation }) {
               onMessage={event => {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
-                  if (msg.type === 'success') {
+                  if (
+                    msg.type === 'success' &&
+                    typeof msg.paymentMethodId === 'string' &&
+                    /^pm_[a-zA-Z0-9]{10,}$/.test(msg.paymentMethodId) &&
+                    typeof msg.last4 === 'string' &&
+                    /^\d{4}$/.test(msg.last4) &&
+                    typeof msg.brand === 'string' &&
+                    msg.brand.length < 30
+                  ) {
                     handleCardSaved(msg.paymentMethodId, msg.last4, msg.brand);
                   }
                 } catch {}
               }}
               javaScriptEnabled
               domStorageEnabled
-              originWhitelist={['*']}
+              originWhitelist={['https://js.stripe.com', 'about:blank']}
             />
           ) : (
             <View style={styles.loadingCenter}>
