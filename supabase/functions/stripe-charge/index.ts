@@ -33,7 +33,7 @@ serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
-    const { parentProfileId, kidId, taskId, amountCents, familyId } = await req.json();
+    const { parentProfileId, kidId, taskId, amountCents, familyId, idempotencyKey } = await req.json();
 
     if (!parentProfileId || !kidId || !amountCents || !familyId) {
       return json({ error: 'Missing required fields' }, 400);
@@ -49,6 +49,19 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Check for existing transaction with this idempotency key
+    if (idempotencyKey) {
+      const { data: existingTx } = await db
+        .from('transactions')
+        .select('id, stripe_payment_intent_id')
+        .eq('idempotency_key', idempotencyKey)
+        .limit(1)
+        .maybeSingle();
+      if (existingTx) {
+        return json({ success: true, paymentIntentId: existingTx.stripe_payment_intent_id, alreadyProcessed: true });
+      }
+    }
 
     // Load parent's Stripe details
     const { data: parent } = await db
@@ -67,6 +80,7 @@ serve(async (req: Request) => {
       headers: {
         Authorization: `Bearer ${stripeKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
+        ...(idempotencyKey ? { 'Idempotency-Key': `kindo_${idempotencyKey}` } : {}),
       },
       body: new URLSearchParams({
         amount:               String(amountCents),
@@ -97,7 +111,7 @@ serve(async (req: Request) => {
     const newBalance = (kidProfile?.balance_cents || 0) + amountCents;
     await db.from('profiles').update({ balance_cents: newBalance }).eq('id', kidId);
 
-    // Write transaction record
+    // Write transaction record (includes idempotency_key for dedup on retry)
     await db.from('transactions').insert({
       family_id:                familyId,
       kid_id:                   kidId,
@@ -105,6 +119,7 @@ serve(async (req: Request) => {
       amount_cents:             amountCents,
       type:                     'payment',
       stripe_payment_intent_id: pi.id,
+      idempotency_key:          idempotencyKey || null,
     });
 
     return json({ success: true, paymentIntentId: pi.id, newBalance });

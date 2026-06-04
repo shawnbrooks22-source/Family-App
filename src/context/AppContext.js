@@ -14,6 +14,11 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import {
+  uploadTaskPhoto as _uploadPhotoToStorage,
+  getSignedPhotoUrl as _getSignedPhotoUrl,
+} from '../services/photoProofService';
+import { chargeTaskReward, recordManualPayout } from '../services/paymentService';
+import {
   hashPin,
   checkPin,
   secureSave,
@@ -785,29 +790,32 @@ export function AppProvider({ children }) {
    * Falls back to the original local URI if upload fails (e.g. offline).
    */
   async function uploadTaskPhoto(localUri, taskId) {
-    if (!SUPABASE_READY || !familyId || !authUser || !localUri) return localUri;
-    try {
-      // Convert local URI to a Blob using fetch (works in React Native)
-      const response = await fetch(localUri);
-      const blob = await response.blob();
-      const ext  = localUri.split('.').pop()?.split('?')[0] || 'jpg';
-      const path = `${familyId}/${taskId}.${ext}`;
+    if (!localUri) return { uri: null, path: null };
+    if (!SUPABASE_READY || !familyId || !authUser) return { uri: localUri, path: null };
+    const path = await _uploadPhotoToStorage(supabase, { familyId, taskId, localUri });
+    if (!path) return { uri: localUri, path: null }; // upload failed — keep local URI as fallback
+    const signedUri = await _getSignedPhotoUrl(supabase, path);
+    return { uri: signedUri || localUri, path };
+  }
 
-      const { error: uploadErr } = await supabase.storage
-        .from('task-photos')
-        .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
+  /** Get a displayable URI for a task photo. Handles both new (path) and legacy (uri) storage. */
+  async function getPhotoUrl(task) {
+    if (!task) return null;
+    if (task.photo_proof_path) return _getSignedPhotoUrl(supabase, task.photo_proof_path);
+    return task.photo_proof_uri || null;
+  }
 
-      if (uploadErr) throw uploadErr;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('task-photos')
-        .getPublicUrl(path);
-
-      return publicUrl;
-    } catch (e) {
-      if (__DEV__) console.warn('Photo upload failed — using local URI fallback:', e);
-      return localUri; // graceful fallback keeps the app functional offline
-    }
+  /** Load ledger-based bucket balances for a kid. Returns { spend, save, give } in cents. */
+  async function loadKidBucketBalances(kidId) {
+    if (!SUPABASE_READY || !familyId || !kidId) return { spend: 0, save: 0, give: 0 };
+    const { data, error } = await supabase
+      .from('ledger_entries')
+      .select('bucket, amount_cents, entry_type')
+      .eq('family_id', familyId)
+      .eq('kid_id', kidId);
+    if (error || !data) return { spend: 0, save: 0, give: 0 };
+    const { computeBucketBalances } = require('../services/ledgerService');
+    return computeBucketBalances(data);
   }
 
   async function completeTask(taskId, photoUri) {
@@ -817,15 +825,16 @@ export function AppProvider({ children }) {
     completingTaskIds.current.add(taskId);
 
     try {
-    // Upload photo to Supabase Storage so it's accessible on all devices
-    const resolvedPhotoUri = photoUri
+    // Upload photo to private Supabase Storage; store path + short-lived signed URI
+    const { uri: resolvedPhotoUri, path: resolvedPhotoPath } = photoUri
       ? await uploadTaskPhoto(photoUri, taskId)
-      : null;
+      : { uri: null, path: null };
 
     const updates = {
       status:       'completed',
       completed_at: Date.now(),
-      ...(resolvedPhotoUri ? { photo_proof_uri: resolvedPhotoUri } : {}),
+      ...(resolvedPhotoPath ? { photo_proof_path: resolvedPhotoPath } : {}),
+      ...(resolvedPhotoUri  ? { photo_proof_uri:  resolvedPhotoUri  } : {}),
     };
 
     if (SUPABASE_READY && familyId && authUser) {
@@ -1568,53 +1577,35 @@ export function AppProvider({ children }) {
     await AsyncStorage.setItem(FAMILY_KEY, JSON.stringify(updated));
   }
 
-  /** Charge parent's card for a task reward and credit the kid's balance */
+  /** Charge (or ledger-record) a task cash reward. Idempotent — safe to call twice. */
   async function chargeForTask(taskId, kidId, amountCents) {
-    if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
-    if (!STRIPE_CHARGE_URL) throw new Error('Stripe charge URL not configured');
-
-    const res = await fetchWithTimeout(STRIPE_CHARGE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        parentProfileId: family?.parentId,
-        kidId,
-        taskId,
-        amountCents,
-        familyId,
-      }),
+    const kid = family?.kids?.find(k => k.id === kidId);
+    return chargeTaskReward({
+      supabase:        SUPABASE_READY ? supabase : null,
+      familyId,
+      kidId,
+      taskId,
+      grossCents:      amountCents,
+      parentProfileId: family?.parentId,
+      kid,
     });
-    let data = {};
-    try { data = await res.json(); } catch { /* non-JSON body, e.g. 502 HTML */ }
-    if (!res.ok) throw new Error(data.error || 'Payment failed');
-
-    // Refresh family data to get updated kid balance
-    await loadFamilyFromSupabase(familyId);
-    return data;
   }
 
-  /** Record a manual payout (reduces the kid's in-app balance) */
+  /** Record a manual payout. Writes ledger debit + transaction record. */
   async function recordPayout(kidId, amountCents) {
-    if (!SUPABASE_READY || !familyId) throw new Error('Supabase not configured');
-    const kid = family?.kids?.find(k => k.id === kidId);
-    if (!kid) throw new Error('Kid not found');
-
-    const newBalance = Math.max(0, (kid.balance_cents || 0) - amountCents);
-
-    const { error: balErr } = await supabase.from('profiles')
-      .update({ balance_cents: newBalance }).eq('id', kidId);
-    if (balErr) throw balErr;
-    const { error: txErr } = await supabase.from('transactions').insert({
-      family_id:    familyId,
-      kid_id:       kidId,
-      amount_cents: amountCents,
-      type:         'payout',
-      note:         'Manual payout recorded by parent',
+    if (!familyId) throw new Error('Family not loaded');
+    await recordManualPayout({
+      supabase:    SUPABASE_READY ? supabase : null,
+      familyId,
+      kidId,
+      amountCents,
+      bucket:      'spend',
+      note:        'Manual payout recorded by parent',
     });
-    if (txErr) throw txErr;
-
-    await loadFamilyFromSupabase(familyId);
-    await loadTransactions();
+    if (SUPABASE_READY) {
+      await loadFamilyFromSupabase(familyId);
+      await loadTransactions();
+    }
   }
 
   const [transactions, setTransactions] = useState([]);
@@ -1885,12 +1876,14 @@ export function AppProvider({ children }) {
         unlockParentZone,
         checkParentSession,
         refreshParentSession,
-        // Payments
+        // Payments & ledger
         setupPaymentMethod,
         chargeForTask,
         recordPayout,
         transactions,
         loadTransactions,
+        loadKidBucketBalances,
+        getPhotoUrl,
         isPaymentsEnabled: !!(process.env.EXPO_PUBLIC_SUPABASE_STRIPE_SETUP),
       }}
     >

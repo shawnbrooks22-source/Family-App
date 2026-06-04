@@ -119,12 +119,33 @@ const headerStyles = StyleSheet.create({
   sub: { fontSize: 13, fontWeight: '500', marginTop: 2 },
 });
 
+// ─── Signed photo component — resolves private storage paths to signed URLs ────
+function TaskPhotoProof({ task, getPhotoUrl, colors, onExpand }) {
+  const [photoUri, setPhotoUri] = React.useState(task.photo_proof_uri || null);
+  React.useEffect(() => {
+    let cancelled = false;
+    getPhotoUrl(task).then(url => { if (!cancelled && url) setPhotoUri(url); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [task.id, task.photo_proof_path, task.photo_proof_uri]);
+  if (!photoUri) return null;
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text3, marginBottom: 6 }}>
+        📸 Photo Proof  <Text style={{ color: colors.primary }}>(tap to expand)</Text>
+      </Text>
+      <TouchableOpacity onPress={() => onExpand(photoUri)} activeOpacity={0.9}>
+        <Image source={{ uri: photoUri }} style={{ width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.divider }} resizeMode="cover" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ─── Home / Approvals Tab ──────────────────────────────────────────────────────
 
 function HomeTab({ navigation }) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge, setKidGoal, redeemMilestone, approveQuestRequest, declineQuestRequest } = useApp();
+  const { tasks, family, approveTask, chargeForTask, refreshParentSession, completeSavingsChallenge, setKidGoal, redeemMilestone, approveQuestRequest, declineQuestRequest, getPhotoUrl } = useApp();
   const { isPremium } = useSubscription();
   const { isTablet, pad } = useDevice();
   const pendingApproval = tasks.filter(t => t.status === 'completed');
@@ -572,35 +593,26 @@ function ApprovalCard({ task, kid, onApprove }) {
         )}
       </View>
 
-      {/* Photo proof thumbnail */}
-      {task.photo_proof_uri ? (
-        <View style={{ marginBottom: 12 }}>
-          <Text style={[styles.approvalNotes, { color: colors.text3, marginBottom: 6 }]}>
-            📸 Photo Proof  <Text style={{ color: colors.primary, fontSize: 12 }}>(tap to expand)</Text>
-          </Text>
-          <TouchableOpacity onPress={() => setPhotoFullscreen(task.photo_proof_uri)} activeOpacity={0.9}>
-            <Image
-              source={{ uri: task.photo_proof_uri }}
-              style={{ width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.divider }}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-          <Modal visible={!!photoFullscreen} transparent animationType="fade" onRequestClose={() => setPhotoFullscreen(null)}>
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}
-              onPress={() => setPhotoFullscreen(null)}
-              activeOpacity={1}
-            >
-              <Image
-                source={{ uri: photoFullscreen }}
-                style={{ width: '95%', height: '70%', borderRadius: 16 }}
-                resizeMode="contain"
-              />
-              <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 16, fontSize: 14 }}>Tap anywhere to close</Text>
-            </TouchableOpacity>
-          </Modal>
-        </View>
+      {/* Photo proof thumbnail — uses signed URL for private storage */}
+      {(task.photo_proof_path || task.photo_proof_uri) ? (
+        <TaskPhotoProof task={task} getPhotoUrl={getPhotoUrl} colors={colors} onExpand={setPhotoFullscreen} />
       ) : null}
+
+      {/* Fullscreen photo modal — rendered outside the conditional so it persists */}
+      <Modal visible={!!photoFullscreen} transparent animationType="fade" onRequestClose={() => setPhotoFullscreen(null)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setPhotoFullscreen(null)}
+          activeOpacity={1}
+        >
+          <Image
+            source={{ uri: photoFullscreen }}
+            style={{ width: '95%', height: '70%', borderRadius: 16 }}
+            resizeMode="contain"
+          />
+          <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 16, fontSize: 14 }}>Tap anywhere to close</Text>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Approve button */}
       <TouchableOpacity style={[styles.approveBtn, { backgroundColor: colors.success }]} onPress={onApprove} activeOpacity={0.85}>

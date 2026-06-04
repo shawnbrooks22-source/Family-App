@@ -118,7 +118,7 @@ function getBrandIcon(brand) {
 }
 
 export default function PaymentsScreen({ navigation }) {
-  const { family, familyId, setupPaymentMethod, recordPayout, transactions, loadTransactions } = useApp();
+  const { family, familyId, setupPaymentMethod, recordPayout, transactions, loadTransactions, loadKidBucketBalances } = useApp();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useTranslation();
   const { isTablet, pad, modalWidth } = useDevice();
@@ -126,11 +126,29 @@ export default function PaymentsScreen({ navigation }) {
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardLoading,   setCardLoading]   = useState(false);
   const [payoutKidId,   setPayoutKidId]   = useState(null);
+  const [bucketBalances, setBucketBalances] = useState({}); // { [kidId]: { spend, save, give } }
+  const [bucketsLoading, setBucketsLoading] = useState(false);
   const webViewRef = useRef(null);
 
   useEffect(() => {
     loadTransactions?.();
+    loadAllBuckets();
   }, []);
+
+  async function loadAllBuckets() {
+    if (!loadKidBucketBalances || !family?.kids?.length) return;
+    setBucketsLoading(true);
+    try {
+      const results = {};
+      await Promise.all(
+        (family.kids || []).map(async kid => {
+          results[kid.id] = await loadKidBucketBalances(kid.id);
+        })
+      );
+      setBucketBalances(results);
+    } catch {}
+    finally { setBucketsLoading(false); }
+  }
 
   const paymentInfo = family?.stripeCardLast4
     ? { last4: family.stripeCardLast4, brand: family.stripeCardBrand || 'card' }
@@ -152,7 +170,7 @@ export default function PaymentsScreen({ navigation }) {
   async function handleRecordPayout(kid, amountCents) {
     Alert.alert(
       `Pay out to ${kid.name}?`,
-      `Record that you transferred ${formatCents(amountCents)} to ${kid.name} outside the app (e.g. bank transfer, cash). This will reduce their balance.`,
+      `This records a manual transfer of ${formatCents(amountCents)} to ${kid.name} (e.g. cash, bank transfer). It will be logged in the family ledger.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -236,6 +254,9 @@ export default function PaymentsScreen({ navigation }) {
               <Text style={[styles.noCardText, { color: colors.text3 }]}>
                 {t('payments.noCardText')}
               </Text>
+              <Text style={[{ fontSize: 12, color: colors.text3, marginTop: 4, marginBottom: 16, lineHeight: 17 }]}>
+                Optional — enables automatic charges when you approve a reward. Without this, rewards are recorded as manual IOUs.
+              </Text>
               <TouchableOpacity
                 style={[styles.addCardBtn, { backgroundColor: colors.primary }]}
                 onPress={() => {
@@ -259,41 +280,67 @@ export default function PaymentsScreen({ navigation }) {
         </View>
 
         {/* ── Kids' Balances ─────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, { marginTop: 28 }]}>{t('payments.kidsBalances')}</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 28 }]}>FAMILY LEDGER</Text>
+        <View style={[styles.noticeCard, { borderColor: colors.border, backgroundColor: colors.surface, marginBottom: 8 }]}>
+          <Text style={[{ fontSize: 12, color: colors.text3, lineHeight: 18 }]}>
+            💡 This is a <Text style={{ fontWeight: '700' }}>parent-managed family ledger</Text> — an IOU record of rewards earned and paid. No automatic bank transfers occur unless you set up Stripe. Always pay kids manually (cash, Venmo, etc.) and tap "Mark Paid" to log it.
+          </Text>
+        </View>
         {kidsWithBalance.length === 0 ? (
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', paddingVertical: 24 }]}>
             <Text style={{ fontSize: 36, marginBottom: 8 }}>👧</Text>
             <Text style={[{ color: colors.text3, fontSize: 15, fontWeight: '600' }]}>No kids added yet</Text>
           </View>
         ) : (
-          kidsWithBalance.map(kid => (
-            <View key={kid.id} style={[styles.kidBalanceCard, { backgroundColor: colors.surface }]}>
-              <View style={[styles.kidAvatar, { backgroundColor: kid.color || colors.primary }]}>
-                <Text style={{ fontSize: 22 }}>{kid.emoji}</Text>
+          kidsWithBalance.map(kid => {
+            const buckets = bucketBalances[kid.id] || { spend: 0, save: 0, give: 0 };
+            const totalOwed = buckets.spend + buckets.save + buckets.give;
+            return (
+              <View key={kid.id} style={[styles.kidBalanceCard, { backgroundColor: colors.surface, flexDirection: 'column', gap: 0 }]}>
+                {/* Kid header row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <View style={[styles.kidAvatar, { backgroundColor: kid.color || colors.primary }]}>
+                    <Text style={{ fontSize: 22 }}>{kid.emoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.kidName, { color: colors.text1 }]}>{kid.name}</Text>
+                    <Text style={[{ fontSize: 13, color: colors.text3, fontWeight: '500' }]}>
+                      Total owed: <Text style={{ color: '#059669', fontWeight: '700' }}>{formatCents(totalOwed)}</Text>
+                    </Text>
+                  </View>
+                  {totalOwed > 0 && (
+                    <TouchableOpacity
+                      style={[styles.payoutBtn, { backgroundColor: '#059669' }]}
+                      onPress={() => handleRecordPayout(kid, buckets.spend)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.payoutBtnText}>Mark Paid</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {/* Bucket breakdown */}
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[
+                    { label: 'Spend',  amount: buckets.spend, color: '#7C3AED', icon: '🛍️' },
+                    { label: 'Save',   amount: buckets.save,  color: '#0EA5E9', icon: '🏦' },
+                    { label: 'Give',   amount: buckets.give,  color: '#10B981', icon: '💝' },
+                  ].map(b => (
+                    <View key={b.label} style={{ flex: 1, backgroundColor: colors.bg, borderRadius: 12, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+                      <Text style={{ fontSize: 16, marginBottom: 2 }}>{b.icon}</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{b.label}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: b.color, marginTop: 2 }}>{formatCents(b.amount)}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.kidName, { color: colors.text1 }]}>{kid.name}</Text>
-                <Text style={[styles.kidBalance, { color: '#059669' }]}>
-                  {formatCents(kid.balance)} {t('payments.earned')}
-                </Text>
-              </View>
-              {kid.balance > 0 && (
-                <TouchableOpacity
-                  style={[styles.payoutBtn, { backgroundColor: '#059669' }]}
-                  onPress={() => handleRecordPayout(kid, kid.balance)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.payoutBtnText}>{t('payments.payOut')}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))
+            );
+          })
         )}
 
         {/* ── Transaction History ────────────────────────────────────────── */}
         {(transactions || []).length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 28 }]}>{t('payments.history')}</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 28 }]}>PAYMENT HISTORY</Text>
             <View style={[styles.card, { backgroundColor: colors.surface }]}>
               {(transactions || []).slice(0, 20).map((tx, idx) => {
                 const kid = family?.kids?.find(k => k.id === tx.kid_id);
