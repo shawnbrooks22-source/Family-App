@@ -14,7 +14,7 @@
     "production": {
       "android": { "buildType": "app-bundle" },
       "ios": { "distribution": "store" },
-      "autoIncrement": true
+      "autoIncrement": false
     }
   },
   "submit": {
