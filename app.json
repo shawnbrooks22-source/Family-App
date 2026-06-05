@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shawnbrooks.kindo",
-      "buildNumber": "1",
+      "buildNumber": "14",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Kindo notifies you when quests are completed or approved.",
@@ -40,7 +40,7 @@
         "backgroundColor": "#7C3AED"
       },
       "package": "com.shawnbrooks.kindo",
-      "versionCode": 1,
+      "versionCode": 14,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.RECEIVE_BOOT_COMPLETED",
